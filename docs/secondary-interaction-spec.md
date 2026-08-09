@@ -121,7 +121,9 @@ The terminal marker `+++` selects weighted unsigned inferred-direction translati
 "Ball/+probe/+++": ""
 ```
 
-The scalar distance is `cursor transaction amount / target baseline transaction amount` in project units, capped at 100. Missing, zero, negative, and non-finite amounts use a deterministic weight of `1`. Implementations MUST use the target-oriented contact normal when nonzero; otherwise they MUST normalize the inferred target-away-from-cursor direction. An entirely indeterminate vector defaults to positive X. Like explicit relative translation, weighted translation is recomputed from the resolved base state and never accumulates.
+Missing, zero, negative, and non-finite cursor or target amounts MUST each use the deterministic atomic minimum transaction amount of `1_000_000`. The scalar project distance is `(cursor transaction amount / target baseline transaction amount) / CENTIUNITS_PER_UNIT`, where `CENTIUNITS_PER_UNIT` is `100`; equal valid weights therefore produce `0.01` project units (one millimetre). Implementations MUST apply the maximum-distance clamp after this centiunit conversion. The maximum is 100 project units, whose intended physical size is 10 metres under the project scale of one unit per 10 centimetres. Implementations MUST use the target-oriented contact normal when nonzero; otherwise they MUST normalize the inferred target-away-from-cursor direction. An entirely indeterminate vector defaults to positive X. Like explicit relative translation, weighted translation is recomputed from the resolved base state and never accumulates.
+
+Weighted translation MUST NOT incorporate surface area, volume, or density until those semantics are specified separately. Geometry-dependent volume requires shape-specific calculation, and transaction weight currently has no documented mass unit.
 
 For each axis, direction is selected in this order:
 
