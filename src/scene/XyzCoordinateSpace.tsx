@@ -3,13 +3,13 @@ import { floorMaterial, wallMaterial } from './materials';
 
 const GRID_OFFSET = 0.015;
 
-interface CornerRoomProps {
+interface XyzCoordinateSpaceProps {
   width: number;
   depth: number;
   height: number;
 }
 
-type GridPlane = 'floor' | 'backWall' | 'sideWall';
+type GridPlane = 'xz' | 'xy' | 'yz';
 
 interface UnitGridProps {
   plane: GridPlane;
@@ -24,7 +24,7 @@ function createUnitGridPositions({ plane, width, depth, height }: UnitGridProps)
   const yMax = Math.ceil(height);
   const zMax = Math.ceil(depth);
 
-  if (plane === 'floor') {
+  if (plane === 'xz') {
     for (let x = 0; x <= xMax; x += 1) {
       positions.push(x, GRID_OFFSET, 0, x, GRID_OFFSET, depth);
     }
@@ -34,7 +34,7 @@ function createUnitGridPositions({ plane, width, depth, height }: UnitGridProps)
     }
   }
 
-  if (plane === 'backWall') {
+  if (plane === 'xy') {
     for (let x = 0; x <= xMax; x += 1) {
       positions.push(x, 0, GRID_OFFSET, x, height, GRID_OFFSET);
     }
@@ -44,7 +44,7 @@ function createUnitGridPositions({ plane, width, depth, height }: UnitGridProps)
     }
   }
 
-  if (plane === 'sideWall') {
+  if (plane === 'yz') {
     for (let z = 0; z <= zMax; z += 1) {
       positions.push(GRID_OFFSET, 0, z, GRID_OFFSET, height, z);
     }
@@ -70,7 +70,7 @@ function UnitGrid(props: UnitGridProps) {
   );
 }
 
-export function CornerRoom({ width, depth, height }: CornerRoomProps) {
+export function XyzCoordinateSpace({ width, depth, height }: XyzCoordinateSpaceProps) {
   return (
     <group>
       <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[width / 2, 0, depth / 2]}>
@@ -88,9 +88,9 @@ export function CornerRoom({ width, depth, height }: CornerRoomProps) {
         <meshStandardMaterial {...wallMaterial} color="#cfc8bc" />
       </mesh>
 
-      <UnitGrid plane="floor" width={width} depth={depth} height={height} />
-      <UnitGrid plane="backWall" width={width} depth={depth} height={height} />
-      <UnitGrid plane="sideWall" width={width} depth={depth} height={height} />
+      <UnitGrid plane="xz" width={width} depth={depth} height={height} />
+      <UnitGrid plane="xy" width={width} depth={depth} height={height} />
+      <UnitGrid plane="yz" width={width} depth={depth} height={height} />
     </group>
   );
 }

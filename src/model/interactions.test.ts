@@ -76,7 +76,7 @@ describe('secondary projection interactions', () => {
     ]) });
 
     expect(distance).toBe(MAX_WEIGHTED_TRANSLATION);
-    expect(document.renderNodes.find((node) => node.namespacePath === 'Ball/')?.box.x).toBe(2 - distance);
+    expect(document.renderNodes.find((node) => node.namespacePath === 'Ball/')?.box.x).toBe(22);
   });
 
   it("uses the translated target's weight for a conditional activated by another scope member", () => {
@@ -105,7 +105,7 @@ describe('secondary projection interactions', () => {
     const cursor = document.renderNodes.find((node) => node.namespacePath === 'Cursor/');
 
     expect(document.interactions).toMatchObject([{ state: 'probe', streamId: 'controller-a', normal: [-1, 0, 0] }]);
-    expect(rod?.box).toMatchObject({ x: -4, width: 1, height: 5, depth: 1 });
+    expect(rod?.box).toMatchObject({ x: 36, width: 1, height: 5, depth: 1 });
     expect(rod?.transform.rotation).toEqual([Math.PI / 2, Math.PI / 2, 0]);
     expect(cursor?.box.x).toBe(1);
   });

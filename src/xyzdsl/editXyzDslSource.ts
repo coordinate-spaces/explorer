@@ -1,6 +1,8 @@
 import { CENTIUNITS_PER_UNIT } from '../model/units';
 import { parseXyzDslDeclaration } from './parser';
 import type { AxisName } from './types';
+import { wrapCoordinate } from '../model/coordinateSpace';
+import type { CoordinateSpaceDimensions } from '../model/coordinateSpace';
 
 const DECLARATION_PATTERN = /^(?<indent>\s*)"(?<path>[^"]+)"(?<middle>\s*:\s*)"(?<properties>[^"]*)"(?<suffix>\s*)$/;
 const AXIS_PATTERN = /^\+(?<offset>\d+(?:c)?)\+(?<size>\d+(?:c)?)$/;
@@ -188,7 +190,13 @@ export function updateDeclarationProperty(source: string, lineNumber: number, ke
   return replaceDeclarationProperties(source, lineNumber, formatProperties(properties));
 }
 
-export function moveDeclarationPath(source: string, lineNumber: number, axis: AxisName, delta: number): string {
+export function moveDeclarationPath(
+  source: string,
+  lineNumber: number,
+  axis: AxisName,
+  delta: number,
+  coordinateSpace?: CoordinateSpaceDimensions,
+): string {
   const line = splitLines(source)[lineNumber - 1];
   const parts = line === undefined ? undefined : declarationParts(line);
 
@@ -200,7 +208,14 @@ export function moveDeclarationPath(source: string, lineNumber: number, axis: Ax
     source,
     lineNumber,
     updatePathAxes(parts.path, (currentAxis, value) =>
-      currentAxis === axis ? { ...value, offset: Math.max(0, value.offset + delta) } : value,
+      currentAxis === axis ? {
+        ...value,
+        offset: axis === 'x' && coordinateSpace
+          ? wrapCoordinate(value.offset + delta, coordinateSpace.width)
+          : axis === 'z' && coordinateSpace
+            ? wrapCoordinate(value.offset + delta, coordinateSpace.depth)
+            : Math.max(0, value.offset + delta),
+      } : value,
     ),
   );
 }

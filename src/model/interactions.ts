@@ -1,4 +1,5 @@
 import type { SpatialBounds, SpatialNode } from './SpatialNode';
+import type { CoordinateSpaceDimensions } from './coordinateSpace';
 import { boundsOverlap } from './collision';
 import type { XyzDslInteractionState } from '../xyzdsl/types';
 
@@ -137,11 +138,37 @@ function probeDetails(target: SpatialBounds, cursor: SpatialBounds, tolerance: n
   return { normal, separation: gaps[axis] };
 }
 
-export function evaluateInteractions(nodes: readonly SpatialNode[], tolerance = 0.001): InteractionFact[] {
+function translatedBounds(bounds: SpatialBounds, x: number, z: number): SpatialBounds {
+  return {
+    minX: bounds.minX + x, maxX: bounds.maxX + x,
+    minY: bounds.minY, maxY: bounds.maxY,
+    minZ: bounds.minZ + z, maxZ: bounds.maxZ + z,
+  };
+}
+
+export function evaluateInteractions(
+  nodes: readonly SpatialNode[],
+  tolerance = 0.001,
+  coordinateSpace?: CoordinateSpaceDimensions,
+): InteractionFact[] {
   const cursors = nodes.filter((node) => node.origin?.sourceKind === 'secondary');
   const targets = nodes.filter((node) => node.origin?.sourceKind !== 'secondary');
   const index = new AabbInteractionIndex(targets);
-  return cursors.flatMap((cursor): InteractionFact[] => index.query(cursor.bounds, tolerance).flatMap((target): InteractionFact[] => {
+  return cursors.flatMap((cursor): InteractionFact[] => {
+    const xOffsets = coordinateSpace ? [-coordinateSpace.width, 0, coordinateSpace.width] : [0];
+    const zOffsets = coordinateSpace ? [-coordinateSpace.depth, 0, coordinateSpace.depth] : [0];
+    const candidates = xOffsets.flatMap((x) => zOffsets.map((z) => translatedBounds(cursor.bounds, x, z)))
+      .flatMap((bounds) => index.query(bounds, tolerance).map((target) => ({ target, cursorBounds: bounds })));
+    const closestByTarget = new Map<string, typeof candidates[number]>();
+    candidates.forEach((candidate) => {
+      const current = closestByTarget.get(candidate.target.id);
+      const distance = Math.hypot(...center(candidate.cursorBounds).map((value, axis) => value - center(candidate.target.bounds)[axis]));
+      const currentDistance = current
+        ? Math.hypot(...center(current.cursorBounds).map((value, axis) => value - center(current.target.bounds)[axis]))
+        : Number.POSITIVE_INFINITY;
+      if (distance < currentDistance) closestByTarget.set(candidate.target.id, candidate);
+    });
+    return [...closestByTarget.values()].flatMap(({ target, cursorBounds }): InteractionFact[] => {
     const common = {
       targetId: target.id,
       targetNamespace: target.namespacePath ?? '',
@@ -151,12 +178,13 @@ export function evaluateInteractions(nodes: readonly SpatialNode[], tolerance = 
       transactionId: cursor.origin?.transactionId,
       transactionTime: cursor.origin?.transactionTime,
       cursorWeight: cursor.origin?.transactionAmount,
-      inferredDirection: ([0, 1, 2].map((axis) => directionAwayFromCursor(target.bounds, cursor.bounds, axis)) as [number, number, number]),
+      inferredDirection: ([0, 1, 2].map((axis) => directionAwayFromCursor(target.bounds, cursorBounds, axis)) as [number, number, number]),
     };
-    if (boundsOverlap(target.bounds, cursor.bounds)) {
-      return [{ ...common, state: 'breach' as const, ...breachDetails(target.bounds, cursor.bounds) }];
+    if (boundsOverlap(target.bounds, cursorBounds)) {
+      return [{ ...common, state: 'breach' as const, ...breachDetails(target.bounds, cursorBounds) }];
     }
-    const probe = probeDetails(target.bounds, cursor.bounds, tolerance);
+    const probe = probeDetails(target.bounds, cursorBounds, tolerance);
     return probe ? [{ ...common, state: 'probe' as const, ...probe }] : [];
-  }));
+    });
+  });
 }
