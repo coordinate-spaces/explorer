@@ -7,6 +7,7 @@ import {
 } from './createSpatialDocument';
 import { interactionTransitions } from '../transactions/interactionTimeline';
 import type { XyzDslDeclarationOrigin } from '../xyzdsl/types';
+import { composeTransforms } from './transform';
 
 function origins(secondaryLine: number): Map<number, XyzDslDeclarationOrigin> {
   return new Map([
@@ -42,7 +43,7 @@ describe('secondary projection interactions', () => {
     const cursor = document.nodes.find((node) => node.namespacePath === 'Cursor/');
 
     expect(document.coordinateSpace).toMatchObject({ width: 40, depth: 40 });
-    expect(cursor?.box).toMatchObject({ x: 1, z: 1 });
+    expect(cursor?.box).toMatchObject({ x: 81, z: 81 });
     expect(cursor?.transform.position).toEqual([1.5, 0.5, 1.5]);
     expect(cursor?.bounds).toMatchObject({ minX: 1, maxX: 2, minZ: 1, maxZ: 2 });
     expect(document.interactions).toMatchObject([{
@@ -77,6 +78,26 @@ describe('secondary projection interactions', () => {
 
     expect(cursor?.transform.position).toEqual([1, 0, 1]);
     expect(tip?.transform.position).toEqual([3.5, 0.5, 4.5]);
+  });
+
+  it('wraps a nested cursor by its world position beneath a rotated and scaled ancestor', () => {
+    const document = createSpatialDocument(`"Frame/+4+2/+0+2/+4+2" : "rotation: 0, 90, 0"
+"Frame/Cursor/+81+1/+0+1/+3+1" : ""`, { originsByLine: new Map([
+      [1, { sourceKind: 'baseline' }],
+      [2, { sourceKind: 'secondary', streamId: 'cursor' }],
+    ]) });
+    const frame = document.nodes.find((node) => node.namespacePath === 'Frame/');
+    const cursor = frame?.children?.find((node) => node.namespacePath === 'Frame/Cursor/');
+    const recomposed = frame?.worldTransform && cursor?.localTransform
+      ? composeTransforms(frame.worldTransform, cursor.localTransform)
+      : undefined;
+
+    expect(cursor?.transform.position[0]).toBeGreaterThanOrEqual(0);
+    expect(cursor?.transform.position[0]).toBeLessThan(document.coordinateSpace.width);
+    expect(cursor?.transform.position[2]).toBeGreaterThanOrEqual(0);
+    expect(cursor?.transform.position[2]).toBeLessThan(document.coordinateSpace.depth);
+    expect(recomposed?.position[0]).toBeCloseTo(cursor!.transform.position[0]);
+    expect(recomposed?.position[2]).toBeCloseTo(cursor!.transform.position[2]);
   });
 
   it('translates one millimetre for equal minimum transaction amounts', () => {

@@ -69,3 +69,9 @@ export function composeTransforms(parent: SpatialTransform, child: SpatialTransf
   const matrix = matrixFromTransform(parent).multiply(matrixFromTransform(child));
   return transformFromMatrix(matrix, child.pivot);
 }
+
+/** Express an existing world transform relative to a parent transform. */
+export function relativeTransform(parent: SpatialTransform, world: SpatialTransform): SpatialTransform {
+  const matrix = matrixFromTransform(parent).invert().multiply(matrixFromTransform(world));
+  return transformFromMatrix(matrix, world.pivot);
+}

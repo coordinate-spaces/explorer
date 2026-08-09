@@ -11,6 +11,7 @@ import { geometryFromBox } from './geometry';
 import {
   anchorTransformFromBox,
   composeTransforms,
+  relativeTransform,
   transformFromBox,
 } from './transform';
 import type { SpatialTransform } from './transform';
@@ -74,11 +75,20 @@ function applyRenderableStateToTree(
   });
 }
 
-function translateNodeWorldState(node: SpatialNode, deltaX: number, deltaZ: number): SpatialNode {
+function translateNodeWorldState(
+  node: SpatialNode,
+  deltaX: number,
+  deltaZ: number,
+  parentWorldTransform?: SpatialTransform,
+): SpatialNode {
   const translateTransform = (transform: SpatialTransform | undefined): SpatialTransform | undefined => transform && ({
     ...transform,
     position: [transform.position[0] + deltaX, transform.position[1], transform.position[2] + deltaZ],
   });
+  const worldTransform = translateTransform(node.worldTransform ?? node.transform)!;
+  const localTransform = parentWorldTransform
+    ? relativeTransform(parentWorldTransform, worldTransform)
+    : worldTransform;
 
   return {
     ...node,
@@ -89,40 +99,37 @@ function translateNodeWorldState(node: SpatialNode, deltaX: number, deltaZ: numb
       minZ: node.bounds.minZ + deltaZ,
       maxZ: node.bounds.maxZ + deltaZ,
     },
-    transform: translateTransform(node.transform)!,
-    worldTransform: translateTransform(node.worldTransform),
-    children: node.children?.map((child) => translateNodeWorldState(child, deltaX, deltaZ)),
+    localTransform,
+    transform: worldTransform,
+    worldTransform,
+    children: node.children?.map((child) => translateNodeWorldState(child, deltaX, deltaZ, worldTransform)),
   };
 }
 
 /** Keep secondary cursor roots and their descendants in the same periodic cell as the rendered space. */
-function wrapSecondaryCursors(nodes: SpatialNode[], space: CoordinateSpaceDimensions): SpatialNode[] {
+function wrapSecondaryCursors(
+  nodes: SpatialNode[],
+  space: CoordinateSpaceDimensions,
+  parentWorldTransform?: SpatialTransform,
+): SpatialNode[] {
   return nodes.map((node) => {
     if (node.origin?.sourceKind !== 'secondary') {
-      return { ...node, children: wrapSecondaryCursors(node.children ?? [], space) };
+      return {
+        ...node,
+        children: wrapSecondaryCursors(node.children ?? [], space, node.worldTransform),
+      };
     }
 
-    const wrappedX = wrapCoordinate(node.box.x, space.width);
-    const wrappedZ = wrapCoordinate(node.box.z, space.depth);
-    const deltaX = wrappedX - node.box.x;
-    const deltaZ = wrappedZ - node.box.z;
-    const shifted = translateNodeWorldState(node, deltaX, deltaZ);
-    const box = { ...node.box, x: wrappedX, z: wrappedZ };
-    const baseBox = node.baseBox ? { ...node.baseBox, x: wrappedX, z: wrappedZ } : undefined;
+    const worldPosition = (node.worldTransform ?? node.transform).position;
+    const wrappedX = wrapCoordinate(worldPosition[0], space.width);
+    const wrappedZ = wrapCoordinate(worldPosition[2], space.depth);
 
-    return {
-      ...shifted,
-      box,
-      baseBox,
-      localTransform: shifted.localTransform && {
-        ...shifted.localTransform,
-        position: [
-          shifted.localTransform.position[0] + deltaX,
-          shifted.localTransform.position[1],
-          shifted.localTransform.position[2] + deltaZ,
-        ],
-      },
-    };
+    return translateNodeWorldState(
+      node,
+      wrappedX - worldPosition[0],
+      wrappedZ - worldPosition[2],
+      parentWorldTransform,
+    );
   });
 }
 
