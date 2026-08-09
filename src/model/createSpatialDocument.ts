@@ -164,11 +164,10 @@ function weightedTranslateBox(
   const direction = fact.normal.some(Boolean) ? fact.normal : fact.inferredDirection;
   const length = Math.hypot(...direction);
   const unitDirection = length > 0 ? direction.map((component) => component / length) : [1, 0, 0];
-  // Contact translation is also used for breaches. Clearing the measured AABB
-  // penetration keeps a cursor step larger than the weighted offset from
-  // leaving the effective target intersecting the cursor.
+  // Contact translation is also used for breaches. Applying the complete AABB
+  // exit distance handles containment, where overlap width alone is too small.
   const distance = weightedTranslationDistance(fact.cursorWeight, targetWeight) +
-    (resolvePenetration ? fact.penetration ?? 0 : 0);
+    (resolvePenetration ? fact.resolutionDistance ?? 0 : 0);
   return translateBoxWithinCoordinateSpace({
     ...box,
     source: `${box.source} (weighted conditional translation)`,

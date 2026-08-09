@@ -129,7 +129,7 @@ Missing, zero, negative, and non-finite cursor or target amounts MUST each use t
 
 Weighted translation MUST NOT incorporate surface area, volume, or density until those semantics are specified separately. Geometry-dependent volume requires shape-specific calculation, and transaction weight currently has no documented mass unit.
 
-When weighted translation is selected by `+contact`, a matching breach MUST add the fact's minimum-axis AABB penetration to the weighted distance. The result is applied along the target-oriented breach normal. This clears the sampled penetration and then adds the force-to-weight displacement, so a cursor step larger than the weighted distance does not deactivate pushing. The result remains recomputed from baseline and current-frame facts; it does not accumulate. `+probe/+++` and `+breach/+++` retain their original weighted-distance-only behavior.
+When weighted translation is selected by `+contact`, a matching breach MUST add the minimum target-to-cursor AABB exit distance to the weighted distance. The exit calculation MUST compare both translation directions on every axis; using intersection width alone is insufficient when either box contains the other. The result is applied along the selected exit normal. This clears the sampled breach and then adds the force-to-weight displacement, so a cursor step larger than the weighted distance does not deactivate pushing. The result remains recomputed from baseline and current-frame facts; it does not accumulate. `+probe/+++` and `+breach/+++` retain their original weighted-distance-only behavior.
 
 For each axis, direction is selected in this order:
 
@@ -155,7 +155,7 @@ The final three `+offset+size` segments replace the complete effective X/Y/Z box
 
 ### 7.2 Breach
 
-`breach` means that cursor and target have positive-volume overlap. The initial implementation uses transformed world-space AABBs and selects a deterministic minimum-penetration axis for its contact normal.
+`breach` means that cursor and target have positive-volume overlap. The initial implementation uses transformed world-space AABBs and selects the deterministic minimum target-exit translation across both directions of every axis for its contact normal.
 
 ### 7.3 Contact matching
 

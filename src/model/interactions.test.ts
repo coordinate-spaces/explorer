@@ -135,6 +135,25 @@ describe('secondary projection interactions', () => {
     expect(nextBreachFrame.renderNodes.find((node) => node.namespacePath === 'Ball/')?.box.x).toBe(1.24);
   });
 
+  it('uses the nearest exit distance when the cursor is contained by the target', () => {
+    const document = createSpatialDocument(`"Target/+0+10/+0+10/+0+10" : ""
+"Target/+contact/+++" : ""
+"Cursor/+4+1/+4+1/+4+1" : ""`, { originsByLine: new Map([
+      [1, { sourceKind: 'baseline', transactionAmount: MIN_TRANSACTION_AMOUNT }],
+      [2, { sourceKind: 'baseline' }],
+      [3, { sourceKind: 'secondary', streamId: 'cursor', transactionAmount: MIN_TRANSACTION_AMOUNT }],
+    ]) });
+    const target = document.renderNodes.find((node) => node.namespacePath === 'Target/');
+
+    expect(document.interactions).toMatchObject([{
+      state: 'breach',
+      penetration: 1,
+      resolutionDistance: 5,
+      normal: [1, 0, 0],
+    }]);
+    expect(target?.bounds.minX).toBeCloseTo(5.01);
+  });
+
   it('resolves contact penetration before ordinary collision packing', () => {
     const document = createSpatialDocument(`"Obstacle/+0+2/+0+3/+4+3" : ""
 "Ball/+2+3/+0+3/+4+3" : "geometry: sphere"
