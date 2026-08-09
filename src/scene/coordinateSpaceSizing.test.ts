@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { CsgExpression } from '../model/csg';
 import type { SpatialDocument } from '../model/SpatialDocument';
 import type { SpatialNode } from '../model/SpatialNode';
-import { nodesForRoomSizing } from './roomSizing';
+import { nodesForCoordinateSpaceSizing } from './coordinateSpaceSizing';
 
 function node(id: string): SpatialNode {
   return {
@@ -23,15 +23,16 @@ function documentWithExpression(expression: CsgExpression): SpatialDocument {
     renderNodes: [node('normal')],
     csgExpressions: [expression],
     diagnostics: [],
+    coordinateSpace: { width: 40, depth: 40, height: 28 },
   };
 }
 
-describe('nodesForRoomSizing', () => {
+describe('nodesForCoordinateSpaceSizing', () => {
   it('includes boolean union tools because they can extend the generated mesh bounds', () => {
     const base = node('base');
     const unionTool = node('union-tool');
     const subtractTool = node('subtract-tool');
-    const sizingNodes = nodesForRoomSizing(
+    const sizingNodes = nodesForCoordinateSpaceSizing(
       documentWithExpression({
         id: 'csg-1',
         base,

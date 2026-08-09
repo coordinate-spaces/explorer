@@ -17,6 +17,22 @@ function origins(secondaryLine: number): Map<number, XyzDslDeclarationOrigin> {
 }
 
 describe('secondary projection interactions', () => {
+  it('keeps secondary cursors out of sizing and detects probes across the X seam', () => {
+    const document = createSpatialDocument(`"Target/+0+1/+0+1/+0+1" : ""
+"Cursor/+39+1/+0+1/+0+1" : ""`, { originsByLine: new Map([
+      [1, { sourceKind: 'baseline' }],
+      [2, { sourceKind: 'secondary', streamId: 'cursor' }],
+    ]) });
+
+    expect(document.coordinateSpace.width).toBe(40);
+    expect(document.interactions).toMatchObject([{
+      state: 'probe',
+      targetNamespace: 'Target/',
+      cursorNamespace: 'Cursor/',
+      normal: [1, 0, 0],
+    }]);
+  });
+
   it('translates one millimetre for equal minimum transaction amounts', () => {
     const document = createSpatialDocument(`"Ball/+2+3/+0+3/+4+3" : "geometry: sphere;"
 "Ball/+probe/+++" : ""
@@ -76,7 +92,7 @@ describe('secondary projection interactions', () => {
     ]) });
 
     expect(distance).toBe(MAX_WEIGHTED_TRANSLATION);
-    expect(document.renderNodes.find((node) => node.namespacePath === 'Ball/')?.box.x).toBe(2 - distance);
+    expect(document.renderNodes.find((node) => node.namespacePath === 'Ball/')?.box.x).toBe(22);
   });
 
   it("uses the translated target's weight for a conditional activated by another scope member", () => {
@@ -105,7 +121,7 @@ describe('secondary projection interactions', () => {
     const cursor = document.renderNodes.find((node) => node.namespacePath === 'Cursor/');
 
     expect(document.interactions).toMatchObject([{ state: 'probe', streamId: 'controller-a', normal: [-1, 0, 0] }]);
-    expect(rod?.box).toMatchObject({ x: -4, width: 1, height: 5, depth: 1 });
+    expect(rod?.box).toMatchObject({ x: 36, width: 1, height: 5, depth: 1 });
     expect(rod?.transform.rotation).toEqual([Math.PI / 2, Math.PI / 2, 0]);
     expect(cursor?.box.x).toBe(1);
   });

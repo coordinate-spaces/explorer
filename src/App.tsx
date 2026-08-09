@@ -855,8 +855,8 @@ export default function App() {
   }, [selectedNodeLineNumber]);
 
   const moveSelectedDeclaration = useCallback((axis: AxisName, delta: number) => {
-    editSelectedDeclaration((source, lineNumber) => moveDeclarationPath(source, lineNumber, axis, delta));
-  }, [editSelectedDeclaration]);
+    editSelectedDeclaration((source, lineNumber) => moveDeclarationPath(source, lineNumber, axis, delta, document.coordinateSpace));
+  }, [document.coordinateSpace, editSelectedDeclaration]);
 
   const resizeSelectedDeclaration = useCallback((axis: AxisName, delta: number) => {
     editSelectedDeclaration((source, lineNumber) => resizeDeclarationPath(source, lineNumber, axis, delta));

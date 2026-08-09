@@ -17,6 +17,8 @@ import type { SpatialTransform } from './transform';
 import { evaluateInteractions } from './interactions';
 import type { InteractionFact } from './interactions';
 import { CENTIUNITS_PER_UNIT } from './units';
+import { dimensionsFromNodes, translateBoxWithinCoordinateSpace } from './coordinateSpace';
+import type { CoordinateSpaceDimensions } from './coordinateSpace';
 
 export interface CreateSpatialDocumentOptions {
   originsByLine?: ReadonlyMap<number, XyzDslDeclarationOrigin>;
@@ -72,15 +74,12 @@ function applyRenderableStateToTree(
   });
 }
 
-function translateBox(box: XyzDslBoxSpec, magnitude: [number, number, number], fact: InteractionFact): XyzDslBoxSpec {
+function translateBox(box: XyzDslBoxSpec, magnitude: [number, number, number], fact: InteractionFact, space: CoordinateSpaceDimensions): XyzDslBoxSpec {
   const signs = magnitude.map((_, axis) => fact.normal[axis] || fact.inferredDirection[axis] || 1) as [number, number, number];
-  return {
+  return translateBoxWithinCoordinateSpace({
     ...box,
     source: `${box.source} (conditional translation)`,
-    x: box.x + magnitude[0] * signs[0],
-    y: box.y + magnitude[1] * signs[1],
-    z: box.z + magnitude[2] * signs[2],
-  };
+  }, magnitude.map((value, axis) => value * signs[axis]) as [number, number, number], space);
 }
 
 export const MIN_TRANSACTION_AMOUNT = 1_000_000;
@@ -96,18 +95,15 @@ export function weightedTranslationDistance(cursorWeight: number | undefined, ta
   return Math.min(projectDistance, MAX_WEIGHTED_TRANSLATION);
 }
 
-function weightedTranslateBox(box: XyzDslBoxSpec, fact: InteractionFact, targetWeight: number | undefined): XyzDslBoxSpec {
+function weightedTranslateBox(box: XyzDslBoxSpec, fact: InteractionFact, targetWeight: number | undefined, space: CoordinateSpaceDimensions): XyzDslBoxSpec {
   const direction = fact.normal.some(Boolean) ? fact.normal : fact.inferredDirection;
   const length = Math.hypot(...direction);
   const unitDirection = length > 0 ? direction.map((component) => component / length) : [1, 0, 0];
   const distance = weightedTranslationDistance(fact.cursorWeight, targetWeight);
-  return {
+  return translateBoxWithinCoordinateSpace({
     ...box,
     source: `${box.source} (weighted conditional translation)`,
-    x: box.x + unitDirection[0] * distance,
-    y: box.y + unitDirection[1] * distance,
-    z: box.z + unitDirection[2] * distance,
-  };
+  }, unitDirection.map((value) => value * distance) as [number, number, number], space);
 }
 
 function variantsForNode(node: SpatialNode, variants: readonly ResolvedConditionalVariant[], facts: readonly InteractionFact[]) {
@@ -132,6 +128,7 @@ function applyConditionalVariants(
   nodes: SpatialNode[],
   variants: readonly ResolvedConditionalVariant[],
   facts: readonly InteractionFact[],
+  space: CoordinateSpaceDimensions,
   parentTransform?: SpatialTransform,
   parentChanged = false,
 ): SpatialNode[] {
@@ -145,15 +142,15 @@ function applyConditionalVariants(
     if (matches.length === 0 && !parentChanged) {
       return {
         ...node,
-        children: applyConditionalVariants(node.children ?? [], variants, facts, node.worldTransform, false),
+        children: applyConditionalVariants(node.children ?? [], variants, facts, space, node.worldTransform, false),
       };
     }
     matches.forEach(({ variant, fact }) => {
       const spatial = variant.conditional.spatialOverride;
       if (spatial.mode === 'absolute-box') box = { ...spatial.box };
-      if (spatial.mode === 'translation') box = translateBox(box, spatial.magnitude, fact);
+      if (spatial.mode === 'translation') box = translateBox(box, spatial.magnitude, fact, space);
       if (spatial.mode === 'weighted-translation') {
-        box = weightedTranslateBox(box, fact, node.origin?.transactionAmount);
+        box = weightedTranslateBox(box, fact, node.origin?.transactionAmount, space);
       }
       material = mergeXyzDslMaterialSpecs(material, variant.properties.material);
       content = mergeXyzDslContentSpecs(content, variant.properties.content);
@@ -190,7 +187,7 @@ function applyConditionalVariants(
       bounds: boundsFromTransformedBox(box, worldTransform),
       activeInteractions: matches.map(({ fact }) => fact),
     };
-    updated.children = applyConditionalVariants(node.children ?? [], variants, facts, worldTransform, matches.length > 0 || parentChanged);
+    updated.children = applyConditionalVariants(node.children ?? [], variants, facts, space, worldTransform, matches.length > 0 || parentChanged);
     return updated;
   });
 }
@@ -268,8 +265,10 @@ export function createSpatialDocument(source: string, options: CreateSpatialDocu
     });
 
   const authoredRenderable = flattenRenderable(topLevelNodes);
-  const interactions = evaluateInteractions(authoredRenderable, options.probeTolerance);
-  const effectiveTree = applyConditionalVariants(topLevelNodes, resolved.variants, interactions);
+  const authoredPhysicalNodes = authoredRenderable.filter((node) => node.origin?.sourceKind !== 'secondary');
+  const coordinateSpace = dimensionsFromNodes(authoredPhysicalNodes);
+  const interactions = evaluateInteractions(authoredRenderable, options.probeTolerance, coordinateSpace);
+  const effectiveTree = applyConditionalVariants(topLevelNodes, resolved.variants, interactions, coordinateSpace);
   const effectiveRenderable = flattenRenderable(effectiveTree);
   const physicalNodes = effectiveRenderable.filter((node) => node.origin?.sourceKind !== 'secondary');
   const sensorNodes = effectiveRenderable.filter((node) => node.origin?.sourceKind === 'secondary');
@@ -284,6 +283,7 @@ export function createSpatialDocument(source: string, options: CreateSpatialDocu
     renderNodes,
     csgExpressions: csg.expressions,
     diagnostics,
+    coordinateSpace,
     interactions,
   };
 }

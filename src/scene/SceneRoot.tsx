@@ -3,13 +3,11 @@ import { OrbitControls, PerspectiveCamera } from '@react-three/drei';
 import { Canvas } from '@react-three/fiber';
 import type { SpatialDocument } from '../model/SpatialDocument';
 import type { SpatialNode } from '../model/SpatialNode';
-import { dimensionsFromNodes } from '../model/room';
-import { CornerRoom } from './CornerRoom';
+import { XyzCoordinateSpace } from './XyzCoordinateSpace';
 import { Lighting } from './Lighting';
 import { ContentPrimitive } from './ContentPrimitive';
 import { CsgPrimitive } from './CsgPrimitive';
 import { SpatialPrimitive } from './SpatialPrimitive';
-import { nodesForRoomSizing } from './roomSizing';
 
 interface SceneRootProps {
   document: SpatialDocument;
@@ -31,7 +29,6 @@ function selectedOrbitNode(spatialDocument: SpatialDocument, selectedNodeId?: st
 }
 
 export function SceneRoot({ document: spatialDocument, selectedNodeId, onSelectNode }: SceneRootProps) {
-  const roomDimensions = dimensionsFromNodes(nodesForRoomSizing(spatialDocument));
   const orbitTarget = useMemo(() => {
     const selectedNode = selectedOrbitNode(spatialDocument, selectedNodeId);
 
@@ -50,7 +47,7 @@ export function SceneRoot({ document: spatialDocument, selectedNodeId, onSelectN
       <color attach="background" args={['#151820']} />
       <PerspectiveCamera makeDefault position={[14, 11, 18]} fov={45} />
       <Lighting />
-      <CornerRoom {...roomDimensions} />
+      <XyzCoordinateSpace {...spatialDocument.coordinateSpace} />
       {spatialDocument.csgExpressions.map((expression) => (
         <CsgPrimitive
           key={expression.id}

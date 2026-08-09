@@ -2,7 +2,7 @@
 
 ## Product goal
 
-The project renders realistic interior spatial compositions from a declarative Spatial Declaration Language. The default space is an XYZDSL corner scene: a floor on the X/Z plane, a back wall at Z = 0, and a side wall at X = 0. Users add fixtures, fittings, furniture, content cards, and primitive geometry by composing spatial declarations in the same shared world space.
+The project renders realistic interior spatial compositions from a declarative Spatial Declaration Language. The default XYZ coordinate space uses reference planes on X/Z, X/Y, and Y/Z. Movement wraps periodically on X and Z while Y remains bounded. Users add fixtures, fittings, furniture, content cards, and primitive geometry by composing spatial declarations in the same shared world space.
 
 The long-term model is intentionally DOM-like: spatial declarations compile into a neutral spatial document model, and the ThreeJS renderer consumes that document. This keeps parsing, layout, collision handling, and rendering independently extensible.
 
@@ -165,7 +165,7 @@ src/
     collision.ts
     createSpatialDocument.ts
   scene/
-    CornerRoom.tsx
+    XyzCoordinateSpace.tsx
     Lighting.tsx
     SceneRoot.tsx
     SpatialPrimitive.tsx
@@ -239,7 +239,7 @@ Full boolean geometry merging is implemented through a ThreeJS-compatible CSG li
 
 ## Rendering architecture
 
-The renderer uses React Three Fiber and Drei. `SceneRoot` owns the canvas, camera, controls, lighting, default room, and spatial primitives. `CornerRoom` creates the default floor and two walls. `SpatialPrimitive` maps each spatial node into a ThreeJS mesh by dispatching on the derived geometry kind while sharing the same transform and union-highlight behavior for all primitives. Simple materials render with `meshStandardMaterial`; nodes that use `fabric`, `sheen`, or `clearcoat` switch to `meshPhysicalMaterial` because those effects require physical material features. `fabric` and `bump` create cached procedural `DataTexture` presets, avoiding per-render texture allocation. `puff` affects the actual box geometry by increasing rounded cushion curvature; collision bounds remain based on the declared transformed box, so the layout contract stays stable even as the silhouette softens.
+The renderer uses React Three Fiber and Drei. `SceneRoot` owns the canvas, camera, controls, lighting, XYZ coordinate space, and spatial primitives. `XyzCoordinateSpace` creates the reference planes and grids. `SpatialPrimitive` maps each spatial node into a ThreeJS mesh by dispatching on the derived geometry kind while sharing the same transform and union-highlight behavior for all primitives. Simple materials render with `meshStandardMaterial`; nodes that use `fabric`, `sheen`, or `clearcoat` switch to `meshPhysicalMaterial` because those effects require physical material features. `fabric` and `bump` create cached procedural `DataTexture` presets, avoiding per-render texture allocation. `puff` affects the actual box geometry by increasing rounded cushion curvature; collision bounds remain based on the declared transformed box, so the layout contract stays stable even as the silhouette softens.
 
 ## UI drawer workflow
 

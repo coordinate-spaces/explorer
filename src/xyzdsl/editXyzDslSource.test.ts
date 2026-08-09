@@ -39,6 +39,15 @@ describe('editXyzDslSource', () => {
     expect(resizeDeclarationPath(SOURCE, 2, 'y', -2)).toContain('"Table/Top/+0+8/+4+1c/+0+8"');
   });
 
+  it('wraps X and Z movement within the current coordinate space while clamping Y', () => {
+    const space = { width: 40, depth: 50, height: 28 };
+    const origin = `"Thing/+0+1/+0+1/+0+1" : ""`;
+    expect(moveDeclarationPath(origin, 1, 'x', -0.01, space)).toContain('+3999c+1/+0+1/+0+1');
+    expect(moveDeclarationPath(origin, 1, 'z', -1, space)).toContain('+0+1/+0+1/+49+1');
+    expect(moveDeclarationPath(origin, 1, 'y', -1, space)).toBe(origin);
+    expect(moveDeclarationPath(origin, 1, 'x', 81, space)).toContain('+1+1/+0+1/+0+1');
+  });
+
   it('adds and updates rotation properties by axis in degrees', () => {
     expect(rotateDeclarationPath(SOURCE, 2, 'y', 15)).toContain('"rotation: 0, 15, 0"');
     expect(rotateDeclarationPath(SOURCE, 2, 'y', 15, [0, 90, 0])).toContain('"rotation: 0, 105, 0"');
