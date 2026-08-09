@@ -17,7 +17,7 @@ import type { SpatialTransform } from './transform';
 import { evaluateInteractions } from './interactions';
 import type { InteractionFact } from './interactions';
 import { CENTIUNITS_PER_UNIT } from './units';
-import { dimensionsFromNodes, translateBoxWithinCoordinateSpace } from './coordinateSpace';
+import { dimensionsFromNodes, translateBoxWithinCoordinateSpace, wrapCoordinate } from './coordinateSpace';
 import type { CoordinateSpaceDimensions } from './coordinateSpace';
 
 export interface CreateSpatialDocumentOptions {
@@ -70,6 +70,58 @@ function applyRenderableStateToTree(
       csgExpressionId: state?.csgExpressionId ?? node.csgExpressionId,
       csgConsumed: state?.csgConsumed ?? node.csgConsumed,
       children: node.children ? applyRenderableStateToTree(node.children, renderableNodes) : undefined,
+    };
+  });
+}
+
+function translateNodeWorldState(node: SpatialNode, deltaX: number, deltaZ: number): SpatialNode {
+  const translateTransform = (transform: SpatialTransform | undefined): SpatialTransform | undefined => transform && ({
+    ...transform,
+    position: [transform.position[0] + deltaX, transform.position[1], transform.position[2] + deltaZ],
+  });
+
+  return {
+    ...node,
+    bounds: {
+      ...node.bounds,
+      minX: node.bounds.minX + deltaX,
+      maxX: node.bounds.maxX + deltaX,
+      minZ: node.bounds.minZ + deltaZ,
+      maxZ: node.bounds.maxZ + deltaZ,
+    },
+    transform: translateTransform(node.transform)!,
+    worldTransform: translateTransform(node.worldTransform),
+    children: node.children?.map((child) => translateNodeWorldState(child, deltaX, deltaZ)),
+  };
+}
+
+/** Keep secondary cursor roots and their descendants in the same periodic cell as the rendered space. */
+function wrapSecondaryCursors(nodes: SpatialNode[], space: CoordinateSpaceDimensions): SpatialNode[] {
+  return nodes.map((node) => {
+    if (node.origin?.sourceKind !== 'secondary') {
+      return { ...node, children: wrapSecondaryCursors(node.children ?? [], space) };
+    }
+
+    const wrappedX = wrapCoordinate(node.box.x, space.width);
+    const wrappedZ = wrapCoordinate(node.box.z, space.depth);
+    const deltaX = wrappedX - node.box.x;
+    const deltaZ = wrappedZ - node.box.z;
+    const shifted = translateNodeWorldState(node, deltaX, deltaZ);
+    const box = { ...node.box, x: wrappedX, z: wrappedZ };
+    const baseBox = node.baseBox ? { ...node.baseBox, x: wrappedX, z: wrappedZ } : undefined;
+
+    return {
+      ...shifted,
+      box,
+      baseBox,
+      localTransform: shifted.localTransform && {
+        ...shifted.localTransform,
+        position: [
+          shifted.localTransform.position[0] + deltaX,
+          shifted.localTransform.position[1],
+          shifted.localTransform.position[2] + deltaZ,
+        ],
+      },
     };
   });
 }
@@ -267,8 +319,10 @@ export function createSpatialDocument(source: string, options: CreateSpatialDocu
   const authoredRenderable = flattenRenderable(topLevelNodes);
   const authoredPhysicalNodes = authoredRenderable.filter((node) => node.origin?.sourceKind !== 'secondary');
   const coordinateSpace = dimensionsFromNodes(authoredPhysicalNodes);
-  const interactions = evaluateInteractions(authoredRenderable, options.probeTolerance, coordinateSpace);
-  const effectiveTree = applyConditionalVariants(topLevelNodes, resolved.variants, interactions, coordinateSpace);
+  const wrappedTree = wrapSecondaryCursors(topLevelNodes, coordinateSpace);
+  const wrappedRenderable = flattenRenderable(wrappedTree);
+  const interactions = evaluateInteractions(wrappedRenderable, options.probeTolerance, coordinateSpace);
+  const effectiveTree = applyConditionalVariants(wrappedTree, resolved.variants, interactions, coordinateSpace);
   const effectiveRenderable = flattenRenderable(effectiveTree);
   const physicalNodes = effectiveRenderable.filter((node) => node.origin?.sourceKind !== 'secondary');
   const sensorNodes = effectiveRenderable.filter((node) => node.origin?.sourceKind === 'secondary');
