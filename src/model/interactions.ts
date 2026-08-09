@@ -16,6 +16,8 @@ export interface InteractionFact {
   /** Per-axis direction away from the cursor, used when a contact normal is zero. */
   inferredDirection: [number, number, number];
   penetration?: number;
+  /** Minimum target translation required to separate a breached AABB. */
+  resolutionDistance?: number;
   separation?: number;
   cursorWeight?: number;
 }
@@ -99,16 +101,28 @@ function directionAwayFromCursor(target: SpatialBounds, cursor: SpatialBounds, a
   return center(target)[axis] < center(cursor)[axis] ? -1 : 1;
 }
 
-function breachDetails(target: SpatialBounds, cursor: SpatialBounds): Pick<InteractionFact, 'normal' | 'penetration'> {
+function breachDetails(target: SpatialBounds, cursor: SpatialBounds): Pick<InteractionFact, 'normal' | 'penetration' | 'resolutionDistance'> {
   const overlaps = [
     Math.min(target.maxX, cursor.maxX) - Math.max(target.minX, cursor.minX),
     Math.min(target.maxY, cursor.maxY) - Math.max(target.minY, cursor.minY),
     Math.min(target.maxZ, cursor.maxZ) - Math.max(target.minZ, cursor.minZ),
   ];
-  const axis = overlaps.indexOf(Math.min(...overlaps));
+  const targetMinimums = [target.minX, target.minY, target.minZ];
+  const targetMaximums = [target.maxX, target.maxY, target.maxZ];
+  const cursorMinimums = [cursor.minX, cursor.minY, cursor.minZ];
+  const cursorMaximums = [cursor.maxX, cursor.maxY, cursor.maxZ];
+  const exits = [0, 1, 2].flatMap((axis) => [
+    { axis, direction: -1, distance: targetMaximums[axis] - cursorMinimums[axis] },
+    { axis, direction: 1, distance: cursorMaximums[axis] - targetMinimums[axis] },
+  ]).sort((a, b) => a.distance - b.distance || a.axis - b.axis || a.direction - b.direction);
+  const exit = exits[0];
   const normal: [number, number, number] = [0, 0, 0];
-  normal[axis] = directionAwayFromCursor(target, cursor, axis);
-  return { normal, penetration: overlaps[axis] };
+  normal[exit.axis] = exit.direction;
+  return {
+    normal,
+    penetration: overlaps[exit.axis],
+    resolutionDistance: exit.distance,
+  };
 }
 
 function probeDetails(target: SpatialBounds, cursor: SpatialBounds, tolerance: number): Pick<InteractionFact, 'normal' | 'separation'> | undefined {

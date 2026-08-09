@@ -17,9 +17,10 @@ export interface XyzDslBoxSpec {
 }
 
 export type XyzDslInteractionState = 'probe' | 'breach';
+export type XyzDslInteractionDirective = XyzDslInteractionState | 'contact';
 
 export interface XyzDslDirectiveSpec {
-  name: XyzDslInteractionState;
+  name: XyzDslInteractionDirective;
   segmentIndex: number;
   scopeNamespace: string[];
 }

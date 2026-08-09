@@ -154,11 +154,20 @@ export function weightedTranslationDistance(cursorWeight: number | undefined, ta
   return Math.min(projectDistance, MAX_WEIGHTED_TRANSLATION);
 }
 
-function weightedTranslateBox(box: XyzDslBoxSpec, fact: InteractionFact, targetWeight: number | undefined, space: CoordinateSpaceDimensions): XyzDslBoxSpec {
+function weightedTranslateBox(
+  box: XyzDslBoxSpec,
+  fact: InteractionFact,
+  targetWeight: number | undefined,
+  space: CoordinateSpaceDimensions,
+  resolvePenetration = false,
+): XyzDslBoxSpec {
   const direction = fact.normal.some(Boolean) ? fact.normal : fact.inferredDirection;
   const length = Math.hypot(...direction);
   const unitDirection = length > 0 ? direction.map((component) => component / length) : [1, 0, 0];
-  const distance = weightedTranslationDistance(fact.cursorWeight, targetWeight);
+  // Contact translation is also used for breaches. Applying the complete AABB
+  // exit distance handles containment, where overlap width alone is too small.
+  const distance = weightedTranslationDistance(fact.cursorWeight, targetWeight) +
+    (resolvePenetration ? fact.resolutionDistance ?? 0 : 0);
   return translateBoxWithinCoordinateSpace({
     ...box,
     source: `${box.source} (weighted conditional translation)`,
@@ -169,7 +178,8 @@ function variantsForNode(node: SpatialNode, variants: readonly ResolvedCondition
   return variants.flatMap((variant) => {
     if (variant.targetNamespacePath !== node.namespacePath) return [];
     const matchingFacts = facts.filter((fact) => variant.conditional.directives.every((directive) =>
-      fact.state === directive.name && fact.targetNamespace.startsWith(canonicalNamespacePath(directive.scopeNamespace)),
+      (directive.name === 'contact' || fact.state === directive.name) &&
+      fact.targetNamespace.startsWith(canonicalNamespacePath(directive.scopeNamespace)),
     ));
     const fact = matchingFacts.sort((a, b) =>
       (b.penetration ?? 0) - (a.penetration ?? 0) ||
@@ -209,7 +219,13 @@ function applyConditionalVariants(
       if (spatial.mode === 'absolute-box') box = { ...spatial.box };
       if (spatial.mode === 'translation') box = translateBox(box, spatial.magnitude, fact, space);
       if (spatial.mode === 'weighted-translation') {
-        box = weightedTranslateBox(box, fact, node.origin?.transactionAmount, space);
+        box = weightedTranslateBox(
+          box,
+          fact,
+          node.origin?.transactionAmount,
+          space,
+          variant.conditional.directives.some((directive) => directive.name === 'contact'),
+        );
       }
       material = mergeXyzDslMaterialSpecs(material, variant.properties.material);
       content = mergeXyzDslContentSpecs(content, variant.properties.content);

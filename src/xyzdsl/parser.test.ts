@@ -159,7 +159,7 @@ describe('parseXyzDslDocument', () => {
     );
     expect(leadingPlusResult.ok).toBe(false);
     expect(leadingPlusResult.diagnostics[0].message).toBe(
-      'Unknown interaction directive "+Room". Expected +probe or +breach.',
+      'Unknown interaction directive "+Room". Expected +probe, +breach, or +contact.',
     );
   });
 
