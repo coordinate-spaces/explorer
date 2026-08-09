@@ -17,6 +17,22 @@ function origins(secondaryLine: number): Map<number, XyzDslDeclarationOrigin> {
 }
 
 describe('secondary projection interactions', () => {
+  it('keeps secondary cursors out of sizing and detects probes across the X seam', () => {
+    const document = createSpatialDocument(`"Target/+0+1/+0+1/+0+1" : ""
+"Cursor/+39+1/+0+1/+0+1" : ""`, { originsByLine: new Map([
+      [1, { sourceKind: 'baseline' }],
+      [2, { sourceKind: 'secondary', streamId: 'cursor' }],
+    ]) });
+
+    expect(document.coordinateSpace.width).toBe(40);
+    expect(document.interactions).toMatchObject([{
+      state: 'probe',
+      targetNamespace: 'Target/',
+      cursorNamespace: 'Cursor/',
+      normal: [1, 0, 0],
+    }]);
+  });
+
   it('translates one millimetre for equal minimum transaction amounts', () => {
     const document = createSpatialDocument(`"Ball/+2+3/+0+3/+4+3" : "geometry: sphere;"
 "Ball/+probe/+++" : ""

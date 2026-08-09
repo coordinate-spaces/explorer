@@ -265,7 +265,8 @@ export function createSpatialDocument(source: string, options: CreateSpatialDocu
     });
 
   const authoredRenderable = flattenRenderable(topLevelNodes);
-  const coordinateSpace = dimensionsFromNodes(authoredRenderable);
+  const authoredPhysicalNodes = authoredRenderable.filter((node) => node.origin?.sourceKind !== 'secondary');
+  const coordinateSpace = dimensionsFromNodes(authoredPhysicalNodes);
   const interactions = evaluateInteractions(authoredRenderable, options.probeTolerance, coordinateSpace);
   const effectiveTree = applyConditionalVariants(topLevelNodes, resolved.variants, interactions, coordinateSpace);
   const effectiveRenderable = flattenRenderable(effectiveTree);
