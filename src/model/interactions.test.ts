@@ -7,6 +7,7 @@ import {
 } from './createSpatialDocument';
 import { interactionTransitions } from '../transactions/interactionTimeline';
 import type { XyzDslDeclarationOrigin } from '../xyzdsl/types';
+import { composeTransforms } from './transform';
 
 function origins(secondaryLine: number): Map<number, XyzDslDeclarationOrigin> {
   return new Map([
@@ -31,6 +32,72 @@ describe('secondary projection interactions', () => {
       cursorNamespace: 'Cursor/',
       normal: [1, 0, 0],
     }]);
+  });
+
+  it('wraps rendered secondary cursors across multiple X/Z spans before evaluating interactions', () => {
+    const document = createSpatialDocument(`"Target/+1+1/+0+1/+1+1" : ""
+"Cursor/+81+1/+0+1/+81+1" : ""`, { originsByLine: new Map([
+      [1, { sourceKind: 'baseline' }],
+      [2, { sourceKind: 'secondary', streamId: 'cursor' }],
+    ]) });
+    const cursor = document.nodes.find((node) => node.namespacePath === 'Cursor/');
+
+    expect(document.coordinateSpace).toMatchObject({ width: 40, depth: 40 });
+    expect(cursor?.box).toMatchObject({ x: 81, z: 81 });
+    expect(cursor?.transform.position).toEqual([1.5, 0.5, 1.5]);
+    expect(cursor?.bounds).toMatchObject({ minX: 1, maxX: 2, minZ: 1, maxZ: 2 });
+    expect(document.interactions).toMatchObject([{
+      state: 'breach',
+      targetNamespace: 'Target/',
+      cursorNamespace: 'Cursor/',
+    }]);
+  });
+
+  it('leaves in-range secondary cursor coordinates unchanged', () => {
+    const document = createSpatialDocument(`"Target/+10+1/+0+1/+10+1" : ""
+"Cursor/+12+1/+0+1/+13+1" : ""`, { originsByLine: new Map([
+      [1, { sourceKind: 'baseline' }],
+      [2, { sourceKind: 'secondary', streamId: 'cursor' }],
+    ]) });
+    const cursor = document.nodes.find((node) => node.namespacePath === 'Cursor/');
+
+    expect(cursor?.box).toMatchObject({ x: 12, z: 13 });
+    expect(cursor?.transform.position).toEqual([12.5, 0.5, 13.5]);
+  });
+
+  it('keeps secondary cursor descendants aligned when their cursor root wraps', () => {
+    const document = createSpatialDocument(`"Target/+0+1/+0+1/+0+1" : ""
+"Cursor/+81+1/+0+1/+81+1" : ""
+"Cursor/Tip/+2+1/+0+1/+3+1" : ""`, { originsByLine: new Map([
+      [1, { sourceKind: 'baseline' }],
+      [2, { sourceKind: 'secondary', streamId: 'cursor' }],
+      [3, { sourceKind: 'secondary', streamId: 'cursor' }],
+    ]) });
+    const cursor = document.nodes.find((node) => node.namespacePath === 'Cursor/');
+    const tip = cursor?.children?.find((node) => node.namespacePath === 'Cursor/Tip/');
+
+    expect(cursor?.transform.position).toEqual([1, 0, 1]);
+    expect(tip?.transform.position).toEqual([3.5, 0.5, 4.5]);
+  });
+
+  it('wraps a nested cursor by its world position beneath a rotated and scaled ancestor', () => {
+    const document = createSpatialDocument(`"Frame/+4+2/+0+2/+4+2" : "rotation: 0, 90, 0"
+"Frame/Cursor/+81+1/+0+1/+3+1" : ""`, { originsByLine: new Map([
+      [1, { sourceKind: 'baseline' }],
+      [2, { sourceKind: 'secondary', streamId: 'cursor' }],
+    ]) });
+    const frame = document.nodes.find((node) => node.namespacePath === 'Frame/');
+    const cursor = frame?.children?.find((node) => node.namespacePath === 'Frame/Cursor/');
+    const recomposed = frame?.worldTransform && cursor?.localTransform
+      ? composeTransforms(frame.worldTransform, cursor.localTransform)
+      : undefined;
+
+    expect(cursor?.transform.position[0]).toBeGreaterThanOrEqual(0);
+    expect(cursor?.transform.position[0]).toBeLessThan(document.coordinateSpace.width);
+    expect(cursor?.transform.position[2]).toBeGreaterThanOrEqual(0);
+    expect(cursor?.transform.position[2]).toBeLessThan(document.coordinateSpace.depth);
+    expect(recomposed?.position[0]).toBeCloseTo(cursor!.transform.position[0]);
+    expect(recomposed?.position[2]).toBeCloseTo(cursor!.transform.position[2]);
   });
 
   it('translates one millimetre for equal minimum transaction amounts', () => {

@@ -11,13 +11,14 @@ import { geometryFromBox } from './geometry';
 import {
   anchorTransformFromBox,
   composeTransforms,
+  relativeTransform,
   transformFromBox,
 } from './transform';
 import type { SpatialTransform } from './transform';
 import { evaluateInteractions } from './interactions';
 import type { InteractionFact } from './interactions';
 import { CENTIUNITS_PER_UNIT } from './units';
-import { dimensionsFromNodes, translateBoxWithinCoordinateSpace } from './coordinateSpace';
+import { dimensionsFromNodes, translateBoxWithinCoordinateSpace, wrapCoordinate } from './coordinateSpace';
 import type { CoordinateSpaceDimensions } from './coordinateSpace';
 
 export interface CreateSpatialDocumentOptions {
@@ -71,6 +72,64 @@ function applyRenderableStateToTree(
       csgConsumed: state?.csgConsumed ?? node.csgConsumed,
       children: node.children ? applyRenderableStateToTree(node.children, renderableNodes) : undefined,
     };
+  });
+}
+
+function translateNodeWorldState(
+  node: SpatialNode,
+  deltaX: number,
+  deltaZ: number,
+  parentWorldTransform?: SpatialTransform,
+): SpatialNode {
+  const translateTransform = (transform: SpatialTransform | undefined): SpatialTransform | undefined => transform && ({
+    ...transform,
+    position: [transform.position[0] + deltaX, transform.position[1], transform.position[2] + deltaZ],
+  });
+  const worldTransform = translateTransform(node.worldTransform ?? node.transform)!;
+  const localTransform = parentWorldTransform
+    ? relativeTransform(parentWorldTransform, worldTransform)
+    : worldTransform;
+
+  return {
+    ...node,
+    bounds: {
+      ...node.bounds,
+      minX: node.bounds.minX + deltaX,
+      maxX: node.bounds.maxX + deltaX,
+      minZ: node.bounds.minZ + deltaZ,
+      maxZ: node.bounds.maxZ + deltaZ,
+    },
+    localTransform,
+    transform: worldTransform,
+    worldTransform,
+    children: node.children?.map((child) => translateNodeWorldState(child, deltaX, deltaZ, worldTransform)),
+  };
+}
+
+/** Keep secondary cursor roots and their descendants in the same periodic cell as the rendered space. */
+function wrapSecondaryCursors(
+  nodes: SpatialNode[],
+  space: CoordinateSpaceDimensions,
+  parentWorldTransform?: SpatialTransform,
+): SpatialNode[] {
+  return nodes.map((node) => {
+    if (node.origin?.sourceKind !== 'secondary') {
+      return {
+        ...node,
+        children: wrapSecondaryCursors(node.children ?? [], space, node.worldTransform),
+      };
+    }
+
+    const worldPosition = (node.worldTransform ?? node.transform).position;
+    const wrappedX = wrapCoordinate(worldPosition[0], space.width);
+    const wrappedZ = wrapCoordinate(worldPosition[2], space.depth);
+
+    return translateNodeWorldState(
+      node,
+      wrappedX - worldPosition[0],
+      wrappedZ - worldPosition[2],
+      parentWorldTransform,
+    );
   });
 }
 
@@ -267,8 +326,10 @@ export function createSpatialDocument(source: string, options: CreateSpatialDocu
   const authoredRenderable = flattenRenderable(topLevelNodes);
   const authoredPhysicalNodes = authoredRenderable.filter((node) => node.origin?.sourceKind !== 'secondary');
   const coordinateSpace = dimensionsFromNodes(authoredPhysicalNodes);
-  const interactions = evaluateInteractions(authoredRenderable, options.probeTolerance, coordinateSpace);
-  const effectiveTree = applyConditionalVariants(topLevelNodes, resolved.variants, interactions, coordinateSpace);
+  const wrappedTree = wrapSecondaryCursors(topLevelNodes, coordinateSpace);
+  const wrappedRenderable = flattenRenderable(wrappedTree);
+  const interactions = evaluateInteractions(wrappedRenderable, options.probeTolerance, coordinateSpace);
+  const effectiveTree = applyConditionalVariants(wrappedTree, resolved.variants, interactions, coordinateSpace);
   const effectiveRenderable = flattenRenderable(effectiveTree);
   const physicalNodes = effectiveRenderable.filter((node) => node.origin?.sourceKind !== 'secondary');
   const sensorNodes = effectiveRenderable.filter((node) => node.origin?.sourceKind === 'secondary');
