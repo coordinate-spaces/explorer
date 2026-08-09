@@ -115,6 +115,43 @@ describe('secondary projection interactions', () => {
     expect(ball?.box).toMatchObject({ x: 1.99, y: 0, z: 4, width: 3, height: 3, depth: 3 });
   });
 
+  it('keeps contact translation active for both exact probes and breaches', () => {
+    const compile = (cursorX: string) => createSpatialDocument(`"Ball/+2+3/+0+3/+4+3" : "geometry: sphere"
+"Ball/+contact/+++" : ""
+"Cursor/+${cursorX}+1/+0+1/+4+1" : ""`, { originsByLine: new Map([
+      [1, { sourceKind: 'baseline', transactionAmount: MIN_TRANSACTION_AMOUNT }],
+      [2, { sourceKind: 'baseline' }],
+      [3, { sourceKind: 'secondary', streamId: 'cursor', transactionAmount: MIN_TRANSACTION_AMOUNT }],
+    ]) });
+
+    const touching = compile('5');
+    const shallowBreach = compile('450c');
+    const nextBreachFrame = compile('425c');
+
+    expect(touching.interactions).toMatchObject([{ state: 'probe', normal: [-1, 0, 0] }]);
+    expect(touching.renderNodes.find((node) => node.namespacePath === 'Ball/')?.box.x).toBe(1.99);
+    expect(shallowBreach.interactions).toMatchObject([{ state: 'breach', penetration: 0.5, normal: [-1, 0, 0] }]);
+    expect(shallowBreach.renderNodes.find((node) => node.namespacePath === 'Ball/')?.box.x).toBe(1.49);
+    expect(nextBreachFrame.renderNodes.find((node) => node.namespacePath === 'Ball/')?.box.x).toBe(1.24);
+  });
+
+  it('resolves contact penetration before ordinary collision packing', () => {
+    const document = createSpatialDocument(`"Obstacle/+0+2/+0+3/+4+3" : ""
+"Ball/+2+3/+0+3/+4+3" : "geometry: sphere"
+"Ball/+contact/+++" : ""
+"Cursor/+5+1/+0+1/+4+1" : ""`, { originsByLine: new Map([
+      [1, { sourceKind: 'baseline' }],
+      [2, { sourceKind: 'baseline', transactionAmount: MIN_TRANSACTION_AMOUNT }],
+      [3, { sourceKind: 'baseline' }],
+      [4, { sourceKind: 'secondary', streamId: 'cursor', transactionAmount: MIN_TRANSACTION_AMOUNT }],
+    ]) });
+    const ball = document.renderNodes.find((node) => node.namespacePath === 'Ball/');
+
+    expect(document.interactions).toMatchObject([{ state: 'probe', targetNamespace: 'Ball/' }]);
+    expect(ball?.box.x).toBe(1.99);
+    expect(ball?.bounds.minX).toBe(2);
+  });
+
   it('scales unequal valid transaction amounts before translating in the polar-opposite direction', () => {
     const distance = weightedTranslationDistance(6_000_000, 2_000_000);
     const document = createSpatialDocument(`"Ball/+2+3/+0+3/+4+3" : ""

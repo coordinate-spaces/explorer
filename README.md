@@ -67,12 +67,13 @@ Spatial transaction validation may limit each memo/properties field to 100 bytes
 
 ## Interaction directives
 
-Secondary projections can act as remote cursors. A baseline object can declare conditional variants with the Base64-compatible `+probe` and `+breach` directives. `probe` means face contact (within a small tolerance); `breach` means positive-volume intersection. Directive segments are removed from object identity, and their position selects the namespace scope that must be interacting.
+Secondary projections can act as remote cursors. A baseline object can declare conditional variants with the Base64-compatible `+probe`, `+breach`, and `+contact` directives. `probe` means face contact (within a small tolerance), `breach` means positive-volume intersection, and `contact` matches either state. Directive segments are removed from object identity, and their position selects the namespace scope that must be interacting.
 
 ```txt
 "Rod/+0+1/+0+5/+0+1" : "geometry: cylinder"
 "Rod/+probe" : "rotation: 90,90,0"
 "Rod/+breach/+9+1/+0+5/+0+1" : "color: red"
+"Rod/+contact/+++" : ""
 ```
 
 Conditional paths have three spatial forms:
@@ -82,9 +83,10 @@ Conditional paths have three spatial forms:
 | `Rod/+probe` | Inherit the baseline box and override only declared properties. |
 | `Rod/+probe/+4/+5/+9` | Translate by unsigned X/Y/Z magnitudes, away from the interacting cursor; an indeterminate direction defaults positive. |
 | `Rod/+probe/+++` | Translate in the polar-opposite contact direction by the cursor-to-target transaction-amount ratio converted to centiunit-scale project distance. |
+| `Rod/+contact/+++` | Push for either a probe or breach; a breach also clears its measured AABB penetration before adding the weighted distance. |
 | `Rod/+probe/+9+1/+0+5/+0+1` | Replace the complete absolute X/Y/Z box, including sizes. |
 
-Relative translation is recalculated from the resolved baseline on each frame and therefore does not accumulate. In `Machine/+probe/Lever`, the target remains `Machine/Lever/`, while placement of the directive after `Machine` makes `Machine/` the interaction scope. Secondary cursor identity includes its projection stream, so independent controllers can reuse the same cursor namespace.
+Relative translation is recalculated from the resolved baseline on each frame and therefore does not accumulate. `+contact/+++` nevertheless remains outside a penetrating cursor because its baseline-relative displacement includes the current penetration depth. In `Machine/+probe/Lever`, the target remains `Machine/Lever/`, while placement of the directive after `Machine` makes `Machine/` the interaction scope. Secondary cursor identity includes its projection stream, so independent controllers can reuse the same cursor namespace.
 
 Weighted translation (`+++`) treats the cursor amount as force and the concrete baseline declaration amount as object weight. Each missing, zero, negative, or non-finite amount deterministically falls back to the atomic minimum transaction amount of `1_000_000`. The cursor-to-target amount ratio is divided by `CENTIUNITS_PER_UNIT` (`100`) to convert it to project distance, so equal valid weights move `0.01` project units (one millimetre). The converted distance is capped at 100 project units (10 metres). The target-oriented contact normal is preferred; otherwise the direction away from the cursor is normalized before applying the distance. No surface-area, volume, or density factor is applied: shape-specific volume semantics and a mass unit for transaction weight are not yet defined.
 

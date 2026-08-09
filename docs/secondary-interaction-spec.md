@@ -40,6 +40,7 @@ The path grammar reserves segment-leading `+` values as follows:
 ```txt
 Rod       ordinary namespace segment
 +probe    interaction directive
++contact  probe-or-breach interaction directive
 +4        unsigned translation magnitude
 +9+1      absolute axis offset and size
 ```
@@ -54,6 +55,9 @@ The initial directive set is:
 
 - `+probe`
 - `+breach`
+- `+contact`
+
+`+contact` is a matching directive rather than a third geometric fact. It selects either a `probe` or `breach` fact while preserving the underlying fact state for inspection and timeline identity. It is intended for responses, such as cursor pushing, that must not deactivate when face contact becomes penetration.
 
 A conditional declaration SHOULD contain one interaction directive. Multiple directives are reserved for a future explicitly defined conjunction model and MUST NOT be relied upon by portable documents.
 
@@ -125,6 +129,8 @@ Missing, zero, negative, and non-finite cursor or target amounts MUST each use t
 
 Weighted translation MUST NOT incorporate surface area, volume, or density until those semantics are specified separately. Geometry-dependent volume requires shape-specific calculation, and transaction weight currently has no documented mass unit.
 
+When weighted translation is selected by `+contact`, a matching breach MUST add the fact's minimum-axis AABB penetration to the weighted distance. The result is applied along the target-oriented breach normal. This clears the sampled penetration and then adds the force-to-weight displacement, so a cursor step larger than the weighted distance does not deactivate pushing. The result remains recomputed from baseline and current-frame facts; it does not accumulate. `+probe/+++` and `+breach/+++` retain their original weighted-distance-only behavior.
+
 For each axis, direction is selected in this order:
 
 1. Use a nonzero target-oriented interaction/contact normal.
@@ -151,7 +157,11 @@ The final three `+offset+size` segments replace the complete effective X/Y/Z box
 
 `breach` means that cursor and target have positive-volume overlap. The initial implementation uses transformed world-space AABBs and selects a deterministic minimum-penetration axis for its contact normal.
 
-### 7.3 Evaluation space and feedback
+### 7.3 Contact matching
+
+`contact` matches either a `probe` or `breach` fact. It MUST NOT replace the fact's state with `contact`, and it does not change the AABB-based predicate semantics. A spherical render geometry therefore still interacts through its transformed AABB in the initial implementation.
+
+### 7.4 Evaluation space and feedback
 
 Interaction predicates MUST be evaluated from authored/resolved pre-variant bounds and before ordinary collision packing. Conditional movement MUST NOT immediately re-evaluate and deactivate its own triggering predicate within the same frame. This avoids same-frame feedback oscillation.
 
