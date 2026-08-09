@@ -16,6 +16,7 @@ import {
 import type { SpatialTransform } from './transform';
 import { evaluateInteractions } from './interactions';
 import type { InteractionFact } from './interactions';
+import { CENTIUNITS_PER_UNIT } from './units';
 
 export interface CreateSpatialDocumentOptions {
   originsByLine?: ReadonlyMap<number, XyzDslDeclarationOrigin>;
@@ -82,16 +83,17 @@ function translateBox(box: XyzDslBoxSpec, magnitude: [number, number, number], f
   };
 }
 
-export const DEFAULT_INTERACTION_WEIGHT = 1;
+export const MIN_TRANSACTION_AMOUNT = 1_000_000;
 export const MAX_WEIGHTED_TRANSLATION = 100;
 
 function validWeight(weight: number | undefined): number {
-  return Number.isFinite(weight) && weight! > 0 ? weight! : DEFAULT_INTERACTION_WEIGHT;
+  return Number.isFinite(weight) && weight! > 0 ? weight! : MIN_TRANSACTION_AMOUNT;
 }
 
-/** Force-to-weight displacement in project units, bounded against pathological transaction values. */
+/** Force-to-weight displacement at centiunit scale, capped at 100 project units (10 metres). */
 export function weightedTranslationDistance(cursorWeight: number | undefined, targetWeight: number | undefined): number {
-  return Math.min(validWeight(cursorWeight) / validWeight(targetWeight), MAX_WEIGHTED_TRANSLATION);
+  const projectDistance = validWeight(cursorWeight) / validWeight(targetWeight) / CENTIUNITS_PER_UNIT;
+  return Math.min(projectDistance, MAX_WEIGHTED_TRANSLATION);
 }
 
 function weightedTranslateBox(box: XyzDslBoxSpec, fact: InteractionFact, targetWeight: number | undefined): XyzDslBoxSpec {

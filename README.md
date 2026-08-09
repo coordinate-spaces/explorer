@@ -81,12 +81,12 @@ Conditional paths have three spatial forms:
 | --- | --- |
 | `Rod/+probe` | Inherit the baseline box and override only declared properties. |
 | `Rod/+probe/+4/+5/+9` | Translate by unsigned X/Y/Z magnitudes, away from the interacting cursor; an indeterminate direction defaults positive. |
-| `Rod/+probe/+++` | Translate in the polar-opposite contact direction by cursor transaction amount divided by the target transaction amount. |
+| `Rod/+probe/+++` | Translate in the polar-opposite contact direction by the cursor-to-target transaction-amount ratio converted to centiunit-scale project distance. |
 | `Rod/+probe/+9+1/+0+5/+0+1` | Replace the complete absolute X/Y/Z box, including sizes. |
 
 Relative translation is recalculated from the resolved baseline on each frame and therefore does not accumulate. In `Machine/+probe/Lever`, the target remains `Machine/Lever/`, while placement of the directive after `Machine` makes `Machine/` the interaction scope. Secondary cursor identity includes its projection stream, so independent controllers can reuse the same cursor namespace.
 
-Weighted translation (`+++`) treats the cursor amount as force and the concrete baseline declaration amount as object weight. Its distance is `cursor amount / object amount` project units, capped at 100 units. Missing, zero, negative, or non-finite amounts fall back to `1`. The target-oriented contact normal is preferred; otherwise the direction away from the cursor is normalized before applying the distance.
+Weighted translation (`+++`) treats the cursor amount as force and the concrete baseline declaration amount as object weight. Each missing, zero, negative, or non-finite amount deterministically falls back to the atomic minimum transaction amount of `1_000_000`. The cursor-to-target amount ratio is divided by `CENTIUNITS_PER_UNIT` (`100`) to convert it to project distance, so equal valid weights move `0.01` project units (one millimetre). The converted distance is capped at 100 project units (10 metres). The target-oriented contact normal is preferred; otherwise the direction away from the cursor is normalized before applying the distance. No surface-area, volume, or density factor is applied: shape-specific volume semantics and a mass unit for transaction weight are not yet defined.
 
 See the [Secondary projection interaction specification](docs/secondary-interaction-spec.md) for the normative syntax and evaluation rules. The current release evaluates persistent `probe` and `breach` facts for the selected frame. Temporal transition playback and a persistent incremental spatial index are only partially implemented; see [Secondary interaction implementation status](docs/secondary-interaction-roadmap.md) for the exact supported behavior and remaining acceptance criteria.
 
