@@ -33,4 +33,46 @@ describe('remote editor lifecycle', () => {
     expect(appSource.match(/handleRemoteEditorTransaction[\s\S]*?\n  \}, \[remoteEditorPublicKey\]\);/)?.[0])
       .toContain('mergeStreamTransactions(existing, [normalizeXyzDslTransaction(transaction)])');
   });
+
+  it('keeps listening for deferred baseline edits while cursors connect only after simulation starts', () => {
+    expect(appSource).toContain('{remoteEditorPublicKey && endpointValidationError');
+    expect(appSource).not.toContain("simulationMode === 'stopped' && remoteEditorPublicKey");
+    expect(appSource).toContain("simulationMode !== 'stopped' ? validSecondaryKeyReferences.map");
+  });
+
+  it('marks cursor streams closed when their subscriptions unmount', () => {
+    expect(appSource).toContain("if (simulationMode !== 'stopped') return;");
+    expect(appSource).toContain("realtimeStatus: 'closed' as const");
+  });
+
+  it('keeps cursor declarations out of the authored scene while stopped without removing the remote baseline', () => {
+    expect(appSource).toContain("simulationMode === 'stopped' ? [] : secondaryTransactionOverlayStreams");
+    expect(appSource).not.toContain("simulationMode === 'stopped' ? '' : remoteEditorSource");
+  });
+
+  it('closes authoring UI when simulation starts', () => {
+    const startSimulation = appSource.match(/const startSimulation = useCallback\(\(\) => \{([\s\S]*?)\n  \}, \[baselineRevision, remoteEditorSource\]\);/)?.[0];
+    expect(startSimulation).toContain("setAppMode('viewer')");
+    expect(startSimulation).toContain('setDrawerOpen(false)');
+    expect(appSource).toContain("authoringAvailable={simulationMode === 'stopped'}");
+  });
+
+  it('freezes remote baseline application during simulation while continuing to receive edits', () => {
+    expect(appSource).toContain('simulationRemoteEditorSourceRef.current = remoteEditorSource');
+    expect(appSource).toContain("simulationMode === 'stopped' ? remoteEditorSource : simulationRemoteEditorSourceRef.current ?? remoteEditorSource");
+    expect(appSource).toContain('simulationRemoteEditorSourceRef.current = undefined');
+  });
+
+  it('advances cursor playback only while the simulation is running', () => {
+    expect(appSource).toContain("if (simulationMode !== 'running') {\n      return undefined;");
+    expect(appSource).toContain("playbackStartedAtMs: simulationMode === 'running' ? playbackStartedAtMs : undefined");
+    expect(appSource).toContain('playbackBaseTransactionTime: stream.transactions[clampPlaybackIndex(stream.playbackIndex, stream.transactions.length)]?.time');
+  });
+
+  it('changes playback speed without consuming paused wall-clock time', () => {
+    const speedHandler = appSource.match(/const handleSecondaryPlaybackSpeedChange = useCallback\(\([\s\S]*?\n  \}, \[setActiveSecondaryTransactions, simulationMode\]\);/)?.[0];
+    expect(speedHandler).toContain("if (simulationMode !== 'running')");
+    expect(speedHandler).toContain('playbackStartedAtMs: undefined');
+    expect(speedHandler).not.toContain("Date.now() - playbackStartedAtMs");
+  });
 });

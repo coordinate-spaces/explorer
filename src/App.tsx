@@ -449,6 +449,36 @@ export default function App() {
     : [];
 
   useEffect(() => {
+    if (simulationMode !== 'stopped') return;
+
+    setActiveSecondaryTransactions((streams) => {
+      let changed = false;
+      const entries = Object.entries(streams).map(([streamKey, stream]) => {
+        if (stream.realtimeStatus === 'closed') return [streamKey, stream];
+        changed = true;
+        return [streamKey, { ...stream, realtimeStatus: 'closed' as const }];
+      });
+      return changed ? Object.fromEntries(entries) : streams;
+    });
+  }, [setActiveSecondaryTransactions, simulationMode]);
+
+  useEffect(() => {
+    const playbackStartedAtMs = Date.now();
+    setActiveSecondaryTransactions((streams) => Object.fromEntries(Object.entries(streams).map(([streamKey, stream]) => [
+      streamKey,
+      stream.replaying ? {
+        ...stream,
+        playbackStartedAtMs: simulationMode === 'running' ? playbackStartedAtMs : undefined,
+        playbackBaseTransactionTime: stream.transactions[clampPlaybackIndex(stream.playbackIndex, stream.transactions.length)]?.time,
+      } : stream,
+    ])));
+  }, [setActiveSecondaryTransactions, simulationMode]);
+
+  useEffect(() => {
+    if (simulationMode !== 'running') {
+      return undefined;
+    }
+
     const replayingStreams = Object.values(activeSecondaryTransactions).filter((stream) => stream.replaying);
 
     if (replayingStreams.length === 0) {
@@ -494,7 +524,7 @@ export default function App() {
     }, playbackTickMilliseconds);
 
     return () => window.clearInterval(interval);
-  }, [activeSecondaryTransactions, setActiveSecondaryTransactions]);
+  }, [activeSecondaryTransactions, setActiveSecondaryTransactions, simulationMode]);
 
   const secondaryTransactionStreams = useMemo<ActiveSecondaryTransactionStream[]>(() => Object.values(activeSecondaryTransactions)
     .map(({ reference, transactions: secondaryTransactions, playbackIndex, playbackSpeed, replaying, realtimeStatus, streamError, historyLoading }) => ({
@@ -542,6 +572,7 @@ export default function App() {
     remoteEditor.transactions,
     remoteEditor.publicKey,
   ), [remoteEditor.publicKey, remoteEditor.transactions]);
+  const simulationRemoteEditorSourceRef = useRef<string | undefined>(undefined);
   const secondaryProjections = useMemo<SecondaryProjection[]>(() => {
     const referencesByProjection = referencesBySecondaryProjection(transactionXyzDsl.secondaryKeys);
 
@@ -601,9 +632,11 @@ export default function App() {
     [authoringSource, primaryRemoteBaselineSource, transactionXyzDsl.originsByLine],
   );
   const renderedBundle = useMemo(
-    () => composeSpatialEditorSourceBundle(authoringSource, secondaryTransactionOverlayStreams, remoteEditorSource,
+    () => composeSpatialEditorSourceBundle(authoringSource,
+      simulationMode === 'stopped' ? [] : secondaryTransactionOverlayStreams,
+      simulationMode === 'stopped' ? remoteEditorSource : simulationRemoteEditorSourceRef.current ?? remoteEditorSource,
       authoringOriginsByLine),
-    [authoringOriginsByLine, authoringSource, remoteEditorSource, secondaryTransactionOverlayStreams],
+    [authoringOriginsByLine, authoringSource, remoteEditorSource, secondaryTransactionOverlayStreams, simulationMode],
   );
   const renderedSource = renderedBundle.source;
   const baselineRevision = useMemo(() => spatialBaselineRevision(authoringSource), [authoringSource]);
@@ -639,14 +672,18 @@ export default function App() {
   const startSimulation = useCallback(() => {
     accumulativeTimelineRef.current = new AccumulativeSpatialTimeline(baselineRevision);
     simulationBaselineRevisionRef.current = baselineRevision;
+    simulationRemoteEditorSourceRef.current = remoteEditorSource;
     evaluatedPhysicsFrameRef.current = undefined;
+    setAppMode('viewer');
+    setDrawerOpen(false);
     setSimulationMode('running');
-  }, [baselineRevision]);
+  }, [baselineRevision, remoteEditorSource]);
 
   const stopSimulation = useCallback(() => {
     accumulativeTimelineRef.current = undefined;
     simulationBaselineRevisionRef.current = undefined;
     evaluatedPhysicsFrameRef.current = undefined;
+    simulationRemoteEditorSourceRef.current = undefined;
     setSimulationMode('stopped');
   }, []);
   const selectedNode = useMemo(
@@ -727,6 +764,19 @@ export default function App() {
         return streams;
       }
 
+      const normalizedPlaybackSpeed = normalizePlaybackSpeed(playbackSpeed);
+      if (simulationMode !== 'running') {
+        return {
+          ...streams,
+          [streamKey]: {
+            ...stream,
+            playbackSpeed: normalizedPlaybackSpeed,
+            playbackStartedAtMs: undefined,
+            playbackBaseTransactionTime: stream.transactions[clampPlaybackIndex(stream.playbackIndex, stream.transactions.length)]?.time,
+          },
+        };
+      }
+
       const now = Date.now();
       const playbackStartedAtMs = stream.playbackStartedAtMs ?? now;
       const playbackBaseTransactionTime = stream.playbackBaseTransactionTime ?? stream.transactions[0]?.time ?? 0;
@@ -741,7 +791,7 @@ export default function App() {
         ...streams,
         [streamKey]: {
           ...stream,
-          playbackSpeed: normalizePlaybackSpeed(playbackSpeed),
+          playbackSpeed: normalizedPlaybackSpeed,
           playbackIndex: stream.replaying
             ? playbackIndexForElapsedTime(stream.transactions, 0, playbackTime)
             : stream.playbackIndex,
@@ -752,7 +802,7 @@ export default function App() {
         },
       };
     });
-  }, [setActiveSecondaryTransactions]);
+  }, [setActiveSecondaryTransactions, simulationMode]);
 
   const handleSecondaryPlaybackSeek = useCallback((
     publicKey: string,
@@ -848,12 +898,15 @@ export default function App() {
   }, []);
 
   const handleModeChange = useCallback((mode: 'viewer' | 'editor') => {
+    if (mode === 'editor' && simulationMode !== 'stopped') {
+      return;
+    }
     setAppMode(mode);
 
     if (mode === 'editor') {
       setDrawerOpen(true);
     }
-  }, []);
+  }, [simulationMode]);
 
   const handleSelectNode = useCallback((id: string | undefined) => {
     if (id === undefined) {
@@ -939,7 +992,7 @@ export default function App() {
           onStatusChange={handleRemoteEditorStatusChange}
         />
       ) : null}
-      {validSecondaryKeyReferences.map((reference) => (
+      {simulationMode !== 'stopped' ? validSecondaryKeyReferences.map((reference) => (
         <SecondaryRealtimeSubscription
           key={streamKeyForSecondaryReference(reference)}
           reference={reference}
@@ -947,7 +1000,7 @@ export default function App() {
           onError={handleSecondaryRealtimeError}
           onStatusChange={handleSecondaryRealtimeStatusChange}
         />
-      ))}
+      )) : null}
       <SceneRoot
         document={document}
         selectedNodeId={selectedSceneNodeId}
@@ -982,6 +1035,7 @@ export default function App() {
       ) : null}
       <XyzDslDrawer
         appMode={appMode}
+        authoringAvailable={simulationMode === 'stopped'}
         document={document}
         isOpen={drawerOpen}
         source={authoringSource}

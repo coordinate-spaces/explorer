@@ -222,8 +222,8 @@ export function transactionsToXyzDslSource(
 }
 
 /**
- * Maps primary-key transactions observed on the overlay node into declarations
- * applied in order by the remote spatial editor.
+ * Maps primary-key transactions observed on the overlay node into baseline
+ * declarations applied in order by the remote spatial editor.
  */
 export function transactionsToRemoteEditorSource(transactions: readonly XyzDslTransaction[], publicKey: string): string {
   if (!publicKey.trim()) {

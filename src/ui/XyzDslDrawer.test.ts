@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { transactionSummary } from './XyzDslDrawer';
+import drawerSource from './XyzDslDrawer.tsx?raw';
 
 describe('transactionSummary', () => {
   it('does not display terminal path filler', () => {
@@ -11,5 +12,14 @@ describe('transactionSummary', () => {
       fee: 0,
       memo: ' geometry: box ',
     })).toBe('from sender · to +2+4/+6+6/+4+3 · memo geometry: box');
+  });
+});
+
+describe('runtime secondary controls', () => {
+  it('keeps cursor playback controls available when authoring is unavailable', () => {
+    expect(drawerSource).toContain('!authoringAvailable && secondaryProjections.length > 0');
+    expect(drawerSource).toContain('className="runtime-playback-controls"');
+    expect(drawerSource.match(/className="runtime-playback-controls"[\s\S]*?<SecondaryProjectionPanel/)?.[0])
+      .toContain('<SecondaryProjectionPanel');
   });
 });

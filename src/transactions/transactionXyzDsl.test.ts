@@ -53,7 +53,7 @@ describe('transactionsToXyzDslSource', () => {
     )).toBe('');
   });
 
-  it('maps multiple outgoing remote editor transactions and filters other senders', () => {
+  it('maps all outgoing remote editor baseline declarations and filters other senders', () => {
     const editorSource = transactionsToRemoteEditorSource([
       transaction('color: cyan', 0, '+4+1/+2+1/+0+1', 'originating-key'),
       transaction('color: magenta', 1, '+5+1/+2+1/+0+1', 'other-key'),
