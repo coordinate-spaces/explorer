@@ -31,4 +31,31 @@ describe('SimulationTimeline', () => {
     expect(replay.transitions[0].kind).toBe('enter');
     expect(replay.physics.states.get('Body/')?.linearVelocity[0]).toBe(1);
   });
+
+  it('uses prior facts and bindings until a sparse frame reaches its target tick', () => {
+    const entering = new SimulationTimeline();
+    entering.reconcileDefinitions([definition]);
+    const entered = entering.evaluate(10, 10, 0, [fact], [
+      { targetId: 'Body/', mode: 'force', magnitude: 60 },
+    ]);
+    expect(entered.physics.states.get('Body/')?.linearVelocity[0]).toBe(1);
+
+    const leaving = new SimulationTimeline();
+    leaving.reconcileDefinitions([definition]);
+    leaving.evaluate(1, 1, 0, [fact], [
+      { targetId: 'Body/', mode: 'force', magnitude: 60 },
+    ]);
+    const left = leaving.evaluate(10, 10, 0, [], []);
+    expect(left.transitions[0].kind).toBe('leave');
+    expect(left.physics.states.get('Body/')?.linearVelocity[0]).toBe(9);
+  });
+
+  it('applies enter impulses on the target tick of a sparse frame', () => {
+    const timeline = new SimulationTimeline();
+    timeline.reconcileDefinitions([definition]);
+    const frame = timeline.evaluate(10, 10, 0, [fact], [
+      { targetId: 'Body/', mode: 'impulse', magnitude: 60 },
+    ]);
+    expect(frame.physics.states.get('Body/')?.position[0]).toBe(1);
+  });
 });
