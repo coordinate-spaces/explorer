@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { canEditDeclarationLine, moveDeclarationPath, resizeDeclarationPath, rotateDeclarationPath, updateDeclarationProperty } from './xyzdsl/editXyzDslSource';
 import type { AxisName } from './xyzdsl/types';
 import { createSpatialDocument } from './model/createSpatialDocument';
-import { AccumulativeSpatialTimeline } from './transactions/AccumulativeSpatialTimeline';
+import { AccumulativeSpatialTimeline, accumulativePhysicsFrameKey } from './transactions/AccumulativeSpatialTimeline';
 import type { SpatialNode } from './model/SpatialNode';
 import {
   findNodeById,
@@ -606,20 +606,19 @@ export default function App() {
   );
   const renderedSource = renderedBundle.source;
   const accumulativeTimelineRef = useRef<AccumulativeSpatialTimeline | undefined>(undefined);
-  const evaluatedBundleRef = useRef<typeof renderedBundle | undefined>(undefined);
+  const evaluatedPhysicsFrameRef = useRef<string | undefined>(undefined);
   const [document, setDocument] = useState(() => createSpatialDocument(renderedBundle.source, {
     originsByLine: renderedBundle.originsByLine,
   }));
   useEffect(() => {
-    // React StrictMode repeats effects in development. A transaction frame must
-    // advance physics exactly once, independently of render/effect frequency.
-    if (evaluatedBundleRef.current === renderedBundle) return;
-    evaluatedBundleRef.current = renderedBundle;
     accumulativeTimelineRef.current ??= new AccumulativeSpatialTimeline();
-    setDocument(accumulativeTimelineRef.current.evaluate(
-      renderedBundle.source,
-      renderedBundle.originsByLine,
-    ).document);
+    const frameKey = accumulativePhysicsFrameKey(renderedBundle.source, renderedBundle.originsByLine);
+    const isNewTransactionFrame = frameKey !== undefined && frameKey !== evaluatedPhysicsFrameRef.current;
+    if (isNewTransactionFrame) evaluatedPhysicsFrameRef.current = frameKey;
+    const frame = isNewTransactionFrame
+      ? accumulativeTimelineRef.current.evaluate(renderedBundle.source, renderedBundle.originsByLine)
+      : accumulativeTimelineRef.current.compile(renderedBundle.source, renderedBundle.originsByLine);
+    setDocument(frame.document);
   }, [renderedBundle]);
   const selectedNode = useMemo(
     () => findNodeById(document.nodes, selectedNodeId) ?? findNodeByLineNumber(document.nodes, selectedLineNumber),

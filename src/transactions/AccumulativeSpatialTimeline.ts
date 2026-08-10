@@ -13,6 +13,24 @@ export interface AccumulativeSpatialFrame {
   tick: number;
 }
 
+/** Stable identity for the selected secondary transaction frame, independent of UI state. */
+export function accumulativePhysicsFrameKey(
+  source: string,
+  originsByLine?: ReadonlyMap<number, XyzDslDeclarationOrigin>,
+): string | undefined {
+  const lines = source.split('\n');
+  const secondaryDeclarations = [...(originsByLine ?? [])]
+    .filter(([, origin]) => origin.sourceKind === 'secondary')
+    .map(([line, origin]) => [
+      origin.streamId ?? origin.publicKey ?? 'secondary',
+      origin.transactionId ?? '',
+      origin.transactionTime ?? '',
+      lines[line - 1]?.trim() ?? '',
+    ].join(':'))
+    .sort();
+  return secondaryDeclarations.length > 0 ? secondaryDeclarations.join('|') : undefined;
+}
+
 function renderable(nodes: readonly SpatialNode[]): SpatialNode[] {
   return nodes.flatMap((node) => [node.renderable ? node : undefined, ...renderable(node.children ?? [])])
     .filter(Boolean) as SpatialNode[];
@@ -22,7 +40,7 @@ function renderable(nodes: readonly SpatialNode[]): SpatialNode[] {
 export class AccumulativeSpatialTimeline {
   readonly simulation = new SimulationTimeline();
 
-  evaluate(source: string, originsByLine?: ReadonlyMap<number, XyzDslDeclarationOrigin>): AccumulativeSpatialFrame {
+  private reconcile(source: string, originsByLine?: ReadonlyMap<number, XyzDslDeclarationOrigin>): SpatialDocument {
     const authored = createSpatialDocument(source, { originsByLine, applyConditionalVariants: false });
     const definitions: RigidBodyDefinition[] = renderable(authored.nodes)
       .filter((node) => node.origin?.sourceKind !== 'secondary')
@@ -33,6 +51,24 @@ export class AccumulativeSpatialTimeline {
         mass: node.origin?.transactionAmount,
       }));
     this.simulation.reconcileDefinitions(definitions);
+    return authored;
+  }
+
+  /** Recompile against retained state without advancing simulation time. */
+  compile(source: string, originsByLine?: ReadonlyMap<number, XyzDslDeclarationOrigin>): AccumulativeSpatialFrame {
+    this.reconcile(source, originsByLine);
+    return {
+      tick: this.simulation.world.tick,
+      document: createSpatialDocument(source, {
+        originsByLine,
+        physicsFrame: this.simulation.world.frame(),
+        accumulativePhysics: true,
+      }),
+    };
+  }
+
+  evaluate(source: string, originsByLine?: ReadonlyMap<number, XyzDslDeclarationOrigin>): AccumulativeSpatialFrame {
+    const authored = this.reconcile(source, originsByLine);
 
     const current = createSpatialDocument(source, {
       originsByLine,

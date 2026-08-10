@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { XyzDslDeclarationOrigin } from '../xyzdsl/types';
-import { AccumulativeSpatialTimeline } from './AccumulativeSpatialTimeline';
+import { AccumulativeSpatialTimeline, accumulativePhysicsFrameKey } from './AccumulativeSpatialTimeline';
 
 function origins(cursorAmount = 1_000_000) {
   return new Map<number, XyzDslDeclarationOrigin>([
@@ -48,6 +48,34 @@ describe('AccumulativeSpatialTimeline', () => {
     const second = frame.document.renderNodes.find((node) => node.origin?.sourceKind !== 'secondary')?.transform.position;
     expect(second).toEqual(first);
     expect(frame.tick).toBe(1);
+  });
+
+  it('compiles UI-only changes without advancing retained physics', () => {
+    const timeline = new AccumulativeSpatialTimeline();
+    const evaluated = timeline.evaluate(source(6, '+2/+0/+0'), origins());
+    const recompiled = timeline.compile(
+      source(6, '+2/+0/+0').replace('0x33aaff', '0xff00ff'),
+      origins(),
+    );
+
+    expect(recompiled.tick).toBe(evaluated.tick);
+    expect(recompiled.document.renderNodes.find((node) => node.origin?.sourceKind !== 'secondary')?.transform.position[0]).toBe(9.5);
+  });
+
+  it('keys physics advancement to secondary transaction identity and declaration', () => {
+    const firstOrigins = origins();
+    firstOrigins.set(3, { ...firstOrigins.get(3)!, transactionId: 'cursor-frame-1' });
+    const nextOrigins = origins();
+    nextOrigins.set(3, { ...nextOrigins.get(3)!, transactionId: 'cursor-frame-2' });
+    const first = accumulativePhysicsFrameKey(source(6, '+2/+0/+0'), firstOrigins);
+    const unrelatedEdit = accumulativePhysicsFrameKey(
+      source(6, '+2/+0/+0').replace('0x33aaff', '0xff00ff'),
+      firstOrigins,
+    );
+    const nextCursorFrame = accumulativePhysicsFrameKey(source(6, '+2/+0/+0'), nextOrigins);
+
+    expect(unrelatedEdit).toBe(first);
+    expect(nextCursorFrame).not.toBe(first);
   });
 
   it('preserves non-contact relative and weighted conditional translations', () => {
