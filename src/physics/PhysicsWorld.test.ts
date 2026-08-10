@@ -26,13 +26,13 @@ describe('PhysicsWorld', () => {
     expect(world.step().states.get(body.id)?.position).toEqual(first);
   });
 
-  it('preserves state across definition edits and removes deleted bodies', () => {
+  it('resets state across body revisions and removes deleted bodies', () => {
     const world = new PhysicsWorld();
     world.reconcileDefinitions([body]);
     world.enqueueInputs([{ kind: 'impulse', bodyId: body.id, tick: 1, vector: [2, 0, 0] }]);
     world.step();
-    world.reconcileDefinitions([{ ...body, revision: 'resized', mass: 4 }]);
-    expect(world.frame().states.get(body.id)?.position[0]).toBeGreaterThan(0);
+    world.reconcileDefinitions([{ ...body, revision: 'replacement', position: [8, 0, 0], mass: 4 }]);
+    expect(world.frame().states.get(body.id)?.position[0]).toBe(8);
     world.reconcileDefinitions([]);
     expect(world.frame().states.has(body.id)).toBe(false);
   });

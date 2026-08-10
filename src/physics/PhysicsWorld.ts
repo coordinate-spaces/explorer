@@ -44,7 +44,7 @@ export class PhysicsWorld {
       const normalized = { ...definition, mass: definition.mass && definition.mass > 0 ? definition.mass : 1 };
       const previous = this.definitions.get(definition.id);
       this.definitions.set(definition.id, normalized);
-      if (!previous) {
+      if (!previous || previous.revision !== normalized.revision) {
         this.states.set(definition.id, {
           id: definition.id,
           position: vector(definition.position),

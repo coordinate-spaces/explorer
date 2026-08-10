@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { XyzDslDeclarationOrigin } from '../xyzdsl/types';
-import { AccumulativeSpatialTimeline, accumulativePhysicsFrameKey } from './AccumulativeSpatialTimeline';
+import { AccumulativeSpatialTimeline, accumulativePhysicsFrameKey, spatialBaselineRevision } from './AccumulativeSpatialTimeline';
 
 function origins(cursorAmount = 1_000_000) {
   return new Map<number, XyzDslDeclarationOrigin>([
@@ -93,15 +93,34 @@ describe('AccumulativeSpatialTimeline', () => {
     firstOrigins.set(3, { ...firstOrigins.get(3)!, transactionId: 'cursor-frame-1' });
     const nextOrigins = origins();
     nextOrigins.set(3, { ...nextOrigins.get(3)!, transactionId: 'cursor-frame-2' });
-    const first = accumulativePhysicsFrameKey(source(6, '+2/+0/+0'), firstOrigins);
+    const baselineRevision = spatialBaselineRevision(source(6, '+2/+0/+0'));
+    const first = accumulativePhysicsFrameKey(source(6, '+2/+0/+0'), firstOrigins, baselineRevision);
     const unrelatedEdit = accumulativePhysicsFrameKey(
       source(6, '+2/+0/+0').replace('0x33aaff', '0xff00ff'),
       firstOrigins,
+      baselineRevision,
     );
-    const nextCursorFrame = accumulativePhysicsFrameKey(source(6, '+2/+0/+0'), nextOrigins);
+    const nextCursorFrame = accumulativePhysicsFrameKey(source(6, '+2/+0/+0'), nextOrigins, baselineRevision);
 
     expect(unrelatedEdit).toBe(first);
     expect(nextCursorFrame).not.toBe(first);
+  });
+
+  it('binds transaction frame identity to the primary baseline revision', () => {
+    const declaration = source(6, '+2/+0/+0');
+    const first = accumulativePhysicsFrameKey(declaration, origins(), spatialBaselineRevision('first baseline'));
+    const second = accumulativePhysicsFrameKey(declaration, origins(), spatialBaselineRevision('replacement baseline'));
+    expect(second).not.toBe(first);
+  });
+
+  it('does not reuse anonymous body positions across baseline revisions', () => {
+    const initial = '"+2+4/+0+6/+1+3":""\n"+2+4/+7+6/+0+10c":""\n"+7+6/+0+15/+0+50c":""';
+    const remote = '"+7+1/+0+1/+11+1":""\n"+6+1/+0+1/+11+1":""\n"+4+1/+0+1/+12+1":""';
+    const initialFrame = new AccumulativeSpatialTimeline(spatialBaselineRevision(initial)).compile(initial);
+    const remoteFrame = new AccumulativeSpatialTimeline(spatialBaselineRevision(remote)).compile(remote);
+
+    expect(initialFrame.document.renderNodes.map((node) => node.transform.position[0])).toEqual([4, 4, 10]);
+    expect(remoteFrame.document.renderNodes.map((node) => node.transform.position[0])).toEqual([7.5, 6.5, 4.5]);
   });
 
   it('preserves non-contact relative and weighted conditional translations', () => {
