@@ -12,4 +12,6 @@ export interface SpatialDocument {
   diagnostics: ParseDiagnostic[];
   coordinateSpace: CoordinateSpaceDimensions;
   interactions?: InteractionFact[];
+  /** Fixed simulation tick used to produce node transforms, when physics is enabled. */
+  physicsTick?: number;
 }

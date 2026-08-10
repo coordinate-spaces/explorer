@@ -130,3 +130,16 @@ Task 7 is complete only when tests and profiling demonstrate:
 ## Delivery order
 
 Complete Task 6 before exposing transition directives in XYZDSL. Complete the persistent-index and correctness portions of Task 7 before optimizing cell sizing or adding geometry-specific narrow phases. Both tasks should preserve the existing rule that interaction predicates are evaluated from pre-variant authored state to avoid same-frame conditional oscillation.
+
+## Accumulative physics foundation
+
+The renderer-independent foundation is now available in `src/physics` and
+`src/transactions/SimulationTimeline.ts`. It provides fixed ticks, persistent
+body state, deterministic input ordering, snapshots, replay-safe interaction
+transitions, force/impulse separation, and an immutable document overlay.
+
+`InteractionWorld` also permits a retained broad-phase index, an injected narrow
+phase, and bounded uniform-grid membership. Application playback integration,
+portable force/mass syntax, angular integration, and a physical contact-manifold
+solver remain intentionally separate follow-up work. Existing directive syntax
+has not changed semantics. See [Accumulative physics](accumulative-physics.md).

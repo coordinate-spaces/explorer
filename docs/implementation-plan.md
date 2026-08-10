@@ -8,6 +8,8 @@ The long-term model is intentionally DOM-like: spatial declarations compile into
 
 Secondary interaction directives are defined by the [Secondary projection interaction specification](secondary-interaction-spec.md). Temporal playback transitions and cross-frame incremental spatial indexing remain partial; the implemented boundary and completion criteria are tracked in [Secondary interaction implementation status](secondary-interaction-roadmap.md).
 
+Persistent fixed-timestep motion is defined separately in the [accumulative physics architecture](accumulative-physics.md). Existing `+++` declarations remain baseline-relative; transaction services may bind interaction facts to forces or enter-time impulses without coupling simulation progress to rendering.
+
 
 ## Terminology
 
