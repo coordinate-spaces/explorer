@@ -1,9 +1,10 @@
 # Accumulative physics
 
-Interaction directives remain declarative sensors. In particular, `+probe/+++`,
-`+breach/+++`, and `+contact/+++` retain their baseline-relative, non-accumulating
-meaning. Changing that syntax would make existing documents depend on playback
-frequency.
+Interaction directives remain declarative sensors when compiled directly with
+`createSpatialDocument`. The application transaction pipeline now gives the spatial
+overrides on `+contact/+x/+y/+z` and `+contact/+++` accumulative semantics: every
+new transaction/playback frame that still reports contact translates the retained
+body pose again. Completed frames remain immutable, so rendering cannot advance time.
 
 Accumulation is owned by the transaction layer instead:
 
@@ -59,9 +60,9 @@ It does not own a world, compare frames, enqueue inputs, or step time. React sho
 hold only the published frame; a transaction/playback service must own the
 `SimulationTimeline`.
 
-Physics force and impulse bindings are currently an application API rather than
-portable XYZDSL syntax. This is deliberate: transaction amount does not yet have
-a specified mass, force, impulse, or time unit. A future syntax must define those
-units and versioning before it can replace application-provided
-`PhysicsDirectiveBinding` values.
+`AccumulativeSpatialTimeline` is the transaction-layer bridge used by the
+application. Explicit contact vectors are per-frame translations. Weighted contact
+uses the existing cursor-amount / target-amount / 100 distance conversion, including
+contact penetration resolution. Force and impulse bindings remain an application API
+until their physical units are standardized.
 

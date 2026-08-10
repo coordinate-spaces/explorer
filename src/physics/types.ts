@@ -35,6 +35,7 @@ interface TimedInput {
 
 export type PhysicsInput =
   | (TimedInput & { kind: 'force' | 'impulse'; vector: Vector3Tuple })
+  | (TimedInput & { kind: 'translation'; vector: Vector3Tuple })
   | (TimedInput & { kind: 'kinematic-target'; position: Vector3Tuple })
   | (TimedInput & { kind: 'teleport'; position: Vector3Tuple; clearVelocity?: boolean });
 
@@ -48,4 +49,3 @@ export interface PhysicsSnapshot {
   states: RigidBodyState[];
   definitions: RigidBodyDefinition[];
 }
-

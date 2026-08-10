@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { canEditDeclarationLine, moveDeclarationPath, resizeDeclarationPath, rotateDeclarationPath, updateDeclarationProperty } from './xyzdsl/editXyzDslSource';
 import type { AxisName } from './xyzdsl/types';
 import { createSpatialDocument } from './model/createSpatialDocument';
+import { AccumulativeSpatialTimeline, accumulativePhysicsFrameKey } from './transactions/AccumulativeSpatialTimeline';
 import type { SpatialNode } from './model/SpatialNode';
 import {
   findNodeById,
@@ -604,9 +605,21 @@ export default function App() {
     [authoringOriginsByLine, authoringSource, remoteEditorSource, secondaryTransactionOverlayStreams],
   );
   const renderedSource = renderedBundle.source;
-  const document = useMemo(() => createSpatialDocument(renderedBundle.source, {
+  const accumulativeTimelineRef = useRef<AccumulativeSpatialTimeline | undefined>(undefined);
+  const evaluatedPhysicsFrameRef = useRef<string | undefined>(undefined);
+  const [document, setDocument] = useState(() => createSpatialDocument(renderedBundle.source, {
     originsByLine: renderedBundle.originsByLine,
-  }), [renderedBundle]);
+  }));
+  useEffect(() => {
+    accumulativeTimelineRef.current ??= new AccumulativeSpatialTimeline();
+    const frameKey = accumulativePhysicsFrameKey(renderedBundle.source, renderedBundle.originsByLine);
+    const isNewTransactionFrame = frameKey !== undefined && frameKey !== evaluatedPhysicsFrameRef.current;
+    if (isNewTransactionFrame) evaluatedPhysicsFrameRef.current = frameKey;
+    const frame = isNewTransactionFrame
+      ? accumulativeTimelineRef.current.evaluate(renderedBundle.source, renderedBundle.originsByLine)
+      : accumulativeTimelineRef.current.compile(renderedBundle.source, renderedBundle.originsByLine);
+    setDocument(frame.document);
+  }, [renderedBundle]);
   const selectedNode = useMemo(
     () => findNodeById(document.nodes, selectedNodeId) ?? findNodeByLineNumber(document.nodes, selectedLineNumber),
     [document.nodes, selectedLineNumber, selectedNodeId],

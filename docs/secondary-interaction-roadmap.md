@@ -18,7 +18,7 @@ This pipeline evaluates the selected transaction frame. It does not yet maintain
 
 ## Task 6: temporal interaction transitions
 
-**Status: partially implemented; not integrated into playback.**
+**Status: integrated for accumulative contact motion; transition effects remain partial.**
 
 ### Implemented
 
@@ -29,7 +29,7 @@ This pipeline evaluates the selected transaction frame. It does not yet maintain
 
 ### Not implemented
 
-- `App.tsx` does not retain the prior evaluated fact set or call `interactionTransitions` during live updates or playback.
+- `App.tsx` retains `AccumulativeSpatialTimeline`, which owns prior facts and calls `interactionTransitions` while contact motion advances. Transitions are not yet exposed as general application effects.
 - Playback seeking does not reconstruct transition state by replaying the transaction prefix or loading a cached snapshot.
 - There is no timeline owner that orders evaluations by transaction time and stable source order.
 - Cursor disappearance, target deletion, stream disconnection, backward seeking, and replay restart do not currently emit application-visible transition events.
