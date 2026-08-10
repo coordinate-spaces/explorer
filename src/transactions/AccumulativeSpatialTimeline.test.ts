@@ -42,6 +42,22 @@ describe('AccumulativeSpatialTimeline', () => {
     expect(second.document.renderNodes.find((node) => node.origin?.sourceKind !== 'secondary')?.transform.position[0]).toBe(11.5);
   });
 
+  it('publishes triggering facts and visual overrides after contact separates the bodies', () => {
+    const declaration = source(6, '+2/+0/+0').replace(
+      '"Box/+contact/+2/+0/+0":""',
+      '"Box/+contact/+2/+0/+0":"color: red; geometry: box; rotation: 0,0,45"',
+    );
+    const frame = new AccumulativeSpatialTimeline().evaluate(declaration, origins());
+    const target = frame.document.renderNodes.find((node) => node.origin?.sourceKind !== 'secondary');
+
+    expect(frame.document.interactions).toHaveLength(1);
+    expect(target?.activeInteractions).toHaveLength(1);
+    expect(target?.transform.position[0]).toBe(9.5);
+    expect(target?.transform.rotation[2]).toBeCloseTo(Math.PI / 4);
+    expect(target?.material.color).toBe('red');
+    expect(target?.geometry.kind).toBe('box');
+  });
+
   it('retains each weighted contact translation across transaction frames', () => {
     const timeline = new AccumulativeSpatialTimeline();
     const first = timeline.evaluate(source(6, '+++'), origins());

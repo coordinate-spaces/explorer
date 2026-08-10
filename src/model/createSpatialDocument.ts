@@ -31,6 +31,8 @@ export interface CreateSpatialDocumentOptions {
   accumulativePhysics?: boolean;
   /** Build authored body definitions without applying any interaction variants. */
   applyConditionalVariants?: boolean;
+  /** Completed facts that triggered this frame, supplied when physics has already stepped. */
+  interactionFacts?: readonly InteractionFact[];
 }
 
 function applyPhysicsFrame(nodes: SpatialNode[], frame: PhysicsFrame | undefined): SpatialNode[] {
@@ -240,6 +242,7 @@ function applyConditionalVariants(
     let content = node.content ?? { diagnostics: [] };
     let rotation = node.localTransform?.rotation ?? node.transform.rotation;
     let transformChanged = false;
+    let positionChanged = false;
     const matches = variantsForNode(node, variants, facts);
     if (matches.length === 0 && !parentChanged) {
       return {
@@ -255,10 +258,12 @@ function applyConditionalVariants(
       if (spatial.mode === 'absolute-box') {
         box = { ...spatial.box };
         transformChanged = true;
+        positionChanged = true;
       }
       if (!physicsOwnsTranslation && spatial.mode === 'translation') {
         box = translateBox(box, spatial.magnitude, fact, space);
         transformChanged = true;
+        positionChanged = true;
       }
       if (!physicsOwnsTranslation && spatial.mode === 'weighted-translation') {
         box = weightedTranslateBox(
@@ -269,6 +274,7 @@ function applyConditionalVariants(
           variant.conditional.directives.some((directive) => directive.name === 'contact'),
         );
         transformChanged = true;
+        positionChanged = true;
       }
       material = mergeXyzDslMaterialSpecs(material, variant.properties.material);
       content = mergeXyzDslContentSpecs(content, variant.properties.content);
@@ -289,14 +295,19 @@ function applyConditionalVariants(
       }
     });
     geometry = { ...geometry, dimensions: [box.width, box.height, box.depth] };
-    const localTransform = transformChanged
+    const localTransform = positionChanged
       ? (node.renderable
           ? transformFromBox(box, { rotation, diagnostics: [] })
           : { ...anchorTransformFromBox(box, { rotation, diagnostics: [] }), scale: node.localTransform?.scale ?? [1, 1, 1] })
-      : node.localTransform!;
-    const worldTransform = transformChanged || parentChanged
+      : transformChanged
+        ? { ...node.localTransform!, rotation }
+        : node.localTransform!;
+    const composedWorldTransform = transformChanged || parentChanged
       ? (parentTransform ? composeTransforms(parentTransform, localTransform) : localTransform)
       : (node.worldTransform ?? node.transform);
+    const worldTransform = transformChanged && !positionChanged && !parentChanged
+      ? { ...composedWorldTransform, position: [...(node.worldTransform ?? node.transform).position] as [number, number, number] }
+      : composedWorldTransform;
     const updated: SpatialNode = {
       ...node,
       baseBox: node.baseBox ?? node.box,
@@ -393,7 +404,9 @@ export function createSpatialDocument(source: string, options: CreateSpatialDocu
   const wrappedTree = wrapSecondaryCursors(topLevelNodes, coordinateSpace);
   const positionedRenderable = applyPhysicsFrame(flattenRenderable(wrappedTree), options.physicsFrame);
   const positionedTree = applyRenderableStateToTree(wrappedTree, positionedRenderable);
-  const interactions = evaluateInteractions(positionedRenderable, options.probeTolerance, coordinateSpace);
+  const interactions = options.interactionFacts
+    ? [...options.interactionFacts]
+    : evaluateInteractions(positionedRenderable, options.probeTolerance, coordinateSpace);
   const effectiveTree = options.applyConditionalVariants === false
     ? positionedTree
     : applyConditionalVariants(positionedTree, resolved.variants, interactions, coordinateSpace, undefined, false, options.accumulativePhysics);

@@ -98,7 +98,12 @@ export class AccumulativeSpatialTimeline {
     const frame = this.simulation.evaluate(tick, tick, 0, current.interactions ?? [], bindings);
     return {
       tick,
-      document: createSpatialDocument(source, { originsByLine, physicsFrame: frame.physics, accumulativePhysics: true }),
+      document: createSpatialDocument(source, {
+        originsByLine,
+        physicsFrame: frame.physics,
+        accumulativePhysics: true,
+        interactionFacts: frame.facts,
+      }),
     };
   }
 }
