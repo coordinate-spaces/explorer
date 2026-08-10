@@ -40,6 +40,11 @@ describe('remote editor lifecycle', () => {
     expect(appSource).toContain("simulationMode !== 'stopped' ? validSecondaryKeyReferences.map");
   });
 
+  it('marks cursor streams closed when their subscriptions unmount', () => {
+    expect(appSource).toContain("if (simulationMode !== 'stopped') return;");
+    expect(appSource).toContain("realtimeStatus: 'closed' as const");
+  });
+
   it('keeps cursor declarations out of the authored scene while stopped without removing the remote baseline', () => {
     expect(appSource).toContain("simulationMode === 'stopped' ? [] : secondaryTransactionOverlayStreams");
     expect(appSource).not.toContain("simulationMode === 'stopped' ? '' : remoteEditorSource");

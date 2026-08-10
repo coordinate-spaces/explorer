@@ -449,6 +449,20 @@ export default function App() {
     : [];
 
   useEffect(() => {
+    if (simulationMode !== 'stopped') return;
+
+    setActiveSecondaryTransactions((streams) => {
+      let changed = false;
+      const entries = Object.entries(streams).map(([streamKey, stream]) => {
+        if (stream.realtimeStatus === 'closed') return [streamKey, stream];
+        changed = true;
+        return [streamKey, { ...stream, realtimeStatus: 'closed' as const }];
+      });
+      return changed ? Object.fromEntries(entries) : streams;
+    });
+  }, [setActiveSecondaryTransactions, simulationMode]);
+
+  useEffect(() => {
     const playbackStartedAtMs = Date.now();
     setActiveSecondaryTransactions((streams) => Object.fromEntries(Object.entries(streams).map(([streamKey, stream]) => [
       streamKey,
