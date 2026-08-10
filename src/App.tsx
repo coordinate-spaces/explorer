@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { canEditDeclarationLine, moveDeclarationPath, resizeDeclarationPath, rotateDeclarationPath, updateDeclarationProperty } from './xyzdsl/editXyzDslSource';
 import type { AxisName } from './xyzdsl/types';
 import { createSpatialDocument } from './model/createSpatialDocument';
-import { AccumulativeSpatialTimeline, accumulativePhysicsFrameKey } from './transactions/AccumulativeSpatialTimeline';
+import { AccumulativeSpatialTimeline, accumulativePhysicsFrameKey, spatialBaselineRevision } from './transactions/AccumulativeSpatialTimeline';
 import type { SpatialNode } from './model/SpatialNode';
 import {
   findNodeById,
@@ -212,6 +212,7 @@ export default function App() {
   const latestRemoteBaselineRef = useRef('');
   const [appMode, setAppMode] = useState<'viewer' | 'editor'>('viewer');
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [simulationMode, setSimulationMode] = useState<'stopped' | 'running' | 'paused'>('stopped');
   const [selectedNodeId, setSelectedNodeId] = useState<string | undefined>();
   const [selectedLeafNodeId, setSelectedLeafNodeId] = useState<string | undefined>();
   const [selectedSceneHighlightNodeId, setSelectedSceneHighlightNodeId] = useState<string | undefined>();
@@ -605,21 +606,49 @@ export default function App() {
     [authoringOriginsByLine, authoringSource, remoteEditorSource, secondaryTransactionOverlayStreams],
   );
   const renderedSource = renderedBundle.source;
+  const baselineRevision = useMemo(() => spatialBaselineRevision(authoringSource), [authoringSource]);
   const accumulativeTimelineRef = useRef<AccumulativeSpatialTimeline | undefined>(undefined);
+  const simulationBaselineRevisionRef = useRef<string | undefined>(undefined);
   const evaluatedPhysicsFrameRef = useRef<string | undefined>(undefined);
   const [document, setDocument] = useState(() => createSpatialDocument(renderedBundle.source, {
     originsByLine: renderedBundle.originsByLine,
   }));
   useEffect(() => {
-    accumulativeTimelineRef.current ??= new AccumulativeSpatialTimeline();
-    const frameKey = accumulativePhysicsFrameKey(renderedBundle.source, renderedBundle.originsByLine);
-    const isNewTransactionFrame = frameKey !== undefined && frameKey !== evaluatedPhysicsFrameRef.current;
+    if (simulationMode === 'stopped') {
+      setDocument(createSpatialDocument(renderedBundle.source, { originsByLine: renderedBundle.originsByLine }));
+      return;
+    }
+    if (simulationBaselineRevisionRef.current !== baselineRevision) {
+      accumulativeTimelineRef.current = undefined;
+      simulationBaselineRevisionRef.current = undefined;
+      evaluatedPhysicsFrameRef.current = undefined;
+      setSimulationMode('stopped');
+      setDocument(createSpatialDocument(renderedBundle.source, { originsByLine: renderedBundle.originsByLine }));
+      return;
+    }
+    accumulativeTimelineRef.current ??= new AccumulativeSpatialTimeline(baselineRevision);
+    const frameKey = accumulativePhysicsFrameKey(renderedBundle.source, renderedBundle.originsByLine, baselineRevision);
+    const isNewTransactionFrame = simulationMode === 'running' && frameKey !== undefined && frameKey !== evaluatedPhysicsFrameRef.current;
     if (isNewTransactionFrame) evaluatedPhysicsFrameRef.current = frameKey;
     const frame = isNewTransactionFrame
       ? accumulativeTimelineRef.current.evaluate(renderedBundle.source, renderedBundle.originsByLine)
       : accumulativeTimelineRef.current.compile(renderedBundle.source, renderedBundle.originsByLine);
     setDocument(frame.document);
-  }, [renderedBundle]);
+  }, [baselineRevision, renderedBundle, simulationMode]);
+
+  const startSimulation = useCallback(() => {
+    accumulativeTimelineRef.current = new AccumulativeSpatialTimeline(baselineRevision);
+    simulationBaselineRevisionRef.current = baselineRevision;
+    evaluatedPhysicsFrameRef.current = undefined;
+    setSimulationMode('running');
+  }, [baselineRevision]);
+
+  const stopSimulation = useCallback(() => {
+    accumulativeTimelineRef.current = undefined;
+    simulationBaselineRevisionRef.current = undefined;
+    evaluatedPhysicsFrameRef.current = undefined;
+    setSimulationMode('stopped');
+  }, []);
   const selectedNode = useMemo(
     () => findNodeById(document.nodes, selectedNodeId) ?? findNodeByLineNumber(document.nodes, selectedLineNumber),
     [document.nodes, selectedLineNumber, selectedNodeId],
@@ -924,6 +953,19 @@ export default function App() {
         selectedNodeId={selectedSceneNodeId}
         onSelectNode={handleSelectNode}
       />
+      <div className="simulation-controls" aria-label="Simulation controls">
+        <span>Simulation: {simulationMode}</span>
+        {simulationMode === 'stopped' ? (
+          <button type="button" onClick={startSimulation}>Start simulation</button>
+        ) : (
+          <>
+            <button type="button" onClick={() => setSimulationMode((mode) => mode === 'running' ? 'paused' : 'running')}>
+              {simulationMode === 'running' ? 'Pause' : 'Resume'}
+            </button>
+            <button type="button" onClick={stopSimulation}>Stop and reset</button>
+          </>
+        )}
+      </div>
       {appMode === 'editor' ? (
         <SelectedNodeInspector
           canEdit={selectedNodeCanEdit}

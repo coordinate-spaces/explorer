@@ -14,10 +14,21 @@ export interface AccumulativeSpatialFrame {
   tick: number;
 }
 
+/** Small deterministic hash used to bind a simulation session to one authored baseline. */
+export function spatialBaselineRevision(source: string): string {
+  let hash = 2166136261;
+  for (let index = 0; index < source.length; index += 1) {
+    hash ^= source.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return `baseline-${(hash >>> 0).toString(16)}`;
+}
+
 /** Stable identity for the selected secondary transaction frame, independent of UI state. */
 export function accumulativePhysicsFrameKey(
   source: string,
   originsByLine?: ReadonlyMap<number, XyzDslDeclarationOrigin>,
+  baselineRevision = spatialBaselineRevision(source),
 ): string | undefined {
   const lines = source.split('\n');
   const secondaryDeclarations = [...(originsByLine ?? [])]
@@ -29,7 +40,9 @@ export function accumulativePhysicsFrameKey(
       lines[line - 1]?.trim() ?? '',
     ].join(':'))
     .sort();
-  return secondaryDeclarations.length > 0 ? secondaryDeclarations.join('|') : undefined;
+  return secondaryDeclarations.length > 0
+    ? `${baselineRevision}::${secondaryDeclarations.join('|')}`
+    : undefined;
 }
 
 function renderable(nodes: readonly SpatialNode[]): SpatialNode[] {
@@ -41,6 +54,8 @@ function renderable(nodes: readonly SpatialNode[]): SpatialNode[] {
 export class AccumulativeSpatialTimeline {
   readonly simulation = new SimulationTimeline();
 
+  constructor(readonly baselineRevision = 'baseline') {}
+
   private reconcile(source: string, originsByLine?: ReadonlyMap<number, XyzDslDeclarationOrigin>): SpatialDocument {
     const authored = createSpatialDocument(source, { originsByLine, applyConditionalVariants: false });
     const definitions: RigidBodyDefinition[] = renderable(authored.nodes)
@@ -50,6 +65,7 @@ export class AccumulativeSpatialTimeline {
         bounds: node.bounds,
         position: [...(node.worldTransform ?? node.transform).position],
         mass: node.origin?.transactionAmount,
+        revision: this.baselineRevision,
       }));
     this.simulation.reconcileDefinitions(definitions);
     return authored;
