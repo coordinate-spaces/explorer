@@ -28,6 +28,12 @@ export interface SpatialInteractionIndex {
   remove(nodeId: string): void;
 }
 
+export interface InteractionNarrowPhase {
+  evaluate(target: SpatialNode, cursorBounds: SpatialBounds, tolerance: number):
+    | Pick<InteractionFact, 'state' | 'normal' | 'inferredDirection' | 'penetration' | 'resolutionDistance' | 'separation'>
+    | undefined;
+}
+
 function expanded(bounds: SpatialBounds, tolerance: number): SpatialBounds {
   return {
     minX: bounds.minX - tolerance, maxX: bounds.maxX + tolerance,
@@ -42,11 +48,19 @@ export class AabbInteractionIndex implements SpatialInteractionIndex {
   private cells = new Map<string, Set<string>>();
   private memberships = new Map<string, string[]>();
 
-  constructor(nodes: readonly SpatialNode[] = [], private readonly cellSize = 10) {
+  private oversized = new Set<string>();
+
+  constructor(nodes: readonly SpatialNode[] = [], private readonly cellSize = 10, private readonly maximumCellsPerNode = 4_096) {
     nodes.forEach((node) => this.update(node));
   }
 
   private keys(bounds: SpatialBounds): string[] {
+    const counts = [
+      Math.floor(bounds.maxX / this.cellSize) - Math.floor(bounds.minX / this.cellSize) + 1,
+      Math.floor(bounds.maxY / this.cellSize) - Math.floor(bounds.minY / this.cellSize) + 1,
+      Math.floor(bounds.maxZ / this.cellSize) - Math.floor(bounds.minZ / this.cellSize) + 1,
+    ];
+    if (counts.some((count) => !Number.isFinite(count) || count <= 0) || counts.reduce((total, count) => total * count, 1) > this.maximumCellsPerNode) return [];
     const keys: string[] = [];
     for (let x = Math.floor(bounds.minX / this.cellSize); x <= Math.floor(bounds.maxX / this.cellSize); x += 1) {
       for (let y = Math.floor(bounds.minY / this.cellSize); y <= Math.floor(bounds.maxY / this.cellSize); y += 1) {
@@ -60,7 +74,12 @@ export class AabbInteractionIndex implements SpatialInteractionIndex {
 
   query(bounds: SpatialBounds, tolerance = 0): SpatialNode[] {
     const queryBounds = expanded(bounds, tolerance);
-    const candidateIds = new Set(this.keys(queryBounds).flatMap((key) => [...(this.cells.get(key) ?? [])]));
+    const keys = this.keys(queryBounds);
+    const candidateIds = new Set([
+      ...keys.flatMap((key) => [...(this.cells.get(key) ?? [])]),
+      ...this.oversized,
+      ...(keys.length === 0 ? this.nodes.keys() : []),
+    ]);
     return [...candidateIds].flatMap((id) => this.nodes.get(id) ?? [])
       .filter((node) => boundsOverlap(queryBounds, expanded(node.bounds, Number.EPSILON)))
       .sort((a, b) => a.id.localeCompare(b.id));
@@ -70,6 +89,7 @@ export class AabbInteractionIndex implements SpatialInteractionIndex {
     this.remove(node.id);
     this.nodes.set(node.id, node);
     const keys = this.keys(node.bounds);
+    if (keys.length === 0) this.oversized.add(node.id);
     this.memberships.set(node.id, keys);
     keys.forEach((key) => {
       const cell = this.cells.get(key) ?? new Set<string>();
@@ -85,6 +105,7 @@ export class AabbInteractionIndex implements SpatialInteractionIndex {
       if (cell?.size === 0) this.cells.delete(key);
     });
     this.memberships.delete(nodeId);
+    this.oversized.delete(nodeId);
     this.nodes.delete(nodeId);
   }
 }
@@ -152,6 +173,17 @@ function probeDetails(target: SpatialBounds, cursor: SpatialBounds, tolerance: n
   return { normal, separation: gaps[axis] };
 }
 
+export class AabbInteractionNarrowPhase implements InteractionNarrowPhase {
+  evaluate(target: SpatialNode, cursorBounds: SpatialBounds, tolerance: number) {
+    const inferredDirection = ([0, 1, 2].map((axis) => directionAwayFromCursor(target.bounds, cursorBounds, axis)) as [number, number, number]);
+    if (boundsOverlap(target.bounds, cursorBounds)) {
+      return { state: 'breach' as const, inferredDirection, ...breachDetails(target.bounds, cursorBounds) };
+    }
+    const probe = probeDetails(target.bounds, cursorBounds, tolerance);
+    return probe ? { state: 'probe' as const, inferredDirection, ...probe } : undefined;
+  }
+}
+
 function translatedBounds(bounds: SpatialBounds, x: number, z: number): SpatialBounds {
   return {
     minX: bounds.minX + x, maxX: bounds.maxX + x,
@@ -164,10 +196,12 @@ export function evaluateInteractions(
   nodes: readonly SpatialNode[],
   tolerance = 0.001,
   coordinateSpace?: CoordinateSpaceDimensions,
+  suppliedIndex?: SpatialInteractionIndex,
+  narrowPhase: InteractionNarrowPhase = new AabbInteractionNarrowPhase(),
 ): InteractionFact[] {
   const cursors = nodes.filter((node) => node.origin?.sourceKind === 'secondary');
   const targets = nodes.filter((node) => node.origin?.sourceKind !== 'secondary');
-  const index = new AabbInteractionIndex(targets);
+  const index = suppliedIndex ?? new AabbInteractionIndex(targets);
   return cursors.flatMap((cursor): InteractionFact[] => {
     const xOffsets = coordinateSpace ? [-coordinateSpace.width, 0, coordinateSpace.width] : [0];
     const zOffsets = coordinateSpace ? [-coordinateSpace.depth, 0, coordinateSpace.depth] : [0];
@@ -192,13 +226,30 @@ export function evaluateInteractions(
       transactionId: cursor.origin?.transactionId,
       transactionTime: cursor.origin?.transactionTime,
       cursorWeight: cursor.origin?.transactionAmount,
-      inferredDirection: ([0, 1, 2].map((axis) => directionAwayFromCursor(target.bounds, cursorBounds, axis)) as [number, number, number]),
     };
-    if (boundsOverlap(target.bounds, cursorBounds)) {
-      return [{ ...common, state: 'breach' as const, ...breachDetails(target.bounds, cursorBounds) }];
-    }
-    const probe = probeDetails(target.bounds, cursorBounds, tolerance);
-    return probe ? [{ ...common, state: 'probe' as const, ...probe }] : [];
+    const contact = narrowPhase.evaluate(target, cursorBounds, tolerance);
+    return contact ? [{ ...common, ...contact }] : [];
     });
   });
+}
+
+/** Retains baseline proxies across cursor-only frames. */
+export class InteractionWorld {
+  readonly index: SpatialInteractionIndex;
+  private targetIds = new Set<string>();
+
+  constructor(index: SpatialInteractionIndex = new AabbInteractionIndex()) {
+    this.index = index;
+  }
+
+  updateTargets(nodes: readonly SpatialNode[]): void {
+    const next = new Set(nodes.map(({ id }) => id));
+    [...this.targetIds].filter((id) => !next.has(id)).forEach((id) => this.index.remove(id));
+    nodes.forEach((node) => this.index.update(node));
+    this.targetIds = next;
+  }
+
+  evaluate(cursors: readonly SpatialNode[], tolerance = 0.001, coordinateSpace?: CoordinateSpaceDimensions): InteractionFact[] {
+    return evaluateInteractions(cursors, tolerance, coordinateSpace, this.index);
+  }
 }

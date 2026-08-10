@@ -20,10 +20,37 @@ import type { InteractionFact } from './interactions';
 import { CENTIUNITS_PER_UNIT } from './units';
 import { dimensionsFromNodes, translateBoxWithinCoordinateSpace, wrapCoordinate } from './coordinateSpace';
 import type { CoordinateSpaceDimensions } from './coordinateSpace';
+import type { PhysicsFrame } from '../physics/types';
 
 export interface CreateSpatialDocumentOptions {
   originsByLine?: ReadonlyMap<number, XyzDslDeclarationOrigin>;
   probeTolerance?: number;
+  /** Completed immutable physics state; document compilation never advances it. */
+  physicsFrame?: PhysicsFrame;
+}
+
+function applyPhysicsFrame(nodes: SpatialNode[], frame: PhysicsFrame | undefined): SpatialNode[] {
+  if (!frame) return nodes;
+  return nodes.map((node) => {
+    const state = frame.states.get(node.id);
+    if (!state) return node;
+    const current = (node.worldTransform ?? node.transform).position;
+    const delta = state.position.map((value, axis) => value - current[axis]) as [number, number, number];
+    const translateTransform = (transform: SpatialTransform | undefined) => transform && ({
+      ...transform,
+      position: transform.position.map((value, axis) => value + delta[axis]) as [number, number, number],
+    });
+    return {
+      ...node,
+      bounds: {
+        minX: node.bounds.minX + delta[0], maxX: node.bounds.maxX + delta[0],
+        minY: node.bounds.minY + delta[1], maxY: node.bounds.maxY + delta[1],
+        minZ: node.bounds.minZ + delta[2], maxZ: node.bounds.maxZ + delta[2],
+      },
+      transform: translateTransform(node.transform)!,
+      worldTransform: translateTransform(node.worldTransform),
+    };
+  });
 }
 
 function nearestConcreteAncestor(
@@ -346,7 +373,7 @@ export function createSpatialDocument(source: string, options: CreateSpatialDocu
   const wrappedRenderable = flattenRenderable(wrappedTree);
   const interactions = evaluateInteractions(wrappedRenderable, options.probeTolerance, coordinateSpace);
   const effectiveTree = applyConditionalVariants(wrappedTree, resolved.variants, interactions, coordinateSpace);
-  const effectiveRenderable = flattenRenderable(effectiveTree);
+  const effectiveRenderable = applyPhysicsFrame(flattenRenderable(effectiveTree), options.physicsFrame);
   const physicalNodes = effectiveRenderable.filter((node) => node.origin?.sourceKind !== 'secondary');
   const sensorNodes = effectiveRenderable.filter((node) => node.origin?.sourceKind === 'secondary');
   const groupedNodes = [...resolveCollisions(physicalNodes), ...sensorNodes];
@@ -362,5 +389,6 @@ export function createSpatialDocument(source: string, options: CreateSpatialDocu
     diagnostics,
     coordinateSpace,
     interactions,
+    physicsTick: options.physicsFrame?.tick,
   };
 }
