@@ -53,23 +53,14 @@ describe('transactionsToXyzDslSource', () => {
     )).toBe('');
   });
 
-  it('maps only the latest outgoing remote editor transaction and filters other senders', () => {
+  it('maps all outgoing remote editor baseline declarations and filters other senders', () => {
     const editorSource = transactionsToRemoteEditorSource([
       transaction('color: cyan', 0, '+4+1/+2+1/+0+1', 'originating-key'),
       transaction('color: magenta', 1, '+5+1/+2+1/+0+1', 'other-key'),
       transaction('color: yellow', 2, '+6+1/+2+1/+0+1', 'originating-key'),
     ], 'originating-key');
 
-    expect(editorSource).toBe('"+6+1/+2+1/+0+1" : "color: yellow"');
-  });
-
-  it('selects the latest remote editor update regardless of arrival order', () => {
-    const editorSource = transactionsToRemoteEditorSource([
-      transaction('color: yellow', 2, '+6+1/+2+1/+0+1', 'originating-key'),
-      transaction('color: cyan', 0, '+4+1/+2+1/+0+1', 'originating-key'),
-    ], 'originating-key');
-
-    expect(editorSource).toBe('"+6+1/+2+1/+0+1" : "color: yellow"');
+    expect(editorSource).toBe('"+4+1/+2+1/+0+1" : "color: cyan"\n"+6+1/+2+1/+0+1" : "color: yellow"');
   });
 
   it('returns an empty remote editor source when the public key is blank', () => {

@@ -222,24 +222,15 @@ export function transactionsToXyzDslSource(
 }
 
 /**
- * Maps primary-key transactions observed on the overlay node into declarations
- * applied in order by the remote spatial editor.
+ * Maps primary-key transactions observed on the overlay node into baseline
+ * declarations applied in order by the remote spatial editor.
  */
 export function transactionsToRemoteEditorSource(transactions: readonly XyzDslTransaction[], publicKey: string): string {
   if (!publicKey.trim()) {
     return '';
   }
 
-  const normalizedPublicKey = publicKey.trim();
-  const latest = transactions
-    .filter((transaction) => transaction.from === normalizedPublicKey)
-    .reduce<XyzDslTransaction | undefined>((current, transaction) => {
-      if (!current) return transaction;
-      if (transaction.time !== current.time) return transaction.time > current.time ? transaction : current;
-      return (transaction.nonce ?? 0) >= (current.nonce ?? 0) ? transaction : current;
-    }, undefined);
-
-  return transactionsToXyzDslSource(latest ? [latest] : [], { publicKey: normalizedPublicKey }).source;
+  return transactionsToXyzDslSource(transactions, { publicKey }).source;
 }
 
 export function transactionToRemoteEditorSource(transaction: XyzDslTransaction | undefined, publicKey: string): string {

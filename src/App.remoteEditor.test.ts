@@ -34,14 +34,14 @@ describe('remote editor lifecycle', () => {
       .toContain('mergeStreamTransactions(existing, [normalizeXyzDslTransaction(transaction)])');
   });
 
-  it('connects overlays only after simulation starts', () => {
-    expect(appSource).toContain("simulationMode !== 'stopped' && remoteEditorPublicKey");
+  it('connects the baseline editor before simulation and cursors only after it starts', () => {
+    expect(appSource).toContain("simulationMode === 'stopped' && remoteEditorPublicKey");
     expect(appSource).toContain("simulationMode !== 'stopped' ? validSecondaryKeyReferences.map");
   });
 
-  it('keeps overlay declarations out of the authored scene while stopped', () => {
+  it('keeps cursor declarations out of the authored scene while stopped without removing the remote baseline', () => {
     expect(appSource).toContain("simulationMode === 'stopped' ? [] : secondaryTransactionOverlayStreams");
-    expect(appSource).toContain("simulationMode === 'stopped' ? '' : remoteEditorSource");
+    expect(appSource).not.toContain("simulationMode === 'stopped' ? '' : remoteEditorSource");
   });
 
   it('closes authoring UI when simulation starts', () => {

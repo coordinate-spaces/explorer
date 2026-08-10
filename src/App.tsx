@@ -603,7 +603,7 @@ export default function App() {
   const renderedBundle = useMemo(
     () => composeSpatialEditorSourceBundle(authoringSource,
       simulationMode === 'stopped' ? [] : secondaryTransactionOverlayStreams,
-      simulationMode === 'stopped' ? '' : remoteEditorSource,
+      remoteEditorSource,
       authoringOriginsByLine),
     [authoringOriginsByLine, authoringSource, remoteEditorSource, secondaryTransactionOverlayStreams, simulationMode],
   );
@@ -937,7 +937,7 @@ export default function App() {
 
   return (
     <main className={`app-shell app-shell--${appMode}`}>
-      {simulationMode !== 'stopped' && remoteEditorPublicKey && endpointValidationError(DEFAULT_OVERLAY_TRANSACTION_ENDPOINT) === undefined ? (
+      {simulationMode === 'stopped' && remoteEditorPublicKey && endpointValidationError(DEFAULT_OVERLAY_TRANSACTION_ENDPOINT) === undefined ? (
         <RemoteEditorRealtimeSubscription
           key={remoteEditorPublicKey}
           publicKey={remoteEditorPublicKey}
