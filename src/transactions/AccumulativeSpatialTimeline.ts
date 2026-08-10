@@ -3,6 +3,7 @@ import type { SpatialDocument } from '../model/SpatialDocument';
 import type { SpatialNode } from '../model/SpatialNode';
 import type { RigidBodyDefinition } from '../physics/types';
 import { parseXyzDslDocument } from '../xyzdsl/parser';
+import { canonicalNamespacePath } from '../xyzdsl/pathParser';
 import { resolveXyzDslDocument } from '../xyzdsl/resolveDocument';
 import type { XyzDslDeclarationOrigin } from '../xyzdsl/types';
 import { SimulationTimeline } from './SimulationTimeline';
@@ -81,11 +82,15 @@ export class AccumulativeSpatialTimeline {
     const bindings = resolved.variants.flatMap((variant): PhysicsDirectiveBinding[] => {
       const targetId = idsByNamespace.get(variant.targetNamespacePath);
       if (!targetId || !variant.conditional.directives.some((directive) => directive.name === 'contact')) return [];
+      const interactionDirectives = variant.conditional.directives.map((directive) => ({
+        state: directive.name,
+        scopeNamespace: canonicalNamespacePath(directive.scopeNamespace),
+      }));
       const spatial = variant.conditional.spatialOverride;
-      if (spatial.mode === 'translation') return [{ targetId, mode: 'translation', vector: spatial.magnitude }];
+      if (spatial.mode === 'translation') return [{ targetId, mode: 'translation', vector: spatial.magnitude, interactionDirectives }];
       if (spatial.mode === 'weighted-translation') {
         const node = renderable(authored.nodes).find(({ id }) => id === targetId);
-        return [{ targetId, mode: 'weighted-translation', targetWeight: node?.origin?.transactionAmount }];
+        return [{ targetId, mode: 'weighted-translation', targetWeight: node?.origin?.transactionAmount, interactionDirectives }];
       }
       return [];
     });

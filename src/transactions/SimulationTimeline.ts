@@ -10,6 +10,11 @@ export interface PhysicsDirectiveBinding {
   magnitude?: number;
   vector?: Vector3Tuple;
   targetWeight?: number;
+  /** Predicates that select the interaction fact independently of the response body. */
+  interactionDirectives?: Array<{
+    state: 'probe' | 'breach' | 'contact';
+    scopeNamespace: string;
+  }>;
 }
 
 export interface SimulationFrame {
@@ -24,6 +29,23 @@ function direction(fact: InteractionFact): Vector3Tuple {
   const candidate = fact.normal.some(Boolean) ? fact.normal : fact.inferredDirection;
   const length = Math.hypot(...candidate);
   return length ? candidate.map((component) => component / length) as Vector3Tuple : [1, 0, 0];
+}
+
+function bindingMatchesFact(binding: PhysicsDirectiveBinding, fact: InteractionFact): boolean {
+  if (!binding.interactionDirectives?.length) return fact.targetId === binding.targetId;
+  return binding.interactionDirectives.every((directive) =>
+    (directive.state === 'contact' || directive.state === fact.state) &&
+    fact.targetNamespace.startsWith(directive.scopeNamespace));
+}
+
+function selectInteractionFact(
+  binding: PhysicsDirectiveBinding,
+  facts: readonly InteractionFact[],
+): InteractionFact | undefined {
+  return facts.filter((fact) => bindingMatchesFact(binding, fact)).sort((a, b) =>
+    (b.penetration ?? 0) - (a.penetration ?? 0) ||
+    (a.separation ?? 0) - (b.separation ?? 0) ||
+    a.streamId.localeCompare(b.streamId) || a.cursorId.localeCompare(b.cursorId))[0];
 }
 
 /** Owns consecutive interaction facts and physics state outside React rendering. */
@@ -72,21 +94,19 @@ export class SimulationTimeline {
       activeFacts: readonly InteractionFact[],
       activeBindings: readonly PhysicsDirectiveBinding[],
     ) => {
-      const bindingsByTarget = new Map(activeBindings.map((binding) => [binding.targetId, binding]));
-      activeFacts.forEach((fact) => {
-        const binding = bindingsByTarget.get(fact.targetId);
-        if (binding?.mode !== 'force') return;
-        inputs.push({ kind: 'force', bodyId: fact.targetId, tick: inputTick, stableSourceOrder, vector: direction(fact).map((value) => value * (binding.magnitude ?? 0)) as Vector3Tuple });
+      activeBindings.filter(({ mode }) => mode === 'force').forEach((binding) => {
+        const fact = selectInteractionFact(binding, activeFacts);
+        if (!fact) return;
+        inputs.push({ kind: 'force', bodyId: binding.targetId, tick: inputTick, stableSourceOrder, vector: direction(fact).map((value) => value * (binding.magnitude ?? 0)) as Vector3Tuple });
       });
     };
     for (let inputTick = this.world.tick + 1; inputTick < tick; inputTick += 1) {
       addForces(inputTick, this.previousFacts, this.previousBindings);
     }
     addForces(tick, facts, bindings);
-    const activeBindingsByTarget = new Map(bindings.map((binding) => [binding.targetId, binding]));
-    facts.forEach((fact) => {
-      const binding = activeBindingsByTarget.get(fact.targetId);
-      if (binding?.mode !== 'translation' && binding?.mode !== 'weighted-translation') return;
+    bindings.filter(({ mode }) => mode === 'translation' || mode === 'weighted-translation').forEach((binding) => {
+      const fact = selectInteractionFact(binding, facts);
+      if (!fact) return;
       let vector: Vector3Tuple;
       if (binding.mode === 'translation') {
         const signs = (binding.vector ?? [0, 0, 0]).map((_, axis) => fact.normal[axis] || fact.inferredDirection[axis] || 1);
@@ -98,13 +118,12 @@ export class SimulationTimeline {
         const distance = Math.min(cursorWeight / targetWeight / 100, 100) + (fact.state === 'breach' ? fact.resolutionDistance ?? 0 : 0);
         vector = unit.map((value) => value * distance) as Vector3Tuple;
       }
-      inputs.push({ kind: 'translation', bodyId: fact.targetId, tick, stableSourceOrder, vector });
+      inputs.push({ kind: 'translation', bodyId: binding.targetId, tick, stableSourceOrder, vector });
     });
-    const bindingsByTarget = new Map(bindings.map((binding) => [binding.targetId, binding]));
     transitions.filter(({ kind }) => kind === 'enter').forEach(({ fact }) => {
-      const binding = bindingsByTarget.get(fact.targetId);
-      if (binding?.mode !== 'impulse') return;
-      inputs.push({ kind: 'impulse', bodyId: fact.targetId, tick, stableSourceOrder, vector: direction(fact).map((value) => value * (binding.magnitude ?? 0)) as Vector3Tuple });
+      bindings.filter((binding) => binding.mode === 'impulse' && bindingMatchesFact(binding, fact)).forEach((binding) => {
+        inputs.push({ kind: 'impulse', bodyId: binding.targetId, tick, stableSourceOrder, vector: direction(fact).map((value) => value * (binding.magnitude ?? 0)) as Vector3Tuple });
+      });
     });
     this.world.enqueueInputs(inputs);
     const physics = this.world.step(tick);

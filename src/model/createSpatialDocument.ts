@@ -239,6 +239,7 @@ function applyConditionalVariants(
     let geometry = node.geometry;
     let content = node.content ?? { diagnostics: [] };
     let rotation = node.localTransform?.rotation ?? node.transform.rotation;
+    let transformChanged = false;
     const matches = variantsForNode(node, variants, facts);
     if (matches.length === 0 && !parentChanged) {
       return {
@@ -251,8 +252,14 @@ function applyConditionalVariants(
       const physicsOwnsTranslation = accumulativePhysics &&
         variant.conditional.directives.some((directive) => directive.name === 'contact') &&
         (spatial.mode === 'translation' || spatial.mode === 'weighted-translation');
-      if (spatial.mode === 'absolute-box') box = { ...spatial.box };
-      if (!physicsOwnsTranslation && spatial.mode === 'translation') box = translateBox(box, spatial.magnitude, fact, space);
+      if (spatial.mode === 'absolute-box') {
+        box = { ...spatial.box };
+        transformChanged = true;
+      }
+      if (!physicsOwnsTranslation && spatial.mode === 'translation') {
+        box = translateBox(box, spatial.magnitude, fact, space);
+        transformChanged = true;
+      }
       if (!physicsOwnsTranslation && spatial.mode === 'weighted-translation') {
         box = weightedTranslateBox(
           box,
@@ -261,6 +268,7 @@ function applyConditionalVariants(
           space,
           variant.conditional.directives.some((directive) => directive.name === 'contact'),
         );
+        transformChanged = true;
       }
       material = mergeXyzDslMaterialSpecs(material, variant.properties.material);
       content = mergeXyzDslContentSpecs(content, variant.properties.content);
@@ -275,15 +283,20 @@ function applyConditionalVariants(
           operation: geometry.operation,
         }, variant.properties.geometry));
       }
-      if (variant.properties.transform.declared) rotation = variant.properties.transform.rotation;
+      if (variant.properties.transform.declared) {
+        rotation = variant.properties.transform.rotation;
+        transformChanged = true;
+      }
     });
     geometry = { ...geometry, dimensions: [box.width, box.height, box.depth] };
-    const localTransform = matches.length > 0
+    const localTransform = transformChanged
       ? (node.renderable
           ? transformFromBox(box, { rotation, diagnostics: [] })
           : { ...anchorTransformFromBox(box, { rotation, diagnostics: [] }), scale: node.localTransform?.scale ?? [1, 1, 1] })
       : node.localTransform!;
-    const worldTransform = parentTransform ? composeTransforms(parentTransform, localTransform) : localTransform;
+    const worldTransform = transformChanged || parentChanged
+      ? (parentTransform ? composeTransforms(parentTransform, localTransform) : localTransform)
+      : (node.worldTransform ?? node.transform);
     const updated: SpatialNode = {
       ...node,
       baseBox: node.baseBox ?? node.box,
@@ -297,7 +310,7 @@ function applyConditionalVariants(
       bounds: boundsFromTransformedBox(box, worldTransform),
       activeInteractions: matches.map(({ fact }) => fact),
     };
-    updated.children = applyConditionalVariants(node.children ?? [], variants, facts, space, worldTransform, matches.length > 0 || parentChanged, accumulativePhysics);
+    updated.children = applyConditionalVariants(node.children ?? [], variants, facts, space, worldTransform, transformChanged || parentChanged, accumulativePhysics);
     return updated;
   });
 }

@@ -22,6 +22,16 @@ function conditionalSource(directive: 'probe' | 'breach' | 'contact', cursorX: n
   return source(cursorX, response).replace('+contact/', `+${directive}/`);
 }
 
+function scopedOrigins() {
+  return new Map<number, XyzDslDeclarationOrigin>([
+    [1, { sourceKind: 'baseline' }],
+    [2, { sourceKind: 'baseline' }],
+    [3, { sourceKind: 'baseline' }],
+    [4, { sourceKind: 'baseline' }],
+    [5, { sourceKind: 'secondary', streamId: 'cursor' }],
+  ]);
+}
+
 describe('AccumulativeSpatialTimeline', () => {
   it('retains each explicit contact translation across transaction frames', () => {
     const timeline = new AccumulativeSpatialTimeline();
@@ -101,5 +111,20 @@ describe('AccumulativeSpatialTimeline', () => {
 
     expect(target?.transform.position[0]).toBe(10);
     expect(target?.box.width).toBe(2);
+  });
+
+  it('moves a response target when contact occurs elsewhere in its directive scope', () => {
+    const source = [
+      '"Machine/+0+10/+0+10/+0+10":""',
+      '"Machine/Button/+0+1/+0+1/+0+1":""',
+      '"Machine/Lever/+5+1/+0+1/+0+1":""',
+      '"Machine/+contact/Lever/+2/+0/+0":""',
+      '"Cursor/+1+1/+0+1/+0+1":""',
+    ].join('\n');
+    const timeline = new AccumulativeSpatialTimeline();
+    const frame = timeline.evaluate(source, scopedOrigins());
+    const lever = frame.document.renderNodes.find((node) => node.namespacePath === 'Machine/Lever/');
+
+    expect(lever?.transform.position[0]).toBe(3.5);
   });
 });
