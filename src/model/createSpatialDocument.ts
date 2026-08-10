@@ -29,6 +29,8 @@ export interface CreateSpatialDocumentOptions {
   physicsFrame?: PhysicsFrame;
   /** Physics owns conditional translation; conditional material/geometry still apply. */
   accumulativePhysics?: boolean;
+  /** Build authored body definitions without applying any interaction variants. */
+  applyConditionalVariants?: boolean;
 }
 
 function applyPhysicsFrame(nodes: SpatialNode[], frame: PhysicsFrame | undefined): SpatialNode[] {
@@ -246,9 +248,12 @@ function applyConditionalVariants(
     }
     matches.forEach(({ variant, fact }) => {
       const spatial = variant.conditional.spatialOverride;
-      if (!accumulativePhysics && spatial.mode === 'absolute-box') box = { ...spatial.box };
-      if (!accumulativePhysics && spatial.mode === 'translation') box = translateBox(box, spatial.magnitude, fact, space);
-      if (!accumulativePhysics && spatial.mode === 'weighted-translation') {
+      const physicsOwnsTranslation = accumulativePhysics &&
+        variant.conditional.directives.some((directive) => directive.name === 'contact') &&
+        (spatial.mode === 'translation' || spatial.mode === 'weighted-translation');
+      if (spatial.mode === 'absolute-box') box = { ...spatial.box };
+      if (!physicsOwnsTranslation && spatial.mode === 'translation') box = translateBox(box, spatial.magnitude, fact, space);
+      if (!physicsOwnsTranslation && spatial.mode === 'weighted-translation') {
         box = weightedTranslateBox(
           box,
           fact,
@@ -376,7 +381,9 @@ export function createSpatialDocument(source: string, options: CreateSpatialDocu
   const positionedRenderable = applyPhysicsFrame(flattenRenderable(wrappedTree), options.physicsFrame);
   const positionedTree = applyRenderableStateToTree(wrappedTree, positionedRenderable);
   const interactions = evaluateInteractions(positionedRenderable, options.probeTolerance, coordinateSpace);
-  const effectiveTree = applyConditionalVariants(positionedTree, resolved.variants, interactions, coordinateSpace, undefined, false, options.accumulativePhysics);
+  const effectiveTree = options.applyConditionalVariants === false
+    ? positionedTree
+    : applyConditionalVariants(positionedTree, resolved.variants, interactions, coordinateSpace, undefined, false, options.accumulativePhysics);
   const effectiveRenderable = flattenRenderable(effectiveTree);
   const physicalNodes = effectiveRenderable.filter((node) => node.origin?.sourceKind !== 'secondary');
   const sensorNodes = effectiveRenderable.filter((node) => node.origin?.sourceKind === 'secondary');

@@ -18,6 +18,10 @@ function source(cursorX: number, response: string) {
   ].join('\n');
 }
 
+function conditionalSource(directive: 'probe' | 'breach' | 'contact', cursorX: number, response: string) {
+  return source(cursorX, response).replace('+contact/', `+${directive}/`);
+}
+
 describe('AccumulativeSpatialTimeline', () => {
   it('retains each explicit contact translation across transaction frames', () => {
     const timeline = new AccumulativeSpatialTimeline();
@@ -44,5 +48,30 @@ describe('AccumulativeSpatialTimeline', () => {
     const second = frame.document.renderNodes.find((node) => node.origin?.sourceKind !== 'secondary')?.transform.position;
     expect(second).toEqual(first);
     expect(frame.tick).toBe(1);
+  });
+
+  it('preserves non-contact relative and weighted conditional translations', () => {
+    const relative = new AccumulativeSpatialTimeline().evaluate(
+      conditionalSource('probe', 6, '+2/+0/+0'),
+      origins(),
+    );
+    const weighted = new AccumulativeSpatialTimeline().evaluate(
+      conditionalSource('probe', 6, '+++'),
+      origins(),
+    );
+
+    expect(relative.document.renderNodes.find((node) => node.origin?.sourceKind !== 'secondary')?.transform.position[0]).toBe(9.5);
+    expect(weighted.document.renderNodes.find((node) => node.origin?.sourceKind !== 'secondary')?.transform.position[0]).toBeCloseTo(7.51);
+  });
+
+  it('preserves conditional absolute-box overrides in accumulative mode', () => {
+    const frame = new AccumulativeSpatialTimeline().evaluate(
+      conditionalSource('probe', 6, '+9+2/+0+1/+11+1'),
+      origins(),
+    );
+    const target = frame.document.renderNodes.find((node) => node.origin?.sourceKind !== 'secondary');
+
+    expect(target?.transform.position[0]).toBe(10);
+    expect(target?.box.width).toBe(2);
   });
 });

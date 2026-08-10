@@ -23,7 +23,7 @@ export class AccumulativeSpatialTimeline {
   readonly simulation = new SimulationTimeline();
 
   evaluate(source: string, originsByLine?: ReadonlyMap<number, XyzDslDeclarationOrigin>): AccumulativeSpatialFrame {
-    const authored = createSpatialDocument(source, { originsByLine });
+    const authored = createSpatialDocument(source, { originsByLine, applyConditionalVariants: false });
     const definitions: RigidBodyDefinition[] = renderable(authored.nodes)
       .filter((node) => node.origin?.sourceKind !== 'secondary')
       .map((node) => ({
