@@ -33,4 +33,21 @@ describe('remote editor lifecycle', () => {
     expect(appSource.match(/handleRemoteEditorTransaction[\s\S]*?\n  \}, \[remoteEditorPublicKey\]\);/)?.[0])
       .toContain('mergeStreamTransactions(existing, [normalizeXyzDslTransaction(transaction)])');
   });
+
+  it('connects overlays only after simulation starts', () => {
+    expect(appSource).toContain("simulationMode !== 'stopped' && remoteEditorPublicKey");
+    expect(appSource).toContain("simulationMode !== 'stopped' ? validSecondaryKeyReferences.map");
+  });
+
+  it('keeps overlay declarations out of the authored scene while stopped', () => {
+    expect(appSource).toContain("simulationMode === 'stopped' ? [] : secondaryTransactionOverlayStreams");
+    expect(appSource).toContain("simulationMode === 'stopped' ? '' : remoteEditorSource");
+  });
+
+  it('closes authoring UI when simulation starts', () => {
+    const startSimulation = appSource.match(/const startSimulation = useCallback\(\(\) => \{([\s\S]*?)\n  \}, \[baselineRevision\]\);/)?.[0];
+    expect(startSimulation).toContain("setAppMode('viewer')");
+    expect(startSimulation).toContain('setDrawerOpen(false)');
+    expect(appSource).toContain("authoringAvailable={simulationMode === 'stopped'}");
+  });
 });

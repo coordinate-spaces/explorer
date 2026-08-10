@@ -230,7 +230,16 @@ export function transactionsToRemoteEditorSource(transactions: readonly XyzDslTr
     return '';
   }
 
-  return transactionsToXyzDslSource(transactions, { publicKey }).source;
+  const normalizedPublicKey = publicKey.trim();
+  const latest = transactions
+    .filter((transaction) => transaction.from === normalizedPublicKey)
+    .reduce<XyzDslTransaction | undefined>((current, transaction) => {
+      if (!current) return transaction;
+      if (transaction.time !== current.time) return transaction.time > current.time ? transaction : current;
+      return (transaction.nonce ?? 0) >= (current.nonce ?? 0) ? transaction : current;
+    }, undefined);
+
+  return transactionsToXyzDslSource(latest ? [latest] : [], { publicKey: normalizedPublicKey }).source;
 }
 
 export function transactionToRemoteEditorSource(transaction: XyzDslTransaction | undefined, publicKey: string): string {

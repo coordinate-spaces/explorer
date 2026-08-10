@@ -601,9 +601,11 @@ export default function App() {
     [authoringSource, primaryRemoteBaselineSource, transactionXyzDsl.originsByLine],
   );
   const renderedBundle = useMemo(
-    () => composeSpatialEditorSourceBundle(authoringSource, secondaryTransactionOverlayStreams, remoteEditorSource,
+    () => composeSpatialEditorSourceBundle(authoringSource,
+      simulationMode === 'stopped' ? [] : secondaryTransactionOverlayStreams,
+      simulationMode === 'stopped' ? '' : remoteEditorSource,
       authoringOriginsByLine),
-    [authoringOriginsByLine, authoringSource, remoteEditorSource, secondaryTransactionOverlayStreams],
+    [authoringOriginsByLine, authoringSource, remoteEditorSource, secondaryTransactionOverlayStreams, simulationMode],
   );
   const renderedSource = renderedBundle.source;
   const baselineRevision = useMemo(() => spatialBaselineRevision(authoringSource), [authoringSource]);
@@ -640,6 +642,8 @@ export default function App() {
     accumulativeTimelineRef.current = new AccumulativeSpatialTimeline(baselineRevision);
     simulationBaselineRevisionRef.current = baselineRevision;
     evaluatedPhysicsFrameRef.current = undefined;
+    setAppMode('viewer');
+    setDrawerOpen(false);
     setSimulationMode('running');
   }, [baselineRevision]);
 
@@ -848,12 +852,15 @@ export default function App() {
   }, []);
 
   const handleModeChange = useCallback((mode: 'viewer' | 'editor') => {
+    if (mode === 'editor' && simulationMode !== 'stopped') {
+      return;
+    }
     setAppMode(mode);
 
     if (mode === 'editor') {
       setDrawerOpen(true);
     }
-  }, []);
+  }, [simulationMode]);
 
   const handleSelectNode = useCallback((id: string | undefined) => {
     if (id === undefined) {
@@ -930,7 +937,7 @@ export default function App() {
 
   return (
     <main className={`app-shell app-shell--${appMode}`}>
-      {remoteEditorPublicKey && endpointValidationError(DEFAULT_OVERLAY_TRANSACTION_ENDPOINT) === undefined ? (
+      {simulationMode !== 'stopped' && remoteEditorPublicKey && endpointValidationError(DEFAULT_OVERLAY_TRANSACTION_ENDPOINT) === undefined ? (
         <RemoteEditorRealtimeSubscription
           key={remoteEditorPublicKey}
           publicKey={remoteEditorPublicKey}
@@ -939,7 +946,7 @@ export default function App() {
           onStatusChange={handleRemoteEditorStatusChange}
         />
       ) : null}
-      {validSecondaryKeyReferences.map((reference) => (
+      {simulationMode !== 'stopped' ? validSecondaryKeyReferences.map((reference) => (
         <SecondaryRealtimeSubscription
           key={streamKeyForSecondaryReference(reference)}
           reference={reference}
@@ -947,7 +954,7 @@ export default function App() {
           onError={handleSecondaryRealtimeError}
           onStatusChange={handleSecondaryRealtimeStatusChange}
         />
-      ))}
+      )) : null}
       <SceneRoot
         document={document}
         selectedNodeId={selectedSceneNodeId}
@@ -982,6 +989,7 @@ export default function App() {
       ) : null}
       <XyzDslDrawer
         appMode={appMode}
+        authoringAvailable={simulationMode === 'stopped'}
         document={document}
         isOpen={drawerOpen}
         source={authoringSource}

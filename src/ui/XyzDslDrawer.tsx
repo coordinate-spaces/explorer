@@ -83,6 +83,7 @@ function renderAuthoringStatus(
 
 interface XyzDslDrawerProps {
   appMode: 'viewer' | 'editor';
+  authoringAvailable: boolean;
   document: SpatialDocument;
   isOpen: boolean;
   source: string;
@@ -123,6 +124,7 @@ interface XyzDslDrawerProps {
 
 export function XyzDslDrawer({
   appMode,
+  authoringAvailable,
   document,
   isOpen,
   source,
@@ -164,18 +166,18 @@ export function XyzDslDrawer({
   return (
     <aside className={`xyzdsl-drawer xyzdsl-drawer--${appMode} ${isOpen ? 'is-open' : ''}`}>
       <div className="mode-controls" aria-label="Application mode">
-        <button
+        {authoringAvailable ? <button
           className="mode-toggle"
           type="button"
           aria-pressed={isEditorMode}
           onClick={() => onModeChange(isEditorMode ? 'viewer' : 'editor')}
         >
           {isEditorMode ? 'Viewer mode' : 'Editor mode'}
-        </button>
+        </button> : null}
 
       </div>
 
-      {isEditorMode && isOpen ? (
+      {authoringAvailable && isEditorMode && isOpen ? (
         <div className="drawer-panel">
           <button className="drawer-close-button" type="button" aria-label="Close declarations and return to viewer mode" onClick={() => onModeChange('viewer')}>
             ×
