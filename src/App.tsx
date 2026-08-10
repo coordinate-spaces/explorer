@@ -449,14 +449,12 @@ export default function App() {
     : [];
 
   useEffect(() => {
-    if (simulationMode !== 'running') return;
-
     const playbackStartedAtMs = Date.now();
     setActiveSecondaryTransactions((streams) => Object.fromEntries(Object.entries(streams).map(([streamKey, stream]) => [
       streamKey,
       stream.replaying ? {
         ...stream,
-        playbackStartedAtMs,
+        playbackStartedAtMs: simulationMode === 'running' ? playbackStartedAtMs : undefined,
         playbackBaseTransactionTime: stream.transactions[clampPlaybackIndex(stream.playbackIndex, stream.transactions.length)]?.time,
       } : stream,
     ])));
@@ -749,6 +747,19 @@ export default function App() {
         return streams;
       }
 
+      const normalizedPlaybackSpeed = normalizePlaybackSpeed(playbackSpeed);
+      if (simulationMode !== 'running') {
+        return {
+          ...streams,
+          [streamKey]: {
+            ...stream,
+            playbackSpeed: normalizedPlaybackSpeed,
+            playbackStartedAtMs: undefined,
+            playbackBaseTransactionTime: stream.transactions[clampPlaybackIndex(stream.playbackIndex, stream.transactions.length)]?.time,
+          },
+        };
+      }
+
       const now = Date.now();
       const playbackStartedAtMs = stream.playbackStartedAtMs ?? now;
       const playbackBaseTransactionTime = stream.playbackBaseTransactionTime ?? stream.transactions[0]?.time ?? 0;
@@ -763,7 +774,7 @@ export default function App() {
         ...streams,
         [streamKey]: {
           ...stream,
-          playbackSpeed: normalizePlaybackSpeed(playbackSpeed),
+          playbackSpeed: normalizedPlaybackSpeed,
           playbackIndex: stream.replaying
             ? playbackIndexForElapsedTime(stream.transactions, 0, playbackTime)
             : stream.playbackIndex,
@@ -774,7 +785,7 @@ export default function App() {
         },
       };
     });
-  }, [setActiveSecondaryTransactions]);
+  }, [setActiveSecondaryTransactions, simulationMode]);
 
   const handleSecondaryPlaybackSeek = useCallback((
     publicKey: string,

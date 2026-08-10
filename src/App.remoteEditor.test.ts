@@ -53,6 +53,14 @@ describe('remote editor lifecycle', () => {
 
   it('advances cursor playback only while the simulation is running', () => {
     expect(appSource).toContain("if (simulationMode !== 'running') {\n      return undefined;");
+    expect(appSource).toContain("playbackStartedAtMs: simulationMode === 'running' ? playbackStartedAtMs : undefined");
     expect(appSource).toContain('playbackBaseTransactionTime: stream.transactions[clampPlaybackIndex(stream.playbackIndex, stream.transactions.length)]?.time');
+  });
+
+  it('changes playback speed without consuming paused wall-clock time', () => {
+    const speedHandler = appSource.match(/const handleSecondaryPlaybackSpeedChange = useCallback\(\([\s\S]*?\n  \}, \[setActiveSecondaryTransactions, simulationMode\]\);/)?.[0];
+    expect(speedHandler).toContain("if (simulationMode !== 'running')");
+    expect(speedHandler).toContain('playbackStartedAtMs: undefined');
+    expect(speedHandler).not.toContain("Date.now() - playbackStartedAtMs");
   });
 });
