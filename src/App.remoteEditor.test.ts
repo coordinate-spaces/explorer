@@ -34,8 +34,9 @@ describe('remote editor lifecycle', () => {
       .toContain('mergeStreamTransactions(existing, [normalizeXyzDslTransaction(transaction)])');
   });
 
-  it('connects the baseline editor before simulation and cursors only after it starts', () => {
-    expect(appSource).toContain("simulationMode === 'stopped' && remoteEditorPublicKey");
+  it('keeps listening for deferred baseline edits while cursors connect only after simulation starts', () => {
+    expect(appSource).toContain('{remoteEditorPublicKey && endpointValidationError');
+    expect(appSource).not.toContain("simulationMode === 'stopped' && remoteEditorPublicKey");
     expect(appSource).toContain("simulationMode !== 'stopped' ? validSecondaryKeyReferences.map");
   });
 
@@ -45,10 +46,16 @@ describe('remote editor lifecycle', () => {
   });
 
   it('closes authoring UI when simulation starts', () => {
-    const startSimulation = appSource.match(/const startSimulation = useCallback\(\(\) => \{([\s\S]*?)\n  \}, \[baselineRevision\]\);/)?.[0];
+    const startSimulation = appSource.match(/const startSimulation = useCallback\(\(\) => \{([\s\S]*?)\n  \}, \[baselineRevision, remoteEditorSource\]\);/)?.[0];
     expect(startSimulation).toContain("setAppMode('viewer')");
     expect(startSimulation).toContain('setDrawerOpen(false)');
     expect(appSource).toContain("authoringAvailable={simulationMode === 'stopped'}");
+  });
+
+  it('freezes remote baseline application during simulation while continuing to receive edits', () => {
+    expect(appSource).toContain('simulationRemoteEditorSourceRef.current = remoteEditorSource');
+    expect(appSource).toContain("simulationMode === 'stopped' ? remoteEditorSource : simulationRemoteEditorSourceRef.current ?? remoteEditorSource");
+    expect(appSource).toContain('simulationRemoteEditorSourceRef.current = undefined');
   });
 
   it('advances cursor playback only while the simulation is running', () => {

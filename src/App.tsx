@@ -558,6 +558,7 @@ export default function App() {
     remoteEditor.transactions,
     remoteEditor.publicKey,
   ), [remoteEditor.publicKey, remoteEditor.transactions]);
+  const simulationRemoteEditorSourceRef = useRef<string | undefined>(undefined);
   const secondaryProjections = useMemo<SecondaryProjection[]>(() => {
     const referencesByProjection = referencesBySecondaryProjection(transactionXyzDsl.secondaryKeys);
 
@@ -619,7 +620,7 @@ export default function App() {
   const renderedBundle = useMemo(
     () => composeSpatialEditorSourceBundle(authoringSource,
       simulationMode === 'stopped' ? [] : secondaryTransactionOverlayStreams,
-      remoteEditorSource,
+      simulationMode === 'stopped' ? remoteEditorSource : simulationRemoteEditorSourceRef.current ?? remoteEditorSource,
       authoringOriginsByLine),
     [authoringOriginsByLine, authoringSource, remoteEditorSource, secondaryTransactionOverlayStreams, simulationMode],
   );
@@ -657,16 +658,18 @@ export default function App() {
   const startSimulation = useCallback(() => {
     accumulativeTimelineRef.current = new AccumulativeSpatialTimeline(baselineRevision);
     simulationBaselineRevisionRef.current = baselineRevision;
+    simulationRemoteEditorSourceRef.current = remoteEditorSource;
     evaluatedPhysicsFrameRef.current = undefined;
     setAppMode('viewer');
     setDrawerOpen(false);
     setSimulationMode('running');
-  }, [baselineRevision]);
+  }, [baselineRevision, remoteEditorSource]);
 
   const stopSimulation = useCallback(() => {
     accumulativeTimelineRef.current = undefined;
     simulationBaselineRevisionRef.current = undefined;
     evaluatedPhysicsFrameRef.current = undefined;
+    simulationRemoteEditorSourceRef.current = undefined;
     setSimulationMode('stopped');
   }, []);
   const selectedNode = useMemo(
@@ -966,7 +969,7 @@ export default function App() {
 
   return (
     <main className={`app-shell app-shell--${appMode}`}>
-      {simulationMode === 'stopped' && remoteEditorPublicKey && endpointValidationError(DEFAULT_OVERLAY_TRANSACTION_ENDPOINT) === undefined ? (
+      {remoteEditorPublicKey && endpointValidationError(DEFAULT_OVERLAY_TRANSACTION_ENDPOINT) === undefined ? (
         <RemoteEditorRealtimeSubscription
           key={remoteEditorPublicKey}
           publicKey={remoteEditorPublicKey}
