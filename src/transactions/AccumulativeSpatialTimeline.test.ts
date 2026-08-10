@@ -1,0 +1,48 @@
+import { describe, expect, it } from 'vitest';
+import type { XyzDslDeclarationOrigin } from '../xyzdsl/types';
+import { AccumulativeSpatialTimeline } from './AccumulativeSpatialTimeline';
+
+function origins(cursorAmount = 1_000_000) {
+  return new Map<number, XyzDslDeclarationOrigin>([
+    [1, { sourceKind: 'baseline', transactionAmount: 1_000_000 }],
+    [2, { sourceKind: 'baseline' }],
+    [3, { sourceKind: 'secondary', streamId: 'cursor', transactionAmount: cursorAmount }],
+  ]);
+}
+
+function source(cursorX: number, response: string) {
+  return [
+    '"Box/+7+1/+0+1/+11+1" : "geometry: sphere; color: 0x33aaff"',
+    `"Box/+contact/${response}":""`,
+    `"+${cursorX}+1/+0+1/+11+1":""`,
+  ].join('\n');
+}
+
+describe('AccumulativeSpatialTimeline', () => {
+  it('retains each explicit contact translation across transaction frames', () => {
+    const timeline = new AccumulativeSpatialTimeline();
+    const first = timeline.evaluate(source(6, '+2/+0/+0'), origins());
+    const second = timeline.evaluate(source(8, '+2/+0/+0'), origins());
+
+    expect(first.document.renderNodes.find((node) => node.origin?.sourceKind !== 'secondary')?.transform.position[0]).toBe(9.5);
+    expect(second.document.renderNodes.find((node) => node.origin?.sourceKind !== 'secondary')?.transform.position[0]).toBe(11.5);
+  });
+
+  it('retains each weighted contact translation across transaction frames', () => {
+    const timeline = new AccumulativeSpatialTimeline();
+    const first = timeline.evaluate(source(6, '+++'), origins());
+    const second = timeline.evaluate(source(7, '+++'), origins());
+
+    expect(first.document.renderNodes.find((node) => node.origin?.sourceKind !== 'secondary')?.transform.position[0]).toBeCloseTo(7.51);
+    expect(second.document.renderNodes.find((node) => node.origin?.sourceKind !== 'secondary')?.transform.position[0]).toBeGreaterThan(7.51);
+  });
+
+  it('does not advance when a completed document is read repeatedly', () => {
+    const timeline = new AccumulativeSpatialTimeline();
+    const frame = timeline.evaluate(source(6, '+2/+0/+0'), origins());
+    const first = frame.document.renderNodes.find((node) => node.origin?.sourceKind !== 'secondary')?.transform.position;
+    const second = frame.document.renderNodes.find((node) => node.origin?.sourceKind !== 'secondary')?.transform.position;
+    expect(second).toEqual(first);
+    expect(frame.tick).toBe(1);
+  });
+});

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { canEditDeclarationLine, moveDeclarationPath, resizeDeclarationPath, rotateDeclarationPath, updateDeclarationProperty } from './xyzdsl/editXyzDslSource';
 import type { AxisName } from './xyzdsl/types';
 import { createSpatialDocument } from './model/createSpatialDocument';
+import { AccumulativeSpatialTimeline } from './transactions/AccumulativeSpatialTimeline';
 import type { SpatialNode } from './model/SpatialNode';
 import {
   findNodeById,
@@ -604,9 +605,22 @@ export default function App() {
     [authoringOriginsByLine, authoringSource, remoteEditorSource, secondaryTransactionOverlayStreams],
   );
   const renderedSource = renderedBundle.source;
-  const document = useMemo(() => createSpatialDocument(renderedBundle.source, {
+  const accumulativeTimelineRef = useRef<AccumulativeSpatialTimeline | undefined>(undefined);
+  const evaluatedBundleRef = useRef<typeof renderedBundle | undefined>(undefined);
+  const [document, setDocument] = useState(() => createSpatialDocument(renderedBundle.source, {
     originsByLine: renderedBundle.originsByLine,
-  }), [renderedBundle]);
+  }));
+  useEffect(() => {
+    // React StrictMode repeats effects in development. A transaction frame must
+    // advance physics exactly once, independently of render/effect frequency.
+    if (evaluatedBundleRef.current === renderedBundle) return;
+    evaluatedBundleRef.current = renderedBundle;
+    accumulativeTimelineRef.current ??= new AccumulativeSpatialTimeline();
+    setDocument(accumulativeTimelineRef.current.evaluate(
+      renderedBundle.source,
+      renderedBundle.originsByLine,
+    ).document);
+  }, [renderedBundle]);
   const selectedNode = useMemo(
     () => findNodeById(document.nodes, selectedNodeId) ?? findNodeByLineNumber(document.nodes, selectedLineNumber),
     [document.nodes, selectedLineNumber, selectedNodeId],

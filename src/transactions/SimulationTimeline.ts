@@ -6,8 +6,10 @@ import type { InteractionTransition } from './interactionTimeline';
 
 export interface PhysicsDirectiveBinding {
   targetId: string;
-  mode: 'force' | 'impulse';
-  magnitude: number;
+  mode: 'force' | 'impulse' | 'translation' | 'weighted-translation';
+  magnitude?: number;
+  vector?: Vector3Tuple;
+  targetWeight?: number;
 }
 
 export interface SimulationFrame {
@@ -74,18 +76,35 @@ export class SimulationTimeline {
       activeFacts.forEach((fact) => {
         const binding = bindingsByTarget.get(fact.targetId);
         if (binding?.mode !== 'force') return;
-        inputs.push({ kind: 'force', bodyId: fact.targetId, tick: inputTick, stableSourceOrder, vector: direction(fact).map((value) => value * binding.magnitude) as Vector3Tuple });
+        inputs.push({ kind: 'force', bodyId: fact.targetId, tick: inputTick, stableSourceOrder, vector: direction(fact).map((value) => value * (binding.magnitude ?? 0)) as Vector3Tuple });
       });
     };
     for (let inputTick = this.world.tick + 1; inputTick < tick; inputTick += 1) {
       addForces(inputTick, this.previousFacts, this.previousBindings);
     }
     addForces(tick, facts, bindings);
+    const activeBindingsByTarget = new Map(bindings.map((binding) => [binding.targetId, binding]));
+    facts.forEach((fact) => {
+      const binding = activeBindingsByTarget.get(fact.targetId);
+      if (binding?.mode !== 'translation' && binding?.mode !== 'weighted-translation') return;
+      let vector: Vector3Tuple;
+      if (binding.mode === 'translation') {
+        const signs = (binding.vector ?? [0, 0, 0]).map((_, axis) => fact.normal[axis] || fact.inferredDirection[axis] || 1);
+        vector = (binding.vector ?? [0, 0, 0]).map((value, axis) => value * signs[axis]) as Vector3Tuple;
+      } else {
+        const unit = direction(fact);
+        const cursorWeight = Number.isFinite(fact.cursorWeight) && fact.cursorWeight! > 0 ? fact.cursorWeight! : 1_000_000;
+        const targetWeight = Number.isFinite(binding.targetWeight) && binding.targetWeight! > 0 ? binding.targetWeight! : 1_000_000;
+        const distance = Math.min(cursorWeight / targetWeight / 100, 100) + (fact.state === 'breach' ? fact.resolutionDistance ?? 0 : 0);
+        vector = unit.map((value) => value * distance) as Vector3Tuple;
+      }
+      inputs.push({ kind: 'translation', bodyId: fact.targetId, tick, stableSourceOrder, vector });
+    });
     const bindingsByTarget = new Map(bindings.map((binding) => [binding.targetId, binding]));
     transitions.filter(({ kind }) => kind === 'enter').forEach(({ fact }) => {
       const binding = bindingsByTarget.get(fact.targetId);
       if (binding?.mode !== 'impulse') return;
-      inputs.push({ kind: 'impulse', bodyId: fact.targetId, tick, stableSourceOrder, vector: direction(fact).map((value) => value * binding.magnitude) as Vector3Tuple });
+      inputs.push({ kind: 'impulse', bodyId: fact.targetId, tick, stableSourceOrder, vector: direction(fact).map((value) => value * (binding.magnitude ?? 0)) as Vector3Tuple });
     });
     this.world.enqueueInputs(inputs);
     const physics = this.world.step(tick);

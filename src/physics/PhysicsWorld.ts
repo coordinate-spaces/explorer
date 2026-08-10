@@ -110,6 +110,11 @@ export class PhysicsWorld {
         state.position = vector(direct.position);
         if (direct.kind === 'teleport' && direct.clearVelocity) state.linearVelocity = [0, 0, 0];
       }
+      bodyInputs.forEach((input) => {
+        if (input.kind === 'translation') {
+          state.position = state.position.map((component, axis) => component + input.vector[axis]) as Vector3Tuple;
+        }
+      });
       if ((definition.mode ?? 'dynamic') === 'dynamic') {
         const mass = definition.mass ?? 1;
         bodyInputs.forEach((input) => {
@@ -129,4 +134,3 @@ export class PhysicsWorld {
     this.currentTick = tick;
   }
 }
-
