@@ -449,6 +449,24 @@ export default function App() {
     : [];
 
   useEffect(() => {
+    if (simulationMode !== 'running') return;
+
+    const playbackStartedAtMs = Date.now();
+    setActiveSecondaryTransactions((streams) => Object.fromEntries(Object.entries(streams).map(([streamKey, stream]) => [
+      streamKey,
+      stream.replaying ? {
+        ...stream,
+        playbackStartedAtMs,
+        playbackBaseTransactionTime: stream.transactions[clampPlaybackIndex(stream.playbackIndex, stream.transactions.length)]?.time,
+      } : stream,
+    ])));
+  }, [setActiveSecondaryTransactions, simulationMode]);
+
+  useEffect(() => {
+    if (simulationMode !== 'running') {
+      return undefined;
+    }
+
     const replayingStreams = Object.values(activeSecondaryTransactions).filter((stream) => stream.replaying);
 
     if (replayingStreams.length === 0) {
@@ -494,7 +512,7 @@ export default function App() {
     }, playbackTickMilliseconds);
 
     return () => window.clearInterval(interval);
-  }, [activeSecondaryTransactions, setActiveSecondaryTransactions]);
+  }, [activeSecondaryTransactions, setActiveSecondaryTransactions, simulationMode]);
 
   const secondaryTransactionStreams = useMemo<ActiveSecondaryTransactionStream[]>(() => Object.values(activeSecondaryTransactions)
     .map(({ reference, transactions: secondaryTransactions, playbackIndex, playbackSpeed, replaying, realtimeStatus, streamError, historyLoading }) => ({

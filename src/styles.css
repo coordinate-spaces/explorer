@@ -96,6 +96,33 @@ button {
   color: #f8fafc;
 }
 
+.runtime-playback-controls {
+  pointer-events: auto;
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  z-index: 19;
+  width: min(30rem, calc(100vw - 2rem));
+  max-height: calc(100vh - 6rem);
+  overflow: auto;
+  border: 1px solid rgb(147 197 253 / 28%);
+  border-radius: 1rem;
+  padding: 0.75rem;
+  background: rgb(15 23 42 / 88%);
+  color: #dbeafe;
+  box-shadow: 0 20px 60px rgb(0 0 0 / 32%);
+  backdrop-filter: blur(16px);
+}
+
+.runtime-playback-controls > summary {
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.runtime-playback-controls[open] > summary {
+  margin-bottom: 0.75rem;
+}
+
 .mode-toggle {
   border: 1px solid rgb(255 255 255 / 22%);
   border-radius: 999px;

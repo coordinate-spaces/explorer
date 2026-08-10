@@ -50,4 +50,9 @@ describe('remote editor lifecycle', () => {
     expect(startSimulation).toContain('setDrawerOpen(false)');
     expect(appSource).toContain("authoringAvailable={simulationMode === 'stopped'}");
   });
+
+  it('advances cursor playback only while the simulation is running', () => {
+    expect(appSource).toContain("if (simulationMode !== 'running') {\n      return undefined;");
+    expect(appSource).toContain('playbackBaseTransactionTime: stream.transactions[clampPlaybackIndex(stream.playbackIndex, stream.transactions.length)]?.time');
+  });
 });

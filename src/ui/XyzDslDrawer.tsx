@@ -298,6 +298,19 @@ export function XyzDslDrawer({
           <XyzDslTreeView document={document} selectedNodeId={selectedNodeId} onSelectNode={onSelectNode} />
         </div>
       ) : null}
+      {!authoringAvailable && secondaryProjections.length > 0 ? (
+        <details className="runtime-playback-controls">
+          <summary>Cursor playback</summary>
+          <SecondaryProjectionPanel
+            projections={secondaryProjections}
+            onReplay={onSecondaryReplay}
+            onPlaybackToggle={onSecondaryPlaybackToggle}
+            onPlaybackSpeedChange={onSecondaryPlaybackSpeedChange}
+            onPlaybackSeek={onSecondaryPlaybackSeek}
+            onLoadHistory={onLoadSecondaryHistory}
+          />
+        </details>
+      ) : null}
     </aside>
   );
 }
