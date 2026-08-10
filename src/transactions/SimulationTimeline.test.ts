@@ -58,4 +58,35 @@ describe('SimulationTimeline', () => {
     ]);
     expect(frame.physics.states.get('Body/')?.position[0]).toBe(1);
   });
+
+  it('invalidates snapshots from an abandoned branch when replaying after a rewind', () => {
+    const timeline = new SimulationTimeline();
+    timeline.reconcileDefinitions([definition]);
+    timeline.evaluate(1, 1, 0, [fact], [
+      { targetId: 'Body/', mode: 'impulse', magnitude: 1 },
+    ]);
+    timeline.evaluate(3, 3, 0, [fact], [
+      { targetId: 'Body/', mode: 'force', magnitude: 60 },
+    ]);
+
+    expect(timeline.seek(1)).toBe(true);
+    timeline.evaluate(2, 2, 0, [], []);
+
+    expect(timeline.seek(3)).toBe(false);
+    expect(timeline.seek(2)).toBe(true);
+    expect(timeline.world.frame().states.get('Body/')?.linearVelocity[0]).toBe(1);
+  });
+
+  it('invalidates future snapshots when definitions change after a rewind', () => {
+    const timeline = new SimulationTimeline();
+    timeline.reconcileDefinitions([definition]);
+    timeline.evaluate(2, 2, 0, [fact], [
+      { targetId: 'Body/', mode: 'impulse', magnitude: 1 },
+    ]);
+
+    expect(timeline.seek(0)).toBe(true);
+    timeline.reconcileDefinitions([{ ...definition, mass: 2 }]);
+
+    expect(timeline.seek(2)).toBe(false);
+  });
 });

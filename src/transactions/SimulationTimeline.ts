@@ -38,9 +38,16 @@ export class SimulationTimeline {
     this.snapshots.set(0, { physics: world.snapshot(), facts: [], bindings: [] });
   }
 
+  private invalidateSnapshotsAfter(tick: number): void {
+    [...this.snapshots.keys()]
+      .filter((snapshotTick) => snapshotTick > tick)
+      .forEach((snapshotTick) => this.snapshots.delete(snapshotTick));
+  }
+
   reconcileDefinitions(definitions: readonly RigidBodyDefinition[]): void {
     this.world.reconcileDefinitions(definitions);
-    if (this.world.tick === 0) this.snapshots.set(0, {
+    this.invalidateSnapshotsAfter(this.world.tick);
+    this.snapshots.set(this.world.tick, {
       physics: this.world.snapshot(),
       facts: [...this.previousFacts],
       bindings: [...this.previousBindings],
@@ -55,6 +62,7 @@ export class SimulationTimeline {
     bindings: readonly PhysicsDirectiveBinding[],
   ): SimulationFrame {
     if (tick <= this.world.tick) throw new Error('Simulation frames must advance; use seek before replaying a prior tick.');
+    this.invalidateSnapshotsAfter(this.world.tick);
     const transitions = interactionTransitions(this.previousFacts, facts);
     const inputs: PhysicsInput[] = [];
     const addForces = (
