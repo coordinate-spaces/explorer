@@ -8,7 +8,7 @@ Normative syntax and evaluation semantics live in the [Secondary projection inte
 
 For each compiled document, the application currently:
 
-1. Preserves declaration provenance for baseline, secondary, and remote-editor sources.
+1. Preserves declaration provenance for baseline and secondary sources.
 2. Resolves authored baseline and secondary cursor bounds.
 3. Evaluates `touch` and `breach` facts before ordinary collision packing.
 4. Applies matching conditional variants to produce effective boxes, transforms, materials, and bounds.

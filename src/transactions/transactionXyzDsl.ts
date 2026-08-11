@@ -10,7 +10,6 @@ import type { XyzDslTransaction, PrimaryHistoricalBaselineXyzDsl, RejectedTransa
 const TRAILING_FILLER_PATTERN = /\/[0=]+$/;
 const TERMINAL_AXIS_SIZE_FILLER_PATTERN = /(?<prefix>\+\d+\+)(?<size>[1-9]\d*?)0*=$/;
 const MAX_MEMO_PREVIEW_LENGTH = 120;
-export const DEFAULT_OVERLAY_TRANSACTION_ENDPOINT = 'wss://ungallant-unimpeding-kade.ngrok-free.dev/000006913ccf73b5990eb4833e4cdbd5ef58061384481ff1f6cee3cb7f18b2cd';
 
 function transactionFallbackId(transaction: XyzDslTransaction, index: number): string {
   return [transaction.time, trimTransactionPathFiller(transaction.to), transaction.series ?? 'none', index].join(':');
@@ -94,6 +93,7 @@ function secondaryKeyReferenceFromInvalidDeclaration(
   memo: string,
   transactionId: string,
   rawDestination = path,
+  endpoints?: SecondaryNodeEndpoints,
 ): SecondaryKeyReference | undefined {
   const publicKey = secondaryPublicKeyCandidate(rawDestination)
     ?? secondaryPublicKeyCandidate(path)
@@ -103,8 +103,12 @@ function secondaryKeyReferenceFromInvalidDeclaration(
     return undefined;
   }
 
+  const endpoint = secondaryNodeEndpoint(memo, endpoints);
+  if (!endpoint) return undefined;
+
   return {
     publicKey,
+    endpoint,
     sourceTransactionId: transactionId,
     memoPreview: previewMemo(`${publicKey}: ${memo}`),
   };
@@ -142,6 +146,42 @@ function parseValidXyzDsl(source: string) {
 
 interface TransactionsToXyzDslSourceOptions {
   publicKey?: string;
+  nodeEndpoints?: SecondaryNodeEndpoints;
+}
+
+export interface SecondaryNodeEndpoints {
+  primary: string;
+  secondary: string;
+}
+
+/** Keeps the final primary-transaction definition for each secondary public key. */
+export function latestSecondaryKeyReferences(
+  references: readonly SecondaryKeyReference[],
+): SecondaryKeyReference[] {
+  const latest = new Map<string, SecondaryKeyReference>();
+  references.forEach((reference) => {
+    latest.delete(reference.publicKey);
+    latest.set(reference.publicKey, reference);
+  });
+  return [...latest.values()];
+}
+
+/** Resolves the node selector carried by a primary transaction defining a secondary key. */
+export function secondaryNodeEndpoint(memo: string, endpoints?: SecondaryNodeEndpoints): string | undefined {
+  const trimmed = memo.trim();
+  if (!trimmed) return endpoints?.primary;
+  const match = /^node\s*:\s*(.+)$/i.exec(trimmed);
+  if (!match) return undefined;
+  const selector = match[1].trim();
+  if (/^primary$/i.test(selector)) return endpoints?.primary;
+  if (/^secondary$/i.test(selector)) return endpoints?.secondary;
+  const normalized = selector.replace(/^wss\/\//i, 'wss://');
+  try {
+    const url = new URL(normalized);
+    return url.protocol === 'wss:' ? normalized : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 export function transactionsToXyzDslSource(
@@ -176,6 +216,28 @@ export function transactionsToXyzDslSource(
       return;
     }
 
+    const isSecondaryDefinition = rawDestinationPublicKey
+      && (!memo || /^node\s*:/i.test(memo));
+    if (isSecondaryDefinition) {
+      const secondaryKey = secondaryKeyReferenceFromInvalidDeclaration(
+        path,
+        memo,
+        id,
+        rawDestination,
+        options.nodeEndpoints,
+      );
+      if (secondaryKey) {
+        secondaryKeys.push(secondaryKey);
+      } else {
+        rejected.push({
+          id,
+          memoPreview: previewMemo(`${path}: ${memo}`),
+          reasons: ['Secondary public-key node must be empty, primary, secondary, or a valid wss:// URL.'],
+        });
+      }
+      return;
+    }
+
     const properties = memoToXyzDslProperties(path, memo);
     const source = quoteXyzDslDeclaration(path, properties);
     const { parsed, valid } = parseValidXyzDsl(source);
@@ -198,6 +260,7 @@ export function transactionsToXyzDslSource(
       memo,
       id,
       rawDestination,
+      options.nodeEndpoints,
     );
 
     if (secondaryKey) {
@@ -219,20 +282,4 @@ export function transactionsToXyzDslSource(
     secondaryKeys,
     originsByLine,
   };
-}
-
-/**
- * Maps primary-key transactions observed on the overlay node into baseline
- * declarations applied in order by the remote spatial editor.
- */
-export function transactionsToRemoteEditorSource(transactions: readonly XyzDslTransaction[], publicKey: string): string {
-  if (!publicKey.trim()) {
-    return '';
-  }
-
-  return transactionsToXyzDslSource(transactions, { publicKey }).source;
-}
-
-export function transactionToRemoteEditorSource(transaction: XyzDslTransaction | undefined, publicKey: string): string {
-  return transactionsToRemoteEditorSource(transaction ? [transaction] : [], publicKey);
 }

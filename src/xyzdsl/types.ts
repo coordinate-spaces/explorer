@@ -38,7 +38,7 @@ export interface XyzDslConditionalSpec {
 }
 
 export interface XyzDslDeclarationOrigin {
-  sourceKind: 'baseline' | 'secondary' | 'remote-editor';
+  sourceKind: 'baseline' | 'secondary';
   streamId?: string;
   publicKey?: string;
   endpoint?: string;

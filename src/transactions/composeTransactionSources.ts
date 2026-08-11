@@ -178,35 +178,22 @@ export function composeTransactionSourceBundle(
   return { source: lines.join('\n'), originsByLine };
 }
 
-/** Composes the static/local document, referenced-key projections, then the canonical remote editor. */
 export function composeSpatialEditorSources(
   documentSource: string,
   secondaryStreams: readonly ComposeTransactionSecondaryStream[],
-  remoteEditorSource: string,
 ): string {
-  return [composeTransactionSources(documentSource, secondaryStreams, {
+  return composeTransactionSources(documentSource, secondaryStreams, {
     namespacePolicy: 'consume-primary-namespaces',
-  }), remoteEditorSource]
-    .filter((source) => source.trim().length > 0)
-    .join('\n');
+  });
 }
 
 export function composeSpatialEditorSourceBundle(
   documentSource: string,
   secondaryStreams: readonly ComposeTransactionSecondaryStream[],
-  remoteEditorSource: string,
   primaryOriginsByLine?: ReadonlyMap<number, XyzDslDeclarationOrigin>,
 ): ComposedXyzDslSource {
   const bundle = composeTransactionSourceBundle(documentSource, secondaryStreams, {
     namespacePolicy: 'consume-primary-namespaces',
   }, primaryOriginsByLine);
-  const lines = sourceLines(bundle.source);
-  const originsByLine = new Map(bundle.originsByLine);
-  sourceLines(remoteEditorSource).forEach((line) => {
-    lines.push(line);
-    if (line.trim().length > 0) {
-      originsByLine.set(lines.length, { sourceKind: 'remote-editor', sourceOrder: lines.length - 1 });
-    }
-  });
-  return { source: lines.join('\n'), originsByLine };
+  return bundle;
 }

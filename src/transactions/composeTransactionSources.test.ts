@@ -73,7 +73,7 @@ describe('composeSpatialEditorSources', () => {
     ]);
     const edited = `${baseline}\n"Ball/+touch/+++" : ""`;
     const remapped = originsForEditedSource(edited, baseline, origins);
-    const bundle = composeSpatialEditorSourceBundle(edited, [], '', remapped);
+    const bundle = composeSpatialEditorSourceBundle(edited, [], remapped);
 
     expect(bundle.originsByLine.get(1)?.transactionAmount).toBe(2);
     expect(bundle.originsByLine.get(2)).toMatchObject({ sourceKind: 'baseline' });
@@ -93,46 +93,39 @@ describe('composeSpatialEditorSources', () => {
     const document = '"First/+0+1/+0+1/+0+1" : ""\n\n"Third/+2+1/+0+1/+0+1" : ""';
     const bundle = composeSpatialEditorSourceBundle(document, [{
       id: 'stream-a', declarations: '"+4+1/+0+1/+0+1" : ""',
-    }], '"+6+1/+0+1/+0+1" : ""');
+    }]);
 
-    expect(bundle.source).toBe(`${document}\n"+4+1/+0+1/+0+1" : ""\n"+6+1/+0+1/+0+1" : ""`);
+    expect(bundle.source).toBe(`${document}\n"+4+1/+0+1/+0+1" : ""`);
     expect(bundle.originsByLine.get(1)?.sourceKind).toBe('baseline');
     expect(bundle.originsByLine.has(2)).toBe(false);
     expect(bundle.originsByLine.get(3)?.sourceKind).toBe('baseline');
     expect(bundle.originsByLine.get(4)).toMatchObject({ sourceKind: 'secondary', streamId: 'stream-a' });
-    expect(bundle.originsByLine.get(5)?.sourceKind).toBe('remote-editor');
   });
 
   it('preserves leading and trailing baseline blanks before appended projections', () => {
     const document = '\n"Second/+0+1/+0+1/+0+1" : ""\n';
     const bundle = composeSpatialEditorSourceBundle(document, [{
       declarations: '"+2+1/+0+1/+0+1" : ""',
-    }], '');
+    }]);
 
     expect(bundle.source).toBe(`${document}\n"+2+1/+0+1/+0+1" : ""`);
     expect(bundle.originsByLine.get(2)?.sourceKind).toBe('baseline');
     expect(bundle.originsByLine.get(4)?.sourceKind).toBe('secondary');
   });
 
-  it('preserves source provenance for baseline, secondary, and editor declarations', () => {
+  it('preserves source provenance for baseline and secondary declarations', () => {
     const bundle = composeSpatialEditorSourceBundle('"Cursor/" : ""', [{
       id: 'stream-a', publicKey: 'key-a', declarations: '"Cursor/+0+1/+0+1/+0+1" : ""', transactionTime: 42,
-    }], '"+2+1/+0+1/+0+1" : ""');
+    }]);
     expect(bundle.originsByLine.get(1)?.sourceKind).toBe('baseline');
     expect(bundle.originsByLine.get(2)).toMatchObject({ sourceKind: 'secondary', streamId: 'stream-a', transactionTime: 42 });
-    expect(bundle.originsByLine.get(3)?.sourceKind).toBe('remote-editor');
   });
-  it('applies the remote editor after the document and namespace-filtered projections', () => {
+
+  it('applies namespace-filtered projections after the document', () => {
     const document = '"Table/" : "color: white"';
-    const result = composeSpatialEditorSources(document, [
+    expect(composeSpatialEditorSources(document, [
       { declarations: '"Lamp/+0+1/+0+1/+0+1" : "color: yellow"\n"Table/+0+1/+0+1/+0+1" : "color: blue"' },
-    ], '"Table/" : "color: cyan"');
-
-    expect(result).toBe(`${document}\n"Table/+0+1/+0+1/+0+1" : "color: blue"\n"Table/" : "color: cyan"`);
+    ])).toBe(`${document}\n"Table/+0+1/+0+1/+0+1" : "color: blue"`);
   });
 
-  it('keeps the remote editor independent when there are no secondary references', () => {
-    expect(composeSpatialEditorSources('', [], '"+0+1/+0+1/+0+1" : "color: cyan"'))
-      .toBe('"+0+1/+0+1/+0+1" : "color: cyan"');
-  });
 });
