@@ -2,8 +2,8 @@
 
 Interaction directives remain declarative sensors when compiled directly with
 `createSpatialDocument`. The application transaction pipeline now gives the spatial
-overrides on `+contact/+x/+y/+z` and `+contact/+++` accumulative semantics: every
-new transaction/playback frame that still reports contact translates the retained
+relative and weighted overrides on `+touch` and `+breach` accumulative semantics:
+every new transaction/playback frame that still reports the selected interaction translates the retained
 body pose again. Completed frames remain immutable, so rendering cannot advance time.
 
 Accumulation is owned by the transaction layer instead:
@@ -48,8 +48,8 @@ covering more than 4,096 cells in an oversized-object set, preventing unbounded
 cell enumeration. Candidate results remain filtered and sorted by stable ID.
 
 The broad phase accepts a replaceable `InteractionNarrowPhase`. The initial
-`AabbInteractionNarrowPhase` preserves the existing probe and breach contract;
-future physical contact manifolds can be implemented separately without changing
+`AabbInteractionNarrowPhase` preserves the existing touch and breach contract;
+future physical collision manifolds can be implemented separately without changing
 directive facts.
 
 ## Integration boundary
@@ -61,8 +61,7 @@ hold only the published frame; a transaction/playback service must own the
 `SimulationTimeline`.
 
 `AccumulativeSpatialTimeline` is the transaction-layer bridge used by the
-application. Explicit contact vectors are per-frame translations. Weighted contact
-uses the existing cursor-amount / target-amount / 100 distance conversion, including
-contact penetration resolution. Force and impulse bindings remain an application API
-until their physical units are standardized.
-
+application. Explicit interaction vectors are per-frame translations. Weighted
+translations use the existing cursor-amount / target-amount / 100 distance
+conversion. Force and impulse bindings remain an application API until their
+physical units are standardized.

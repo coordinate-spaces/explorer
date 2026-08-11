@@ -27,7 +27,7 @@ describe('secondary projection interactions', () => {
 
     expect(document.coordinateSpace.width).toBe(40);
     expect(document.interactions).toMatchObject([{
-      state: 'probe',
+      state: 'touch',
       targetNamespace: 'Target/',
       cursorNamespace: 'Cursor/',
       normal: [1, 0, 0],
@@ -102,7 +102,7 @@ describe('secondary projection interactions', () => {
 
   it('translates one millimetre for equal minimum transaction amounts', () => {
     const document = createSpatialDocument(`"Ball/+2+3/+0+3/+4+3" : "geometry: sphere;"
-"Ball/+probe/+++" : ""
+"Ball/+touch/+++" : ""
 "Cursor/+5+1/+0+1/+4+1" : ""`, { originsByLine: new Map([
       [1, { sourceKind: 'baseline', transactionAmount: MIN_TRANSACTION_AMOUNT }],
       [2, { sourceKind: 'baseline' }],
@@ -115,29 +115,29 @@ describe('secondary projection interactions', () => {
     expect(ball?.box).toMatchObject({ x: 1.99, y: 0, z: 4, width: 3, height: 3, depth: 3 });
   });
 
-  it('keeps contact translation active for both exact probes and breaches', () => {
-    const compile = (cursorX: string) => createSpatialDocument(`"Ball/+2+3/+0+3/+4+3" : "geometry: sphere"
-"Ball/+contact/+++" : ""
+  it('keeps touch and breach directives distinct', () => {
+    const compile = (cursorX: string, directive: 'touch' | 'breach') => createSpatialDocument(`"Ball/+2+3/+0+3/+4+3" : "geometry: sphere"
+"Ball/+${directive}/+++" : ""
 "Cursor/+${cursorX}+1/+0+1/+4+1" : ""`, { originsByLine: new Map([
       [1, { sourceKind: 'baseline', transactionAmount: MIN_TRANSACTION_AMOUNT }],
       [2, { sourceKind: 'baseline' }],
       [3, { sourceKind: 'secondary', streamId: 'cursor', transactionAmount: MIN_TRANSACTION_AMOUNT }],
     ]) });
 
-    const touching = compile('5');
-    const shallowBreach = compile('450c');
-    const nextBreachFrame = compile('425c');
+    const touching = compile('5', 'touch');
+    const unmatchedBreach = compile('450c', 'touch');
+    const matchedBreach = compile('450c', 'breach');
 
-    expect(touching.interactions).toMatchObject([{ state: 'probe', normal: [-1, 0, 0] }]);
+    expect(touching.interactions).toMatchObject([{ state: 'touch', normal: [-1, 0, 0] }]);
     expect(touching.renderNodes.find((node) => node.namespacePath === 'Ball/')?.box.x).toBe(1.99);
-    expect(shallowBreach.interactions).toMatchObject([{ state: 'breach', penetration: 0.5, normal: [-1, 0, 0] }]);
-    expect(shallowBreach.renderNodes.find((node) => node.namespacePath === 'Ball/')?.box.x).toBe(1.49);
-    expect(nextBreachFrame.renderNodes.find((node) => node.namespacePath === 'Ball/')?.box.x).toBe(1.24);
+    expect(unmatchedBreach.interactions).toMatchObject([{ state: 'breach', penetration: 0.5, normal: [-1, 0, 0] }]);
+    expect(unmatchedBreach.renderNodes.find((node) => node.namespacePath === 'Ball/')?.box.x).toBe(2);
+    expect(matchedBreach.renderNodes.find((node) => node.namespacePath === 'Ball/')?.box.x).toBe(1.99);
   });
 
-  it('uses the nearest exit distance when the cursor is contained by the target', () => {
+  it('applies weighted translation directly to a contained breach', () => {
     const document = createSpatialDocument(`"Target/+0+10/+0+10/+0+10" : ""
-"Target/+contact/+++" : ""
+"Target/+breach/+++" : ""
 "Cursor/+4+1/+4+1/+4+1" : ""`, { originsByLine: new Map([
       [1, { sourceKind: 'baseline', transactionAmount: MIN_TRANSACTION_AMOUNT }],
       [2, { sourceKind: 'baseline' }],
@@ -151,13 +151,13 @@ describe('secondary projection interactions', () => {
       resolutionDistance: 5,
       normal: [1, 0, 0],
     }]);
-    expect(target?.bounds.minX).toBeCloseTo(5.01);
+    expect(target?.bounds.minX).toBeCloseTo(0.01);
   });
 
-  it('resolves contact penetration before ordinary collision packing', () => {
+  it('resolves breach penetration before ordinary collision packing', () => {
     const document = createSpatialDocument(`"Obstacle/+0+2/+0+3/+4+3" : ""
 "Ball/+2+3/+0+3/+4+3" : "geometry: sphere"
-"Ball/+contact/+++" : ""
+"Ball/+touch/+++" : ""
 "Cursor/+5+1/+0+1/+4+1" : ""`, { originsByLine: new Map([
       [1, { sourceKind: 'baseline' }],
       [2, { sourceKind: 'baseline', transactionAmount: MIN_TRANSACTION_AMOUNT }],
@@ -166,7 +166,7 @@ describe('secondary projection interactions', () => {
     ]) });
     const ball = document.renderNodes.find((node) => node.namespacePath === 'Ball/');
 
-    expect(document.interactions).toMatchObject([{ state: 'probe', targetNamespace: 'Ball/' }]);
+    expect(document.interactions).toMatchObject([{ state: 'touch', targetNamespace: 'Ball/' }]);
     expect(ball?.box.x).toBe(1.99);
     expect(ball?.bounds.minX).toBe(2);
   });
@@ -174,7 +174,7 @@ describe('secondary projection interactions', () => {
   it('scales unequal valid transaction amounts before translating in the polar-opposite direction', () => {
     const distance = weightedTranslationDistance(6_000_000, 2_000_000);
     const document = createSpatialDocument(`"Ball/+2+3/+0+3/+4+3" : ""
-"Ball/+probe/+++" : ""
+"Ball/+touch/+++" : ""
 "Cursor/+5+1/+0+1/+4+1" : ""`, { originsByLine: new Map([
       [1, { sourceKind: 'baseline', transactionAmount: 2_000_000 }],
       [2, { sourceKind: 'baseline' }],
@@ -193,7 +193,7 @@ describe('secondary projection interactions', () => {
   ])('uses the atomic minimum for %s transaction amounts', (_label, invalidAmount) => {
     const distance = weightedTranslationDistance(invalidAmount, invalidAmount);
     const document = createSpatialDocument(`"Ball/+2+3/+0+3/+4+3" : ""
-"Ball/+probe/+++" : ""
+"Ball/+touch/+++" : ""
 "Cursor/+5+1/+0+1/+4+1" : ""`, { originsByLine: new Map([
       [1, { sourceKind: 'baseline', transactionAmount: invalidAmount }],
       [2, { sourceKind: 'baseline' }],
@@ -207,7 +207,7 @@ describe('secondary projection interactions', () => {
   it('caps the converted project distance at 100 units in the polar-opposite direction', () => {
     const distance = weightedTranslationDistance(20_000_000_000, MIN_TRANSACTION_AMOUNT);
     const document = createSpatialDocument(`"Ball/+2+3/+0+3/+4+3" : ""
-"Ball/+probe/+++" : ""
+"Ball/+touch/+++" : ""
 "Cursor/+5+1/+0+1/+4+1" : ""`, { originsByLine: new Map([
       [1, { sourceKind: 'baseline', transactionAmount: MIN_TRANSACTION_AMOUNT }],
       [2, { sourceKind: 'baseline' }],
@@ -222,7 +222,7 @@ describe('secondary projection interactions', () => {
     const document = createSpatialDocument(`"Machine/+0+10/+0+10/+0+10" : ""
 "Machine/Button/+0+1/+0+1/+0+1" : ""
 "Machine/Lever/+5+1/+0+1/+0+1" : ""
-"Machine/+probe/Lever/+++" : ""
+"Machine/+touch/Lever/+++" : ""
 "Cursor/+1+1/+0+1/+0+1" : ""`, { originsByLine: new Map([
       [1, { sourceKind: 'baseline', transactionAmount: 1 }],
       [2, { sourceKind: 'baseline', transactionAmount: 2 }],
@@ -236,14 +236,14 @@ describe('secondary projection interactions', () => {
     expect(lever?.box.x).toBe(4.98);
   });
 
-  it('detects probe before packing and applies inferred-direction translation without resizing', () => {
+  it('detects touch before packing and applies inferred-direction translation without resizing', () => {
     const document = createSpatialDocument(`"Rod/+0+1/+0+5/+0+1" : "geometry: cylinder"
-"Rod/+probe/+4/+0/+0" : "rotation: 90,90,0"
+"Rod/+touch/+4/+0/+0" : "rotation: 90,90,0"
 "Cursor/+1+1/+0+1/+0+1" : ""`, { originsByLine: origins(3) });
     const rod = document.renderNodes.find((node) => node.namespacePath === 'Rod/');
     const cursor = document.renderNodes.find((node) => node.namespacePath === 'Cursor/');
 
-    expect(document.interactions).toMatchObject([{ state: 'probe', streamId: 'controller-a', normal: [-1, 0, 0] }]);
+    expect(document.interactions).toMatchObject([{ state: 'touch', streamId: 'controller-a', normal: [-1, 0, 0] }]);
     expect(rod?.box).toMatchObject({ x: 36, width: 1, height: 5, depth: 1 });
     expect(rod?.transform.rotation).toEqual([Math.PI / 2, Math.PI / 2, 0]);
     expect(cursor?.box.x).toBe(1);
@@ -262,7 +262,7 @@ describe('secondary projection interactions', () => {
 
   it('merges conditional texture attributes without dropping base channels or presets', () => {
     const document = createSpatialDocument(`"Rod/+0+1/+0+1/+0+1" : "texture: wood.oak; normal-texture: bump.noise"
-"Rod/+probe" : "texture-repeat: 3 4"
+"Rod/+touch" : "texture-repeat: 3 4"
 "Cursor/+1+1/+0+1/+0+1" : ""`, { originsByLine: origins(3) });
     const material = document.renderNodes.find((node) => node.namespacePath === 'Rod/')?.material;
 
@@ -272,7 +272,7 @@ describe('secondary projection interactions', () => {
 
   it('merges a conditional channel attribute into its inherited texture specification', () => {
     const document = createSpatialDocument(`"Rod/+0+1/+0+1/+0+1" : "texture: wood.oak; normal-texture: bump.noise"
-"Rod/+probe" : "normal-texture-repeat: 5 6"
+"Rod/+touch" : "normal-texture-repeat: 5 6"
 "Cursor/+1+1/+0+1/+0+1" : ""`, { originsByLine: origins(3) });
     const material = document.renderNodes.find((node) => node.namespacePath === 'Rod/')?.material;
 
@@ -282,7 +282,7 @@ describe('secondary projection interactions', () => {
 
   it('retains the base geometry kind for a partial conditional geometry override', () => {
     const document = createSpatialDocument(`"Rod/+0+1/+0+5/+0+1" : "geometry: cylinder"
-"Rod/+probe" : "operation: subtraction"
+"Rod/+touch" : "operation: subtraction"
 "Cursor/+1+1/+0+1/+0+1" : ""`, { originsByLine: origins(3) });
     const rod = document.nodes.find((node) => node.namespacePath === 'Rod/');
 
@@ -292,7 +292,7 @@ describe('secondary projection interactions', () => {
 
   it('applies conditional content overrides to the effective node', () => {
     const document = createSpatialDocument(`"Card/+0+1/+0+1/+0+1" : "content-kind: text; content-text: Waiting"
-"Card/+probe" : "content-kind: text; content-text: Active"
+"Card/+touch" : "content-kind: text; content-text: Active"
 "Cursor/+1+1/+0+1/+0+1" : ""`, { originsByLine: origins(3) });
     const card = document.renderNodes.find((node) => node.namespacePath === 'Card/');
 
@@ -323,7 +323,7 @@ describe('secondary projection interactions', () => {
     expect(interactionTransitions([fact], [])[0].kind).toBe('leave');
   });
 
-  it('does not treat edge-only contact as a probe', () => {
+  it('does not treat edge-only proximity as a touch', () => {
     const source = `"Rod/+0+1/+0+1/+0+1" : ""
 "Cursor/+1+1/+1+1/+0+1" : ""`;
     const facts = createSpatialDocument(source, { originsByLine: new Map([

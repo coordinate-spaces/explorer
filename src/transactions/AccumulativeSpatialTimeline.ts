@@ -50,7 +50,7 @@ function renderable(nodes: readonly SpatialNode[]): SpatialNode[] {
     .filter(Boolean) as SpatialNode[];
 }
 
-/** Transaction/playback-owned bridge from XYZDSL contact declarations to persistent physics. */
+/** Transaction/playback-owned bridge from XYZDSL interaction declarations to persistent physics. */
 export class AccumulativeSpatialTimeline {
   readonly simulation = new SimulationTimeline();
 
@@ -97,7 +97,7 @@ export class AccumulativeSpatialTimeline {
     const idsByNamespace = new Map(renderable(authored.nodes).map((node) => [node.namespacePath, node.id]));
     const bindings = resolved.variants.flatMap((variant): PhysicsDirectiveBinding[] => {
       const targetId = idsByNamespace.get(variant.targetNamespacePath);
-      if (!targetId || !variant.conditional.directives.some((directive) => directive.name === 'contact')) return [];
+      if (!targetId) return [];
       const interactionDirectives = variant.conditional.directives.map((directive) => ({
         state: directive.name,
         scopeNamespace: canonicalNamespacePath(directive.scopeNamespace),

@@ -67,30 +67,29 @@ Spatial transaction validation may limit each memo/properties field to 100 bytes
 
 ## Interaction directives
 
-Secondary projections can act as remote cursors. A baseline object can declare conditional variants with the Base64-compatible `+probe`, `+breach`, and `+contact` directives. `probe` means face contact (within a small tolerance), `breach` means positive-volume intersection, and `contact` matches either state. Directive segments are removed from object identity, and their position selects the namespace scope that must be interacting.
+Secondary projections can act as remote cursors. A baseline object can declare conditional variants with the Base64-compatible `+touch` and `+breach` directives. `touch` means faces meet within a small tolerance without overlapping, while `breach` means positive-volume intersection. Directive segments are removed from object identity, and their position selects the namespace scope that must be interacting.
 
 ```txt
 "Rod/+0+1/+0+5/+0+1" : "geometry: cylinder"
-"Rod/+probe" : "rotation: 90,90,0"
+"Rod/+touch" : "rotation: 90,90,0"
 "Rod/+breach/+9+1/+0+5/+0+1" : "color: red"
-"Rod/+contact/+++" : ""
+"Rod/+breach/+++" : ""
 ```
 
 Conditional paths have three spatial forms:
 
 | Form | Effect while active |
 | --- | --- |
-| `Rod/+probe` | Inherit the baseline box and override only declared properties. |
-| `Rod/+probe/+4/+5/+9` | Translate by unsigned X/Y/Z magnitudes, away from the interacting cursor; an indeterminate direction defaults positive. |
-| `Rod/+probe/+++` | Translate in the polar-opposite contact direction by the cursor-to-target transaction-amount ratio converted to centiunit-scale project distance. |
-| `Rod/+contact/+++` | Push for either a probe or breach; a breach also applies the shortest AABB exit translation before adding the weighted distance. |
-| `Rod/+probe/+9+1/+0+5/+0+1` | Replace the complete absolute X/Y/Z box, including sizes. |
+| `Rod/+touch` | Inherit the baseline box and override only declared properties. |
+| `Rod/+touch/+4/+5/+9` | Translate by unsigned X/Y/Z magnitudes, away from the interacting cursor; an indeterminate direction defaults positive. |
+| `Rod/+touch/+++` | Translate in the polar-opposite interaction direction by the cursor-to-target transaction-amount ratio converted to centiunit-scale project distance. |
+| `Rod/+touch/+9+1/+0+5/+0+1` | Replace the complete absolute X/Y/Z box, including sizes. |
 
-Direct `createSpatialDocument` calls recalculate relative translation from the resolved baseline. In the application transaction pipeline, `+contact/+x/+y/+z` and `+contact/+++` are instead applied to the retained physics pose once per new transaction/playback frame, so repeated contacts accumulate without depending on render frequency. `+contact/+++` also includes the current shortest AABB exit distance for a penetrating cursor. In `Machine/+probe/Lever`, the target remains `Machine/Lever/`, while placement of the directive after `Machine` makes `Machine/` the interaction scope. Secondary cursor identity includes its projection stream, so independent controllers can reuse the same cursor namespace.
+Direct `createSpatialDocument` calls recalculate relative translation from the resolved baseline. In the application transaction pipeline, relative and weighted translations for either interaction directive are instead applied to the retained physics pose once per new transaction/playback frame, so repeated interactions accumulate without depending on render frequency. In `Machine/+touch/Lever`, the target remains `Machine/Lever/`, while placement of the directive after `Machine` makes `Machine/` the interaction scope. Secondary cursor identity includes its projection stream, so independent controllers can reuse the same cursor namespace.
 
-Weighted translation (`+++`) treats the cursor amount as force and the concrete baseline declaration amount as object weight. Each missing, zero, negative, or non-finite amount deterministically falls back to the atomic minimum transaction amount of `1_000_000`. The cursor-to-target amount ratio is divided by `CENTIUNITS_PER_UNIT` (`100`) to convert it to project distance, so equal valid weights move `0.01` project units (one millimetre). The converted distance is capped at 100 project units (10 metres). The target-oriented contact normal is preferred; otherwise the direction away from the cursor is normalized before applying the distance. No surface-area, volume, or density factor is applied: shape-specific volume semantics and a mass unit for transaction weight are not yet defined.
+Weighted translation (`+++`) treats the cursor amount as force and the concrete baseline declaration amount as object weight. Each missing, zero, negative, or non-finite amount deterministically falls back to the atomic minimum transaction amount of `1_000_000`. The cursor-to-target amount ratio is divided by `CENTIUNITS_PER_UNIT` (`100`) to convert it to project distance, so equal valid weights move `0.01` project units (one millimetre). The converted distance is capped at 100 project units (10 metres). The target-oriented interaction normal is preferred; otherwise the direction away from the cursor is normalized before applying the distance. No surface-area, volume, or density factor is applied: shape-specific volume semantics and a mass unit for transaction weight are not yet defined.
 
-See the [Secondary projection interaction specification](docs/secondary-interaction-spec.md) for the normative syntax and evaluation rules. The current release evaluates persistent `probe` and `breach` facts for the selected frame. Temporal transition playback and a persistent incremental spatial index are only partially implemented; see [Secondary interaction implementation status](docs/secondary-interaction-roadmap.md) for the exact supported behavior and remaining acceptance criteria.
+See the [Secondary projection interaction specification](docs/secondary-interaction-spec.md) for the normative syntax and evaluation rules. The current release evaluates persistent `touch` and `breach` facts for the selected frame. Temporal transition playback and a persistent incremental spatial index are only partially implemented; see [Secondary interaction implementation status](docs/secondary-interaction-roadmap.md) for the exact supported behavior and remaining acceptance criteria.
 
 ## Spatial content cards
 
