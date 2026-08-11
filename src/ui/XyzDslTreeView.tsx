@@ -1,6 +1,7 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo } from 'react';
 import type { SpatialDocument } from '../model/SpatialDocument';
 import type { SpatialNode } from '../model/SpatialNode';
+import { usePersistentState } from './usePersistentState';
 
 interface XyzDslTreeViewProps {
   document: SpatialDocument;
@@ -16,6 +17,11 @@ function displayName(node: SpatialNode): string {
   return node.id;
 }
 
+function localName(node: SpatialNode): string {
+  const path = displayName(node);
+  return path.split('/').filter(Boolean).at(-1) ?? path;
+}
+
 function metadataValue<T>(node: SpatialNode, key: string): T | undefined {
   return node.metadata?.[key] as T | undefined;
 }
@@ -26,10 +32,6 @@ function sortedTreeIds(nodes: SpatialNode[]): string[] {
 
 function hasNestedNodes(nodes: SpatialNode[]): boolean {
   return nodes.some((node) => (node.children?.length ?? 0) > 0 || hasNestedNodes(node.children ?? []));
-}
-
-function rotationDegrees(node: SpatialNode): string {
-  return node.transform.rotation.map((radian) => Math.round((radian * 180) / Math.PI)).join(', ');
 }
 
 function geometryLabel(node: SpatialNode): string {
@@ -90,17 +92,8 @@ function TreeItem({
           aria-current={isSelected ? 'true' : undefined}
           onClick={() => onSelectNode?.(node.id)}
         >
-          <strong>{displayName(node)}</strong>
-          <span>
-            {node.renderable ? node.geometry.kind : 'group'} · {node.box.width} × {node.box.height} × {node.box.depth} at ({node.box.x},{' '}
-            {node.box.y}, {node.box.z})
-          </span>
-          {node.renderable ? (
-            <span className="xyzdsl-tree-object-details">
-              {geometryLabel(node)} bounding box: {node.box.width} × {node.box.height} × {node.box.depth} at ({node.box.x}, {node.box.y},{' '}
-              {node.box.z}); rotation: {rotationDegrees(node)}°
-            </span>
-          ) : null}
+          <strong title={displayName(node)}>{localName(node)}</strong>
+          <span>{node.renderable ? geometryLabel(node) : 'group'}</span>
         </button>
 
         <div className="xyzdsl-tree-badges" aria-label="Spatial node metadata">
@@ -132,12 +125,19 @@ function TreeItem({
 }
 
 export function XyzDslTreeView({ document, selectedNodeId, onSelectNode }: XyzDslTreeViewProps) {
-  const [collapsedIds, setCollapsedIds] = useState<Set<string>>(() => new Set());
+  const [storedCollapsedIds, setStoredCollapsedIds] = usePersistentState<string[]>('xyzdsl-tree-collapsed-v1', []);
+  const collapsedIds = useMemo(() => new Set(storedCollapsedIds), [storedCollapsedIds]);
   const nodeIds = useMemo(() => sortedTreeIds(document.nodes), [document.nodes]);
   const hasCollapsibleNodes = useMemo(() => hasNestedNodes(document.nodes), [document.nodes]);
 
+  useEffect(() => {
+    const validIds = new Set(nodeIds);
+    const reconciled = storedCollapsedIds.filter((id) => validIds.has(id));
+    if (reconciled.length !== storedCollapsedIds.length) setStoredCollapsedIds(reconciled);
+  }, [nodeIds, setStoredCollapsedIds, storedCollapsedIds]);
+
   function toggleNode(id: string) {
-    setCollapsedIds((current) => {
+    setStoredCollapsedIds((current) => {
       const next = new Set(current);
 
       if (next.has(id)) {
@@ -146,16 +146,16 @@ export function XyzDslTreeView({ document, selectedNodeId, onSelectNode }: XyzDs
         next.add(id);
       }
 
-      return next;
+      return [...next];
     });
   }
 
   function expandAll() {
-    setCollapsedIds(new Set());
+    setStoredCollapsedIds([]);
   }
 
   function collapseAll() {
-    setCollapsedIds(new Set(nodeIds));
+    setStoredCollapsedIds(nodeIds);
   }
 
   return (

@@ -1014,20 +1014,6 @@ export default function App() {
           </>
         )}
       </div>
-      {appMode === 'editor' ? (
-        <SelectedNodeInspector
-          canEdit={selectedNodeCanEdit}
-          node={selectedNode}
-          selectionPath={selectedHierarchyPath}
-          onClearSelection={() => handleSelectNode(undefined)}
-          onMove={moveSelectedDeclaration}
-          onPathNodeSelect={handleSelectHierarchyNode}
-          onPropertyChange={updateSelectedDeclarationProperty}
-          onResize={resizeSelectedDeclaration}
-          onSelectNode={handleSelectExactNode}
-          onRotate={rotateSelectedDeclaration}
-        />
-      ) : null}
       <XyzDslDrawer
         appMode={appMode}
         authoringAvailable={simulationMode === 'stopped'}
@@ -1066,6 +1052,20 @@ export default function App() {
         onLoadSecondaryHistory={handleLoadSecondaryHistory}
         selectedNodeId={selectedNode?.id}
         onSelectNode={handleSelectExactNode}
+        inspector={appMode === 'editor' && selectedNode ? (
+          <SelectedNodeInspector
+            canEdit={selectedNodeCanEdit}
+            node={selectedNode}
+            selectionPath={selectedHierarchyPath}
+            onClearSelection={() => handleSelectNode(undefined)}
+            onMove={moveSelectedDeclaration}
+            onPathNodeSelect={handleSelectHierarchyNode}
+            onPropertyChange={updateSelectedDeclarationProperty}
+            onResize={resizeSelectedDeclaration}
+            onSelectNode={handleSelectExactNode}
+            onRotate={rotateSelectedDeclaration}
+          />
+        ) : null}
       />
     </main>
   );

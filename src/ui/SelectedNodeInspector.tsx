@@ -1,5 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
-import type { CSSProperties, PointerEvent } from 'react';
+import { useState } from 'react';
 import type { AxisName, XyzDslGeometryKind } from '../xyzdsl/types';
 import type { SpatialNode } from '../model/SpatialNode';
 
@@ -32,28 +31,6 @@ const ROTATION_AXIS_DESCRIPTIONS: Record<AxisName, string> = {
   z: 'Rotates around the depth Z axis, rolling the object clockwise or counterclockwise.',
 };
 
-interface InspectorPosition {
-  x: number;
-  y: number;
-}
-
-interface DragState {
-  pointerId: number;
-  offsetX: number;
-  offsetY: number;
-}
-
-function clampedInspectorPosition(x: number, y: number, width: number, height: number): InspectorPosition {
-  const margin = 16;
-  const maxX = Math.max(margin, window.innerWidth - width - margin);
-  const maxY = Math.max(margin, window.innerHeight - height - margin);
-
-  return {
-    x: Math.min(Math.max(margin, x), maxX),
-    y: Math.min(Math.max(margin, y), maxY),
-  };
-}
-
 export function SelectedNodeInspector({
   node,
   canEdit,
@@ -66,87 +43,21 @@ export function SelectedNodeInspector({
   onPropertyChange,
   onSelectNode,
 }: SelectedNodeInspectorProps) {
-  const inspectorRef = useRef<HTMLElement>(null);
-  const dragStateRef = useRef<DragState | undefined>(undefined);
-  const [position, setPosition] = useState<InspectorPosition | undefined>();
-
-  const handleDragStart = useCallback((event: PointerEvent<HTMLElement>) => {
-    if ((event.target as HTMLElement).closest('button, input, select, textarea, a')) {
-      return;
-    }
-
-    const inspector = inspectorRef.current;
-
-    if (!inspector) {
-      return;
-    }
-
-    const rect = inspector.getBoundingClientRect();
-    dragStateRef.current = {
-      pointerId: event.pointerId,
-      offsetX: event.clientX - rect.left,
-      offsetY: event.clientY - rect.top,
-    };
-    setPosition(clampedInspectorPosition(rect.left, rect.top, rect.width, rect.height));
-    inspector.setPointerCapture(event.pointerId);
-    event.preventDefault();
-  }, []);
-
-  const handleDragMove = useCallback((event: PointerEvent<HTMLElement>) => {
-    const dragState = dragStateRef.current;
-    const inspector = inspectorRef.current;
-
-    if (!dragState || !inspector || event.pointerId !== dragState.pointerId) {
-      return;
-    }
-
-    const rect = inspector.getBoundingClientRect();
-    setPosition(clampedInspectorPosition(event.clientX - dragState.offsetX, event.clientY - dragState.offsetY, rect.width, rect.height));
-  }, []);
-
-  const handleDragEnd = useCallback((event: PointerEvent<HTMLElement>) => {
-    const dragState = dragStateRef.current;
-    const inspector = inspectorRef.current;
-
-    if (!dragState || event.pointerId !== dragState.pointerId) {
-      return;
-    }
-
-    dragStateRef.current = undefined;
-
-    if (inspector?.hasPointerCapture(event.pointerId)) {
-      inspector.releasePointerCapture(event.pointerId);
-    }
-  }, []);
+  const [translationStep, setTranslationStep] = useState<1 | 0.01>(1);
 
   if (!node) {
     return null;
   }
 
   const lineNumber = metadataValue<number>(node, 'lineNumber');
-  const unitStep = 1;
-  const centiunitStep = 0.01;
-  const rotationCoarseStep = 15;
-  const rotationFineStep = 1;
+  const rotationStep = translationStep === 1 ? 15 : 1;
   const childNodes = node.children ?? [];
-  const inspectorStyle: CSSProperties | undefined = position
-    ? { left: position.x, top: position.y, right: 'auto', bottom: 'auto' }
-    : undefined;
+
 
   return (
-    <section
-      ref={inspectorRef}
-      className="selected-node-inspector"
-      style={inspectorStyle}
-      aria-label="Selected scene object editor"
-      onPointerMove={handleDragMove}
-      onPointerUp={handleDragEnd}
-      onPointerCancel={handleDragEnd}
-    >
+    <section className="selected-node-inspector" aria-label="Selected scene object editor">
       <div
-        className="section-heading-row inspector-drag-handle"
-        title="Drag to move object selection pane"
-        onPointerDown={handleDragStart}
+        className="section-heading-row"
       >
         <div>
           <h2>Object selection</h2>
@@ -223,94 +134,37 @@ export function SelectedNodeInspector({
 
       {!canEdit ? <p className="inspector-warning">This selection cannot be rewritten as a single editable spatial declaration.</p> : null}
 
-      <div className="inspector-grid" aria-label="Move selected object">
-        <strong>Move</strong>
-        {(['x', 'y', 'z'] as AxisName[]).map((axis) => (
-          <span key={`move-${axis}`} className="inspector-control-row">
-            <span className="inspector-axis-label">{axis.toUpperCase()}</span>
-            <button type="button" disabled={!canEdit} aria-label={`Move ${axis.toUpperCase()} -1 unit`} onClick={() => onMove(axis, -unitStep)}>
-              -1
-            </button>
-            <button type="button" disabled={!canEdit} aria-label={`Move ${axis.toUpperCase()} +1 unit`} onClick={() => onMove(axis, unitStep)}>
-              +1
-            </button>
-            <button type="button" disabled={!canEdit} aria-label={`Move ${axis.toUpperCase()} -1 centiunit`} onClick={() => onMove(axis, -centiunitStep)}>
-              -1c
-            </button>
-            <button type="button" disabled={!canEdit} aria-label={`Move ${axis.toUpperCase()} +1 centiunit`} onClick={() => onMove(axis, centiunitStep)}>
-              +1c
-            </button>
-          </span>
+      <details className="inspector-section" open>
+        <summary>
+          <strong>Transform</strong>
+          <label onClick={(event) => event.stopPropagation()}>
+            Step
+            <select value={translationStep} onChange={(event) => setTranslationStep(Number(event.target.value) as 1 | 0.01)}>
+              <option value="1">1 unit</option>
+              <option value="0.01">1 centiunit</option>
+            </select>
+          </label>
+        </summary>
+        {([
+          ['Move', onMove, translationStep],
+          ['Resize', onResize, translationStep],
+          ['Rotate', onRotate, rotationStep],
+        ] as const).map(([label, handler, step]) => (
+          <div className="inspector-transform-row" key={label}>
+            <strong>{label}</strong>
+            {(['x', 'y', 'z'] as AxisName[]).map((axis) => (
+              <span key={`${label}-${axis}`} className="inspector-axis-stepper">
+                <span title={label === 'Rotate' ? ROTATION_AXIS_DESCRIPTIONS[axis] : undefined}>{axis.toUpperCase()}</span>
+                <button type="button" disabled={!canEdit} aria-label={`${label} ${axis.toUpperCase()} backward by ${step}`} onClick={() => handler(axis, -step)}>−</button>
+                <button type="button" disabled={!canEdit} aria-label={`${label} ${axis.toUpperCase()} forward by ${step}`} onClick={() => handler(axis, step)}>+</button>
+              </span>
+            ))}
+          </div>
         ))}
-      </div>
+      </details>
 
-      <div className="inspector-grid" aria-label="Resize selected object">
-        <strong>Resize</strong>
-        {(['x', 'y', 'z'] as AxisName[]).map((axis) => (
-          <span key={`resize-${axis}`} className="inspector-control-row">
-            <span className="inspector-axis-label">{axis.toUpperCase()}</span>
-            <button type="button" disabled={!canEdit} aria-label={`Resize ${axis.toUpperCase()} -1 unit`} onClick={() => onResize(axis, -unitStep)}>
-              -1
-            </button>
-            <button type="button" disabled={!canEdit} aria-label={`Resize ${axis.toUpperCase()} +1 unit`} onClick={() => onResize(axis, unitStep)}>
-              +1
-            </button>
-            <button type="button" disabled={!canEdit} aria-label={`Resize ${axis.toUpperCase()} -1 centiunit`} onClick={() => onResize(axis, -centiunitStep)}>
-              -1c
-            </button>
-            <button type="button" disabled={!canEdit} aria-label={`Resize ${axis.toUpperCase()} +1 centiunit`} onClick={() => onResize(axis, centiunitStep)}>
-              +1c
-            </button>
-          </span>
-        ))}
-      </div>
-
-      <div className="inspector-grid" aria-label="Rotate selected object">
-        <strong>Rotate</strong>
-        <p className="inspector-help">Rotations happen around the named axis: X pitches forward/back, Y yaws left/right, and Z rolls clockwise/counterclockwise.</p>
-        {(['x', 'y', 'z'] as AxisName[]).map((axis) => (
-          <span key={`rotate-${axis}`} className="inspector-control-row">
-            <span className="inspector-axis-label" title={ROTATION_AXIS_DESCRIPTIONS[axis]}>{axis.toUpperCase()}</span>
-            <button
-              type="button"
-              disabled={!canEdit}
-              aria-label={`Rotate ${axis.toUpperCase()} -${rotationCoarseStep} degrees`}
-              title={ROTATION_AXIS_DESCRIPTIONS[axis]}
-              onClick={() => onRotate(axis, -rotationCoarseStep)}
-            >
-              -{rotationCoarseStep}°
-            </button>
-            <button
-              type="button"
-              disabled={!canEdit}
-              aria-label={`Rotate ${axis.toUpperCase()} +${rotationCoarseStep} degrees`}
-              title={ROTATION_AXIS_DESCRIPTIONS[axis]}
-              onClick={() => onRotate(axis, rotationCoarseStep)}
-            >
-              +{rotationCoarseStep}°
-            </button>
-            <button
-              type="button"
-              disabled={!canEdit}
-              aria-label={`Rotate ${axis.toUpperCase()} -${rotationFineStep} degree`}
-              title={ROTATION_AXIS_DESCRIPTIONS[axis]}
-              onClick={() => onRotate(axis, -rotationFineStep)}
-            >
-              -{rotationFineStep}°
-            </button>
-            <button
-              type="button"
-              disabled={!canEdit}
-              aria-label={`Rotate ${axis.toUpperCase()} +${rotationFineStep} degree`}
-              title={ROTATION_AXIS_DESCRIPTIONS[axis]}
-              onClick={() => onRotate(axis, rotationFineStep)}
-            >
-              +{rotationFineStep}°
-            </button>
-          </span>
-        ))}
-      </div>
-
+      <details className="inspector-section" open>
+        <summary><strong>Appearance</strong></summary>
       <div className="inspector-fields">
         <label>
           Geometry
@@ -357,6 +211,7 @@ export function SelectedNodeInspector({
           />
         </label>
       </div>
+      </details>
     </section>
   );
 }

@@ -7,6 +7,7 @@ import { XyzDslEditor } from './XyzDslEditor';
 import { XyzDslTransactionControls } from './XyzDslTransactionControls';
 import { SecondaryProjectionPanel } from './SecondaryProjectionPanel';
 import { XyzDslTreeView } from './XyzDslTreeView';
+import { usePersistentState } from './usePersistentState';
 
 function describeAuthoringState(
   hasRemoteBaseline: boolean,
@@ -119,6 +120,7 @@ interface XyzDslDrawerProps {
   onLoadSecondaryHistory: (publicKey: string) => void;
   selectedNodeId?: string;
   onSelectNode?: (id: string) => void;
+  inspector?: ReactNode;
 }
 
 export function XyzDslDrawer({
@@ -159,8 +161,10 @@ export function XyzDslDrawer({
   onLoadSecondaryHistory,
   selectedNodeId,
   onSelectNode,
+  inspector,
 }: XyzDslDrawerProps) {
   const isEditorMode = appMode === 'editor';
+  const [activeView, setActiveView] = usePersistentState<'explorer' | 'source'>('xyzdsl-drawer-view-v1', 'explorer');
   return (
     <aside className={`xyzdsl-drawer xyzdsl-drawer--${appMode} ${isOpen ? 'is-open' : ''}`}>
       <div className="mode-controls" aria-label="Application mode">
@@ -182,11 +186,53 @@ export function XyzDslDrawer({
           </button>
 
           <header>
-            <p className="eyebrow">Candid Spaces</p>
-            <p>Compose primitive geometry in a shared coordinate space.</p>
+            <div>
+              <p className="eyebrow">Candid Spaces</p>
+              <strong>Spatial workspace</strong>
+            </div>
+            <span className={`workspace-status ${hasAuthoringEdits ? 'is-modified' : ''}`}>
+              {hasAuthoringEdits ? 'Modified' : hasRemoteBaseline ? 'Remote' : 'Local'}
+            </span>
           </header>
 
-          <XyzDslTransactionControls
+          <div className="workspace-tabs" role="tablist" aria-label="Workspace views">
+            {(['explorer', 'source'] as const).map((view) => (
+              <button
+                key={view}
+                type="button"
+                role="tab"
+                aria-selected={activeView === view}
+                onClick={() => setActiveView(view)}
+              >
+                {view === 'explorer' ? 'Explorer' : 'Source'}
+              </button>
+            ))}
+          </div>
+
+          <div className="workspace-primary" role="tabpanel">
+            {activeView === 'explorer' ? (
+              <XyzDslTreeView document={document} selectedNodeId={selectedNodeId} onSelectNode={onSelectNode} />
+            ) : (
+              <XyzDslEditor
+                actions={
+                  <button type="button" disabled={!hasRemoteBaseline || !hasAuthoringEdits} onClick={onResetToRemote}>
+                    Reset
+                  </button>
+                }
+                description={describeAuthoringState(hasRemoteBaseline, hasAuthoringEdits, remoteBaselineChanged)}
+                status={renderAuthoringStatus(hasRemoteBaseline, hasAuthoringEdits, remoteBaselineChanged, authoringChangeSummary)}
+                selectedLineNumber={selectedLineNumber}
+                value={source}
+                onChange={onChange}
+              />
+            )}
+          </div>
+
+          {inspector ? <div className="workspace-properties">{inspector}</div> : null}
+
+          <details className="workspace-more">
+            <summary>Connections &amp; diagnostics</summary>
+            <XyzDslTransactionControls
             publicKey={transactionPublicKey}
             publicKeyShareUrl={transactionPublicKeyShareUrl}
             range={transactionRange}
@@ -203,27 +249,7 @@ export function XyzDslDrawer({
             onRangeChange={onTransactionRangeChange}
             onReload={onReloadTransactions}
             onUseTip={onUseTransactionTip}
-          />
-
-          <XyzDslEditor
-            actions={
-              <button type="button" disabled={!hasRemoteBaseline || !hasAuthoringEdits} onClick={onResetToRemote}>
-                Reset to remote
-              </button>
-            }
-            description={describeAuthoringState(hasRemoteBaseline, hasAuthoringEdits, remoteBaselineChanged)}
-            status={renderAuthoringStatus(
-              hasRemoteBaseline,
-              hasAuthoringEdits,
-              remoteBaselineChanged,
-              authoringChangeSummary,
-            )}
-            selectedLineNumber={selectedLineNumber}
-            value={source}
-            onChange={onChange}
-          />
-
-
+            />
 
           {mappedTransactionSource.trim().length > 0 ? (
             <details className="remote-baseline-reference">
@@ -277,7 +303,7 @@ export function XyzDslDrawer({
             </details>
           ) : null}
 
-          <XyzDslTreeView document={document} selectedNodeId={selectedNodeId} onSelectNode={onSelectNode} />
+          </details>
         </div>
       ) : null}
       {!authoringAvailable && secondaryProjections.length > 0 ? (
