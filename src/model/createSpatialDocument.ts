@@ -125,6 +125,7 @@ function translateNodeWorldState(
 
   return {
     ...node,
+    unwrappedTransform: node.unwrappedTransform ?? node.worldTransform ?? node.transform,
     bounds: {
       ...node.bounds,
       minX: node.bounds.minX + deltaX,

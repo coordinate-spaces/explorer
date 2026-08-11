@@ -24,6 +24,8 @@ export interface SpatialNode {
   transform: SpatialTransform;
   localTransform?: SpatialTransform;
   worldTransform?: SpatialTransform;
+  /** World transform before periodic secondary-cursor wrapping. */
+  unwrappedTransform?: SpatialTransform;
   namespacePath?: string;
   parentNamespacePath?: string;
   renderable?: boolean;
