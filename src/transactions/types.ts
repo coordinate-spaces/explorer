@@ -38,6 +38,7 @@ export type SecondaryRealtimeStatus = 'connecting' | 'connected' | 'closed' | 'e
 
 /** A secondary public key discovered in a primary transaction. */
 export interface DiscoveredSecondaryPublicKeyReference extends Pick<TransactionPublicKeyEndpoint, 'publicKey'> {
+  endpoint: string;
   sourceTransactionId: string;
   memoPreview: string;
 }
@@ -52,13 +53,6 @@ export interface ActiveSecondaryTransactionStream extends TransactionPublicKeyEn
   historyLoading?: boolean;
   /** Diagnostics for the transaction selected by this stream's playback cursor. */
   currentTransactionRejectedDiagnostics: RejectedTransaction[];
-}
-
-/** The canonical live editor for the document, read from the overlay node. */
-export interface RemoteSpatialEditor extends TransactionPublicKeyEndpoint {
-  transactions: XyzDslTransaction[];
-  realtimeStatus: SecondaryRealtimeStatus;
-  streamError?: string;
 }
 
 export type SecondaryKeyReference = DiscoveredSecondaryPublicKeyReference;

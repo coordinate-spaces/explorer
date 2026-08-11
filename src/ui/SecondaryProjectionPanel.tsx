@@ -77,7 +77,7 @@ export function SecondaryProjectionPanel({
               ) : null}
               <details className="secondary-projection-details">
                 <summary>Discovery details</summary>
-                <p>Shared overlay node: {projection.endpoint}</p>
+                <p>Selected node: {projection.endpoint}</p>
                 <ul>{projection.references.map((reference) => <li key={reference.sourceTransactionId}><strong>{reference.sourceTransactionId}</strong><span>{reference.memoPreview || '(empty memo)'}</span></li>)}</ul>
               </details>
               {projection.currentTransactionRejectedDiagnostics.length > 0 ? <details className="secondary-projection-details"><summary>Current-frame parsing diagnostics ({projection.currentTransactionRejectedDiagnostics.length})</summary><ul>{projection.currentTransactionRejectedDiagnostics.map((rejection) => <li key={rejection.id}>{rejection.reasons.join(' ')}</li>)}</ul></details> : null}
