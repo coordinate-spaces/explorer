@@ -10,6 +10,7 @@ import type {
 import type { SpatialBounds } from '../model/SpatialNode';
 
 export const DEFAULT_PHYSICS_HZ = 60;
+export const DEFAULT_GRAVITY = -9.81;
 
 const vector = (value: readonly number[]): Vector3Tuple => [value[0], value[1], value[2]];
 const cloneState = (state: RigidBodyState): RigidBodyState => ({
@@ -46,6 +47,16 @@ export class PhysicsWorld {
   get tick(): number { return this.currentTick; }
 
   reconcileDefinitions(next: readonly RigidBodyDefinition[]): void {
+    const modesByEntity = new Map<string, Set<string>>();
+    next.forEach((definition) => {
+      const entityId = definition.entityId ?? definition.id;
+      const modes = modesByEntity.get(entityId) ?? new Set<string>();
+      modes.add(definition.mode ?? 'dynamic');
+      modesByEntity.set(entityId, modes);
+    });
+    modesByEntity.forEach((modes, entityId) => {
+      if (modes.size > 1) throw new Error(`Physics entity ${entityId} cannot mix rigid body modes.`);
+    });
     const nextIds = new Set(next.map(({ id }) => id));
     [...this.definitions.keys()].filter((id) => !nextIds.has(id)).forEach((id) => {
       this.definitions.delete(id);
@@ -112,6 +123,7 @@ export class PhysicsWorld {
     const inputs = [...(this.queuedInputs.get(tick) ?? [])].sort((a, b) =>
       (a.stableSourceOrder ?? 0) - (b.stableSourceOrder ?? 0) || a.bodyId.localeCompare(b.bodyId) || a.kind.localeCompare(b.kind));
     const entities = this.bodyIdsByEntity();
+    const skipVerticalSettling = new Set<string>();
     [...entities].sort(([a], [b]) => a.localeCompare(b)).forEach(([, bodyIds]) => {
       const bodyIdSet = new Set(bodyIds);
       const entityInputs = inputs.filter((input) => bodyIdSet.has(input.bodyId));
@@ -121,6 +133,7 @@ export class PhysicsWorld {
       if (direct && 'position' in direct) {
         const targetState = this.states.get(direct.bodyId)!;
         const delta = direct.position.map((value, axis) => value - targetState.position[axis]) as Vector3Tuple;
+        if (delta[1] > 0) skipVerticalSettling.add(this.definitions.get(direct.bodyId)?.entityId ?? direct.bodyId);
         states.forEach((state) => {
           state.position = state.position.map((value, axis) => value + delta[axis]) as Vector3Tuple;
           if (direct.kind === 'teleport' && direct.clearVelocity) state.linearVelocity = [0, 0, 0];
@@ -128,20 +141,25 @@ export class PhysicsWorld {
       }
       entityInputs.forEach((input) => {
         if (input.kind === 'translation') {
+          if (input.vector[1] > 0) skipVerticalSettling.add(this.definitions.get(input.bodyId)?.entityId ?? input.bodyId);
           states.forEach((state) => {
             state.position = state.position.map((component, axis) => component + input.vector[axis]) as Vector3Tuple;
           });
         }
       });
-      const dynamic = definitions.some((definition) => (definition.mode ?? 'dynamic') === 'dynamic');
+      const dynamic = (definitions[0].mode ?? 'dynamic') === 'dynamic';
       if (dynamic) {
         const velocity = vector(states[0].linearVelocity);
+        const entityMass = definitions
+          .filter((definition) => definition.contributesToBounds !== false)
+          .reduce((mass, definition) => mass + (definition.mass ?? 1), 0) || 1;
         entityInputs.forEach((input) => {
           if (input.kind !== 'force' && input.kind !== 'impulse') return;
-          const mass = this.definitions.get(input.bodyId)?.mass ?? 1;
-          const scale = input.kind === 'force' ? dt / mass : 1 / mass;
+          if (input.vector[1] > 0) skipVerticalSettling.add(this.definitions.get(input.bodyId)?.entityId ?? input.bodyId);
+          const scale = input.kind === 'force' ? dt / entityMass : 1 / entityMass;
           input.vector.forEach((component, axis) => { velocity[axis] += component * scale; });
         });
+        velocity[1] += DEFAULT_GRAVITY * dt;
         const damping = Math.max(0, Math.min(1, definitions[0].linearDamping ?? 0));
         const dampedVelocity = velocity.map((component) => component * Math.max(0, 1 - damping * dt)) as Vector3Tuple;
         states.forEach((state) => {
@@ -154,7 +172,7 @@ export class PhysicsWorld {
         state.sleeping = definitions[index].mode === 'static' || Math.hypot(...state.linearVelocity) < 1e-9;
       });
     });
-    this.resolveSpatialConstraints();
+    this.resolveSpatialConstraints(skipVerticalSettling);
     this.queuedInputs.delete(tick);
     this.currentTick = tick;
   }
@@ -168,7 +186,7 @@ export class PhysicsWorld {
     return entities;
   }
 
-  private resolveSpatialConstraints(): void {
+  private resolveSpatialConstraints(skipVerticalSettling = new Set<string>()): void {
     const entitiesById = this.bodyIdsByEntity();
     const boundsFor = (bodyIds: readonly string[]): SpatialBounds => bodyIds
       .filter((id) => this.definitions.get(id)?.contributesToBounds !== false)
@@ -238,12 +256,19 @@ export class PhysicsWorld {
     // Resolve from low to high so only ground-connected entities can support a stack.
     const grounded: PhysicsEntity[] = [];
     [...entities].sort((a, b) => a.bounds.minY - b.bounds.minY || a.id.localeCompare(b.id)).forEach((entity) => {
+      const mode = this.definitions.get(entity.bodyIds[0])?.mode ?? 'dynamic';
+      if (mode !== 'dynamic') {
+        grounded.push(entity);
+        return;
+      }
+      const movingUp = entity.bodyIds.some((id) => (this.states.get(id)?.linearVelocity[1] ?? 0) > 0);
+      if (skipVerticalSettling.has(entity.id) || movingUp) return;
       const supportY = grounded
-        .filter((support) => support.bounds.maxY <= entity.bounds.minY &&
+        .filter((support) => support.bounds.minY < entity.bounds.minY &&
           overlaps(entity.bounds.minX, entity.bounds.maxX, support.bounds.minX, support.bounds.maxX) &&
           overlaps(entity.bounds.minZ, entity.bounds.maxZ, support.bounds.minZ, support.bounds.maxZ))
         .reduce((highest, support) => Math.max(highest, support.bounds.maxY), 0);
-      if (entity.bounds.minY > supportY) translate(entity, [0, supportY - entity.bounds.minY, 0]);
+      if (entity.bounds.minY !== supportY) translate(entity, [0, supportY - entity.bounds.minY, 0]);
       entity.bodyIds.forEach((id) => {
         const state = this.states.get(id)!;
         if (state.linearVelocity[1] < 0) state.linearVelocity[1] = 0;

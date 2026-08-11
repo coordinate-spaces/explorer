@@ -68,9 +68,38 @@ describe('PhysicsWorld', () => {
     ]);
     const frame = world.step();
 
-    expect(frame.states.get('PartA/')?.position[0]).toBeCloseTo(12.1);
-    expect(frame.states.get('PartB/')?.position[0]).toBeCloseTo(13.1);
+    expect(frame.states.get('PartA/')?.position[0]).toBeCloseTo(12.05);
+    expect(frame.states.get('PartB/')?.position[0]).toBeCloseTo(13.05);
     expect(frame.states.get('PartA/')?.linearVelocity).toEqual(frame.states.get('PartB/')?.linearVelocity);
+    expect(frame.states.get('PartA/')?.linearVelocity[0]).toBeCloseTo(0.5);
+  });
+
+  it('allows upward inputs to become airborne before gravity returns the body to support', () => {
+    const world = new PhysicsWorld(10);
+    world.reconcileDefinitions([body]);
+    world.enqueueInputs([{ kind: 'impulse', bodyId: body.id, tick: 1, vector: [0, 4, 0] }]);
+
+    expect(world.step().states.get(body.id)?.position[1]).toBeGreaterThan(0);
+    expect(world.step(3).states.get(body.id)?.position[1]).toBe(0);
+    expect(world.frame().states.get(body.id)?.linearVelocity[1]).toBe(0);
+  });
+
+  it('preserves an upward translation for its input tick and clamps downward penetration', () => {
+    const world = new PhysicsWorld(10);
+    world.reconcileDefinitions([body]);
+    world.enqueueInputs([{ kind: 'translation', bodyId: body.id, tick: 1, vector: [0, 2, 0] }]);
+    expect(world.step().states.get(body.id)?.position[1]).toBeGreaterThan(1.9);
+
+    world.enqueueInputs([{ kind: 'translation', bodyId: body.id, tick: 2, vector: [0, -4, 0] }]);
+    expect(world.step().states.get(body.id)?.position[1]).toBe(0);
+  });
+
+  it('rejects entities that mix rigid body modes', () => {
+    const world = new PhysicsWorld();
+    expect(() => world.reconcileDefinitions([
+      { ...body, id: 'Dynamic/', entityId: 'mixed' },
+      { ...body, id: 'Static/', entityId: 'mixed', mode: 'static' },
+    ])).toThrow('Physics entity mixed cannot mix rigid body modes.');
   });
 
   it.each(['teleport', 'kinematic-target'] as const)('moves a whole component for a %s input', (kind) => {
