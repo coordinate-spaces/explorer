@@ -96,6 +96,23 @@ button {
   color: #f8fafc;
 }
 
+.simulation-camera-control {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: #bfdbfe;
+  font-size: 0.75rem;
+}
+
+.simulation-camera-control select {
+  max-width: 15rem;
+  border: 1px solid rgb(147 197 253 / 35%);
+  border-radius: 999px;
+  padding: 0.4rem 0.65rem;
+  background: #172033;
+  color: #f8fafc;
+}
+
 .runtime-playback-controls {
   pointer-events: auto;
   position: fixed;

@@ -234,6 +234,12 @@ Implementations SHOULD diagnose:
 
 Authoring tools SHOULD expose the effective state, base state, active directive, cursor namespace, stream identity, transaction time, inferred direction/interaction normal, and contributing variant source when available.
 
+### 13.1 Simulation cursor camera
+
+During simulation, a viewer MAY select a secondary cursor as the active camera. Camera selection MUST use the cursor's complete `(streamId, cursorNamespace)` identity so equally named cursors from different streams remain independent. The camera faces the latest nonzero transaction-to-transaction movement direction and retains that heading while the cursor is stationary. Before the first movement, it uses positive X as a deterministic fallback.
+
+Implementations SHOULD place the camera slightly behind the cursor rather than inside its geometry, use a near clipping plane suitable for tight spaces, and smooth ordinary live updates. Playback seeks and other large discontinuities SHOULD snap instead of interpolating through intervening geometry. If the selected cursor disappears or simulation stops, the viewer MUST return to its ordinary camera controls.
+
 ## 14. Examples
 
 ### Rotate on touch
