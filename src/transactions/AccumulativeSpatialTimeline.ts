@@ -75,6 +75,7 @@ export class AccumulativeSpatialTimeline {
         id: node.id,
         entityId: csgEntityByNodeId.get(node.id) ?? physicsEntityId(node),
         entityOrder,
+        contributesToBounds: node.geometry.operation === undefined,
         bounds: node.bounds,
         position: [...(node.worldTransform ?? node.transform).position],
         mass: node.origin?.transactionAmount,

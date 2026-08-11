@@ -170,29 +170,33 @@ export class PhysicsWorld {
 
   private resolveSpatialConstraints(): void {
     const entitiesById = this.bodyIdsByEntity();
-    const boundsFor = (bodyIds: readonly string[]): SpatialBounds => bodyIds.reduce<SpatialBounds>((combined, id) => {
-      const definition = this.definitions.get(id)!;
-      const state = this.states.get(id)!;
-      const dx = state.position[0] - definition.position[0];
-      const dy = state.position[1] - definition.position[1];
-      const dz = state.position[2] - definition.position[2];
-      const bounds = {
-        minX: definition.bounds.minX + dx, maxX: definition.bounds.maxX + dx,
-        minY: definition.bounds.minY + dy, maxY: definition.bounds.maxY + dy,
-        minZ: definition.bounds.minZ + dz, maxZ: definition.bounds.maxZ + dz,
-      };
-      return {
-        minX: Math.min(combined.minX, bounds.minX), maxX: Math.max(combined.maxX, bounds.maxX),
-        minY: Math.min(combined.minY, bounds.minY), maxY: Math.max(combined.maxY, bounds.maxY),
-        minZ: Math.min(combined.minZ, bounds.minZ), maxZ: Math.max(combined.maxZ, bounds.maxZ),
-      };
-    }, { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity, minZ: Infinity, maxZ: -Infinity });
-    const entities = [...entitiesById].map(([id, bodyIds]): PhysicsEntity => ({
-      id,
-      bodyIds,
-      bounds: boundsFor(bodyIds),
-      order: Math.min(...bodyIds.map((bodyId) => this.definitions.get(bodyId)?.entityOrder ?? 0)),
-    })).sort((a, b) => a.order - b.order || a.id.localeCompare(b.id));
+    const boundsFor = (bodyIds: readonly string[]): SpatialBounds => bodyIds
+      .filter((id) => this.definitions.get(id)?.contributesToBounds !== false)
+      .reduce<SpatialBounds>((combined, id) => {
+        const definition = this.definitions.get(id)!;
+        const state = this.states.get(id)!;
+        const dx = state.position[0] - definition.position[0];
+        const dy = state.position[1] - definition.position[1];
+        const dz = state.position[2] - definition.position[2];
+        const bounds = {
+          minX: definition.bounds.minX + dx, maxX: definition.bounds.maxX + dx,
+          minY: definition.bounds.minY + dy, maxY: definition.bounds.maxY + dy,
+          minZ: definition.bounds.minZ + dz, maxZ: definition.bounds.maxZ + dz,
+        };
+        return {
+          minX: Math.min(combined.minX, bounds.minX), maxX: Math.max(combined.maxX, bounds.maxX),
+          minY: Math.min(combined.minY, bounds.minY), maxY: Math.max(combined.maxY, bounds.maxY),
+          minZ: Math.min(combined.minZ, bounds.minZ), maxZ: Math.max(combined.maxZ, bounds.maxZ),
+        };
+      }, { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity, minZ: Infinity, maxZ: -Infinity });
+    const entities = [...entitiesById]
+      .filter(([, bodyIds]) => bodyIds.some((id) => this.definitions.get(id)?.contributesToBounds !== false))
+      .map(([id, bodyIds]): PhysicsEntity => ({
+        id,
+        bodyIds,
+        bounds: boundsFor(bodyIds),
+        order: Math.min(...bodyIds.map((bodyId) => this.definitions.get(bodyId)?.entityOrder ?? 0)),
+      })).sort((a, b) => a.order - b.order || a.id.localeCompare(b.id));
     const translate = (entity: PhysicsEntity, delta: Vector3Tuple): void => {
       entity.bodyIds.forEach((id) => {
         const state = this.states.get(id)!;

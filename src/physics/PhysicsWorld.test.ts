@@ -44,6 +44,18 @@ describe('PhysicsWorld', () => {
     expect(a[1]).toBe(0);
   });
 
+  it('does not use CSG tool volumes as collision obstacles', () => {
+    const world = new PhysicsWorld();
+    world.reconcileDefinitions([
+      { ...body, id: 'Base/', entityId: 'component:Shape', bounds: { ...body.bounds, maxX: 4 } },
+      { ...body, id: 'Cutter/', entityId: 'component:Shape', contributesToBounds: false, position: [3, 0, 0], bounds: { ...body.bounds, minX: 3, maxX: 6 } },
+      { ...body, id: 'Neighbor/', entityOrder: 1, position: [5, 0, 0], bounds: { ...body.bounds, minX: 5, maxX: 6 } },
+    ]);
+
+    expect(world.frame().states.get('Neighbor/')?.position[0]).toBe(5);
+    expect(world.frame().states.get('Cutter/')?.position[0]).toBe(3);
+  });
+
   it('applies translations and impulses to every member of a rigid component', () => {
     const world = new PhysicsWorld(10);
     world.reconcileDefinitions([

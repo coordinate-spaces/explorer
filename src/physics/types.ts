@@ -10,6 +10,8 @@ export interface RigidBodyDefinition {
   entityId?: string;
   /** Authored entity order used for deterministic packing precedence. */
   entityOrder?: number;
+  /** False for CSG tools that follow their entity without contributing collision volume. */
+  contributesToBounds?: boolean;
   bounds: SpatialBounds;
   position: Vector3Tuple;
   orientation?: QuaternionTuple;

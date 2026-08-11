@@ -55,6 +55,18 @@ describe('AccumulativeSpatialTimeline', () => {
     expect(frame.document.csgExpressions[0].operations[0].tool.geometry.kind).toBe('cylinder');
   });
 
+  it('excludes a CSG cutter volume from simulation collision bounds', () => {
+    const declaration = [
+      '"+0+4/+0+1/+0+1":"geometry: sphere"',
+      '"+3+3/+0+1/+0+1":"operation: subtraction"',
+      '"Neighbor/+5+1/+0+1/+0+1":""',
+    ].join('\n');
+    const frame = new AccumulativeSpatialTimeline().compile(declaration);
+
+    expect(frame.document.csgExpressions).toHaveLength(1);
+    expect(frame.document.renderNodes.find((node) => node.namespacePath === 'Neighbor/')?.bounds.minX).toBe(5);
+  });
+
   it('stacks primary objects vertically without moving or supporting them with cursors', () => {
     const declaration = [
       '"Ground/+0+1/+0+1/+0+1":""',
