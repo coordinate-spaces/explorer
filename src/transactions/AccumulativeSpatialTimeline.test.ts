@@ -43,6 +43,18 @@ describe('AccumulativeSpatialTimeline', () => {
     expect(simulated.renderNodes.map((node) => node.transform.position[0])).toEqual([0.5, 1.5]);
   });
 
+  it('keeps anonymous CSG tools attached to their selected base during simulation packing', () => {
+    const declaration = [
+      '"+0+6/+0+6/+0+6":"geometry: sphere"',
+      '"+2+2/+0+6/+2+2":"geometry: cylinder; operation: subtraction"',
+    ].join('\n');
+    const frame = new AccumulativeSpatialTimeline().compile(declaration);
+
+    expect(frame.document.csgExpressions).toHaveLength(1);
+    expect(frame.document.csgExpressions[0].base.geometry.kind).toBe('sphere');
+    expect(frame.document.csgExpressions[0].operations[0].tool.geometry.kind).toBe('cylinder');
+  });
+
   it('stacks primary objects vertically without moving or supporting them with cursors', () => {
     const declaration = [
       '"Ground/+0+1/+0+1/+0+1":""',

@@ -63,11 +63,17 @@ export class AccumulativeSpatialTimeline {
 
   private reconcile(source: string, originsByLine?: ReadonlyMap<number, XyzDslDeclarationOrigin>): SpatialDocument {
     const authored = createSpatialDocument(source, { originsByLine, applyConditionalVariants: false });
+    const csgEntityByNodeId = new Map<string, string>();
+    authored.csgExpressions.forEach((expression) => {
+      const entityId = physicsEntityId(expression.base);
+      csgEntityByNodeId.set(expression.base.id, entityId);
+      expression.operations.forEach(({ tool }) => csgEntityByNodeId.set(tool.id, entityId));
+    });
     const definitions: RigidBodyDefinition[] = renderable(authored.nodes)
       .filter((node) => node.origin?.sourceKind !== 'secondary')
       .map((node, entityOrder) => ({
         id: node.id,
-        entityId: physicsEntityId(node),
+        entityId: csgEntityByNodeId.get(node.id) ?? physicsEntityId(node),
         entityOrder,
         bounds: node.bounds,
         position: [...(node.worldTransform ?? node.transform).position],
