@@ -111,48 +111,65 @@ export class PhysicsWorld {
     const dt = 1 / this.ticksPerSecond;
     const inputs = [...(this.queuedInputs.get(tick) ?? [])].sort((a, b) =>
       (a.stableSourceOrder ?? 0) - (b.stableSourceOrder ?? 0) || a.bodyId.localeCompare(b.bodyId) || a.kind.localeCompare(b.kind));
-    const byBody = new Map<string, PhysicsInput[]>();
-    inputs.forEach((input) => byBody.set(input.bodyId, [...(byBody.get(input.bodyId) ?? []), input]));
-
-    [...this.states].sort(([a], [b]) => a.localeCompare(b)).forEach(([id, state]) => {
-      const definition = this.definitions.get(id)!;
-      const bodyInputs = byBody.get(id) ?? [];
-      const direct = bodyInputs.filter((input) => input.kind === 'teleport' || input.kind === 'kinematic-target').at(-1);
+    const entities = this.bodyIdsByEntity();
+    [...entities].sort(([a], [b]) => a.localeCompare(b)).forEach(([, bodyIds]) => {
+      const bodyIdSet = new Set(bodyIds);
+      const entityInputs = inputs.filter((input) => bodyIdSet.has(input.bodyId));
+      const states = bodyIds.map((id) => this.states.get(id)!);
+      const definitions = bodyIds.map((id) => this.definitions.get(id)!);
+      const direct = entityInputs.filter((input) => input.kind === 'teleport' || input.kind === 'kinematic-target').at(-1);
       if (direct && 'position' in direct) {
-        state.position = vector(direct.position);
-        if (direct.kind === 'teleport' && direct.clearVelocity) state.linearVelocity = [0, 0, 0];
+        const targetState = this.states.get(direct.bodyId)!;
+        const delta = direct.position.map((value, axis) => value - targetState.position[axis]) as Vector3Tuple;
+        states.forEach((state) => {
+          state.position = state.position.map((value, axis) => value + delta[axis]) as Vector3Tuple;
+          if (direct.kind === 'teleport' && direct.clearVelocity) state.linearVelocity = [0, 0, 0];
+        });
       }
-      bodyInputs.forEach((input) => {
+      entityInputs.forEach((input) => {
         if (input.kind === 'translation') {
-          state.position = state.position.map((component, axis) => component + input.vector[axis]) as Vector3Tuple;
+          states.forEach((state) => {
+            state.position = state.position.map((component, axis) => component + input.vector[axis]) as Vector3Tuple;
+          });
         }
       });
-      if ((definition.mode ?? 'dynamic') === 'dynamic') {
-        const mass = definition.mass ?? 1;
-        bodyInputs.forEach((input) => {
+      const dynamic = definitions.some((definition) => (definition.mode ?? 'dynamic') === 'dynamic');
+      if (dynamic) {
+        const velocity = vector(states[0].linearVelocity);
+        entityInputs.forEach((input) => {
           if (input.kind !== 'force' && input.kind !== 'impulse') return;
+          const mass = this.definitions.get(input.bodyId)?.mass ?? 1;
           const scale = input.kind === 'force' ? dt / mass : 1 / mass;
-          state.linearVelocity = state.linearVelocity.map((component, axis) =>
-            component + input.vector[axis] * scale) as Vector3Tuple;
+          input.vector.forEach((component, axis) => { velocity[axis] += component * scale; });
         });
-        const damping = Math.max(0, Math.min(1, definition.linearDamping ?? 0));
-        state.linearVelocity = state.linearVelocity.map((component) => component * Math.max(0, 1 - damping * dt)) as Vector3Tuple;
-        state.position = state.position.map((component, axis) => component + state.linearVelocity[axis] * dt) as Vector3Tuple;
+        const damping = Math.max(0, Math.min(1, definitions[0].linearDamping ?? 0));
+        const dampedVelocity = velocity.map((component) => component * Math.max(0, 1 - damping * dt)) as Vector3Tuple;
+        states.forEach((state) => {
+          state.linearVelocity = vector(dampedVelocity);
+          state.position = state.position.map((component, axis) => component + dampedVelocity[axis] * dt) as Vector3Tuple;
+        });
       }
-      state.tick = tick;
-      state.sleeping = definition.mode === 'static' || Math.hypot(...state.linearVelocity) < 1e-9;
+      states.forEach((state, index) => {
+        state.tick = tick;
+        state.sleeping = definitions[index].mode === 'static' || Math.hypot(...state.linearVelocity) < 1e-9;
+      });
     });
     this.resolveSpatialConstraints();
     this.queuedInputs.delete(tick);
     this.currentTick = tick;
   }
 
-  private resolveSpatialConstraints(): void {
-    const entitiesById = new Map<string, string[]>();
+  private bodyIdsByEntity(): Map<string, string[]> {
+    const entities = new Map<string, string[]>();
     this.definitions.forEach((definition, id) => {
       const entityId = definition.entityId ?? id;
-      entitiesById.set(entityId, [...(entitiesById.get(entityId) ?? []), id]);
+      entities.set(entityId, [...(entities.get(entityId) ?? []), id]);
     });
+    return entities;
+  }
+
+  private resolveSpatialConstraints(): void {
+    const entitiesById = this.bodyIdsByEntity();
     const boundsFor = (bodyIds: readonly string[]): SpatialBounds => bodyIds.reduce<SpatialBounds>((combined, id) => {
       const definition = this.definitions.get(id)!;
       const state = this.states.get(id)!;

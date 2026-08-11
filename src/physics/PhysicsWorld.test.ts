@@ -44,6 +44,36 @@ describe('PhysicsWorld', () => {
     expect(a[1]).toBe(0);
   });
 
+  it('applies translations and impulses to every member of a rigid component', () => {
+    const world = new PhysicsWorld(10);
+    world.reconcileDefinitions([
+      { ...body, id: 'PartA/', entityId: 'component:Parts', position: [10, 0, 0], bounds: { ...body.bounds, minX: 10, maxX: 11 } },
+      { ...body, id: 'PartB/', entityId: 'component:Parts', position: [11, 0, 0], bounds: { ...body.bounds, minX: 11, maxX: 12 } },
+    ]);
+    world.enqueueInputs([
+      { kind: 'translation', bodyId: 'PartA/', tick: 1, vector: [2, 0, 0] },
+      { kind: 'impulse', bodyId: 'PartB/', tick: 1, vector: [2, 0, 0] },
+    ]);
+    const frame = world.step();
+
+    expect(frame.states.get('PartA/')?.position[0]).toBeCloseTo(12.1);
+    expect(frame.states.get('PartB/')?.position[0]).toBeCloseTo(13.1);
+    expect(frame.states.get('PartA/')?.linearVelocity).toEqual(frame.states.get('PartB/')?.linearVelocity);
+  });
+
+  it.each(['teleport', 'kinematic-target'] as const)('moves a whole component for a %s input', (kind) => {
+    const world = new PhysicsWorld();
+    world.reconcileDefinitions([
+      { ...body, id: 'PartA/', entityId: 'component:Parts', position: [10, 0, 0], bounds: { ...body.bounds, minX: 10, maxX: 11 }, mode: 'kinematic' },
+      { ...body, id: 'PartB/', entityId: 'component:Parts', position: [11, 0, 0], bounds: { ...body.bounds, minX: 11, maxX: 12 }, mode: 'kinematic' },
+    ]);
+    world.enqueueInputs([{ kind, bodyId: 'PartB/', tick: 1, position: [20, 0, 0] }]);
+    const frame = world.step();
+
+    expect(frame.states.get('PartA/')?.position[0]).toBe(19);
+    expect(frame.states.get('PartB/')?.position[0]).toBe(20);
+  });
+
   it('accumulates force on fixed ticks rather than render calls', () => {
     const world = new PhysicsWorld(10);
     world.reconcileDefinitions([body]);
