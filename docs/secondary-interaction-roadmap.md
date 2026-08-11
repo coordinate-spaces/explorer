@@ -10,7 +10,7 @@ For each compiled document, the application currently:
 
 1. Preserves declaration provenance for baseline, secondary, and remote-editor sources.
 2. Resolves authored baseline and secondary cursor bounds.
-3. Evaluates `probe` and `breach` facts before ordinary collision packing.
+3. Evaluates `touch` and `breach` facts before ordinary collision packing.
 4. Applies matching conditional variants to produce effective boxes, transforms, materials, and bounds.
 5. Excludes secondary sensor nodes from baseline collision packing.
 
@@ -18,7 +18,7 @@ This pipeline evaluates the selected transaction frame. It does not yet maintain
 
 ## Task 6: temporal interaction transitions
 
-**Status: integrated for accumulative contact motion; transition effects remain partial.**
+**Status: integrated for accumulative interaction motion; transition effects remain partial.**
 
 ### Implemented
 
@@ -29,7 +29,7 @@ This pipeline evaluates the selected transaction frame. It does not yet maintain
 
 ### Not implemented
 
-- `App.tsx` retains `AccumulativeSpatialTimeline`, which owns prior facts and calls `interactionTransitions` while contact motion advances. Transitions are not yet exposed as general application effects.
+- `App.tsx` retains `AccumulativeSpatialTimeline`, which owns prior facts and calls `interactionTransitions` while interaction motion advances. Transitions are not yet exposed as general application effects.
 - Playback seeking does not reconstruct transition state by replaying the transaction prefix or loading a cached snapshot.
 - There is no timeline owner that orders evaluations by transaction time and stable source order.
 - Cursor disappearance, target deletion, stream disconnection, backward seeking, and replay restart do not currently emit application-visible transition events.
@@ -53,9 +53,9 @@ Forward evaluation compares the new fact set with the immediately preceding tran
 
 Persistent predicates and transition events must remain separate:
 
-- `probe` and `breach` remain active for as long as their spatial predicate is true.
-- `probe-enter`, `probe-leave`, `breach-enter`, and `breach-leave` are one evaluated-frame events.
-- A target probed by two cursors remains in persistent `probe` when one cursor leaves, while still emitting a cursor-specific leave event.
+- `touch` and `breach` remain active for as long as their spatial predicate is true.
+- `touch-enter`, `touch-leave`, `breach-enter`, and `breach-leave` are one evaluated-frame events.
+- A target touched by two cursors remains in persistent `touch` when one cursor leaves, while still emitting a cursor-specific leave event.
 
 ### Acceptance criteria
 
@@ -77,8 +77,8 @@ Task 6 is complete only when tests and application integration demonstrate:
 
 - `SpatialInteractionIndex` defines `query`, `update`, and `remove` operations.
 - `AabbInteractionIndex` partitions baseline AABBs into deterministic uniform-grid cells.
-- Queries expand cursor bounds by probe tolerance, deduplicate cell candidates, apply an AABB broad-phase filter, and return stable ID ordering.
-- `evaluateInteractions` uses the index before its probe/breach predicate checks.
+- Queries expand cursor bounds by touch tolerance, deduplicate cell candidates, apply an AABB broad-phase filter, and return stable ID ordering.
+- `evaluateInteractions` uses the index before its touch/breach predicate checks.
 
 ### Not implemented
 
@@ -109,7 +109,7 @@ The broad phase should feed a replaceable narrow phase:
 
 ```ts
 interface InteractionNarrowPhase {
-  evaluate(target: SpatialNode, cursor: SpatialNode): InteractionContact | undefined;
+  evaluate(target: SpatialNode, cursor: SpatialNode): InteractionResult | undefined;
 }
 ```
 
@@ -140,6 +140,6 @@ transitions, force/impulse separation, and an immutable document overlay.
 
 `InteractionWorld` also permits a retained broad-phase index, an injected narrow
 phase, and bounded uniform-grid membership. Application playback integration,
-portable force/mass syntax, angular integration, and a physical contact-manifold
-solver remain intentionally separate follow-up work. Existing directive syntax
-has not changed semantics. See [Accumulative physics](accumulative-physics.md).
+portable force/mass syntax, angular integration, and a physical collision-manifold
+solver remain intentionally separate follow-up work. The remaining directive syntax
+retains its documented semantics. See [Accumulative physics](accumulative-physics.md).

@@ -71,7 +71,7 @@ describe('composeSpatialEditorSources', () => {
     const origins = new Map<number, XyzDslDeclarationOrigin>([
       [1, { sourceKind: 'baseline', transactionAmount: 2 }],
     ]);
-    const edited = `${baseline}\n"Ball/+probe/+++" : ""`;
+    const edited = `${baseline}\n"Ball/+touch/+++" : ""`;
     const remapped = originsForEditedSource(edited, baseline, origins);
     const bundle = composeSpatialEditorSourceBundle(edited, [], '', remapped);
 

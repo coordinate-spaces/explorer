@@ -12,7 +12,7 @@ export interface PhysicsDirectiveBinding {
   targetWeight?: number;
   /** Predicates that select the interaction fact independently of the response body. */
   interactionDirectives?: Array<{
-    state: 'probe' | 'breach' | 'contact';
+    state: 'touch' | 'breach';
     scopeNamespace: string;
   }>;
 }
@@ -34,7 +34,7 @@ function direction(fact: InteractionFact): Vector3Tuple {
 function bindingMatchesFact(binding: PhysicsDirectiveBinding, fact: InteractionFact): boolean {
   if (!binding.interactionDirectives?.length) return fact.targetId === binding.targetId;
   return binding.interactionDirectives.every((directive) =>
-    (directive.state === 'contact' || directive.state === fact.state) &&
+    directive.state === fact.state &&
     fact.targetNamespace.startsWith(directive.scopeNamespace));
 }
 
@@ -115,7 +115,7 @@ export class SimulationTimeline {
         const unit = direction(fact);
         const cursorWeight = Number.isFinite(fact.cursorWeight) && fact.cursorWeight! > 0 ? fact.cursorWeight! : 1_000_000;
         const targetWeight = Number.isFinite(binding.targetWeight) && binding.targetWeight! > 0 ? binding.targetWeight! : 1_000_000;
-        const distance = Math.min(cursorWeight / targetWeight / 100, 100) + (fact.state === 'breach' ? fact.resolutionDistance ?? 0 : 0);
+        const distance = Math.min(cursorWeight / targetWeight / 100, 100);
         vector = unit.map((value) => value * distance) as Vector3Tuple;
       }
       inputs.push({ kind: 'translation', bodyId: binding.targetId, tick, stableSourceOrder, vector });

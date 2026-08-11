@@ -3,7 +3,7 @@ import type { InteractionFact } from '../model/interactions';
 import { SimulationTimeline } from './SimulationTimeline';
 
 const definition = { id: 'Body/', bounds: { minX: 0, maxX: 1, minY: 0, maxY: 1, minZ: 0, maxZ: 1 }, position: [0, 0, 0] as [number, number, number] };
-const fact: InteractionFact = { state: 'probe', targetId: 'Body/', targetNamespace: 'Body/', cursorId: 'Cursor/', cursorNamespace: 'Cursor/', streamId: 'controller', normal: [1, 0, 0], inferredDirection: [1, 1, 1] };
+const fact: InteractionFact = { state: 'touch', targetId: 'Body/', targetNamespace: 'Body/', cursorId: 'Cursor/', cursorNamespace: 'Cursor/', streamId: 'controller', normal: [1, 0, 0], inferredDirection: [1, 1, 1] };
 
 describe('SimulationTimeline', () => {
   it('applies force while persistent and impulse only on enter', () => {
