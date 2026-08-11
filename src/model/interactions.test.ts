@@ -45,6 +45,7 @@ describe('secondary projection interactions', () => {
     expect(document.coordinateSpace).toMatchObject({ width: 40, depth: 40 });
     expect(cursor?.box).toMatchObject({ x: 81, z: 81 });
     expect(cursor?.transform.position).toEqual([1.5, 0.5, 1.5]);
+    expect(cursor?.unwrappedTransform?.position).toEqual([81.5, 0.5, 81.5]);
     expect(cursor?.bounds).toMatchObject({ minX: 1, maxX: 2, minZ: 1, maxZ: 2 });
     expect(document.interactions).toMatchObject([{
       state: 'breach',

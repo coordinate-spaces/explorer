@@ -29,5 +29,19 @@ describe('SecondaryCameraMotionTracker', () => {
     const tracker = new SecondaryCameraMotionTracker();
     tracker.update(alice, [0, 0, 0]);
     expect(tracker.update(alice, [13, 0, 0], 12).snap).toBe(true);
+    expect(tracker.snapshot(alice).discontinuity).toBe(1);
+  });
+
+  it('retains history before the cursor is selected as a camera', () => {
+    const tracker = new SecondaryCameraMotionTracker();
+    tracker.update(alice, [4, 0, 4]);
+    tracker.update(alice, [4, 0, 6]);
+    expect(tracker.heading(alice)).toEqual([0, 0, 1]);
+  });
+
+  it('derives seam-crossing direction from unwrapped samples', () => {
+    const tracker = new SecondaryCameraMotionTracker();
+    tracker.update(alice, [39, 0, 0]);
+    expect(tracker.update(alice, [41, 0, 0])).toEqual({ heading: [1, 0, 0], snap: false });
   });
 });

@@ -5,9 +5,19 @@ export interface SecondaryCameraTarget {
   cursorNamespace: string;
 }
 
+export interface SecondaryCameraSample {
+  target: SecondaryCameraTarget;
+  position: Vector3Tuple;
+}
+
 export interface SecondaryCameraMotion {
   heading: Vector3Tuple;
   snap: boolean;
+}
+
+export interface SecondaryCameraSnapshot {
+  heading: Vector3Tuple;
+  discontinuity: number;
 }
 
 export function secondaryCameraTargetKey(target: SecondaryCameraTarget): string {
@@ -29,6 +39,7 @@ function normalized(vector: Vector3Tuple): Vector3Tuple {
 export class SecondaryCameraMotionTracker {
   private positions = new Map<string, Vector3Tuple>();
   private headings = new Map<string, Vector3Tuple>();
+  private discontinuities = new Map<string, number>();
 
   update(target: SecondaryCameraTarget, position: Vector3Tuple, discontinuityThreshold = 12): SecondaryCameraMotion {
     const key = secondaryCameraTargetKey(target);
@@ -44,6 +55,21 @@ export class SecondaryCameraMotionTracker {
 
     this.positions.set(key, [...position]);
     this.headings.set(key, heading);
+    if (previous && movementDistance > discontinuityThreshold) {
+      this.discontinuities.set(key, (this.discontinuities.get(key) ?? 0) + 1);
+    }
     return { heading, snap: !previous || movementDistance > discontinuityThreshold };
+  }
+
+  heading(target: SecondaryCameraTarget): Vector3Tuple {
+    return this.headings.get(secondaryCameraTargetKey(target)) ?? [1, 0, 0];
+  }
+
+  snapshot(target: SecondaryCameraTarget): SecondaryCameraSnapshot {
+    const key = secondaryCameraTargetKey(target);
+    return {
+      heading: this.headings.get(key) ?? [1, 0, 0],
+      discontinuity: this.discontinuities.get(key) ?? 0,
+    };
   }
 }

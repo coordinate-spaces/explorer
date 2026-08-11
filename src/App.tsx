@@ -13,7 +13,7 @@ import {
   selectionTargetForNodeId,
 } from './selection';
 import { SceneRoot } from './scene/SceneRoot';
-import { secondaryCameraTargetKey, type SecondaryCameraTarget } from './scene/secondaryCamera';
+import { secondaryCameraTargetKey, type SecondaryCameraSample, type SecondaryCameraTarget } from './scene/secondaryCamera';
 import { fetchPublicKeyTransactions, fetchTipHeight, normalizeEndpoint } from './transactions/publicKeyTransactions';
 import { createPublicKeyShareUrl, readPublicKeyFromUrl } from './transactions/publicKeyShareUrl';
 import { composeSpatialEditorSourceBundle, originsForEditedSource } from './transactions/composeTransactionSources';
@@ -182,6 +182,7 @@ export default function App() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [simulationMode, setSimulationMode] = useState<'stopped' | 'running' | 'paused'>('stopped');
   const [secondaryCameraTarget, setSecondaryCameraTarget] = useState<SecondaryCameraTarget | undefined>();
+  const [secondaryCameraDiscontinuity, setSecondaryCameraDiscontinuity] = useState(0);
   const [selectedNodeId, setSelectedNodeId] = useState<string | undefined>();
   const [selectedLeafNodeId, setSelectedLeafNodeId] = useState<string | undefined>();
   const [selectedSceneHighlightNodeId, setSelectedSceneHighlightNodeId] = useState<string | undefined>();
@@ -574,6 +575,34 @@ export default function App() {
   const [document, setDocument] = useState(() => createSpatialDocument(renderedBundle.source, {
     originsByLine: renderedBundle.originsByLine,
   }));
+  const secondaryCameraHistorySamples = useMemo<SecondaryCameraSample[]>(() => secondaryTransactionStreams.flatMap((stream) => {
+    const currentIndex = clampPlaybackIndex(stream.playbackIndex, stream.transactions.length);
+    const indices = [...new Set([Math.max(0, currentIndex - 1), currentIndex])];
+
+    return indices.flatMap((index) => {
+      const transaction = stream.transactions[index];
+      if (!transaction) return [];
+      const xyzdslResult = transactionsToXyzDslSource([transaction], { publicKey: stream.publicKey });
+      const streamId = `${stream.publicKey}@@${stream.endpoint}`;
+      const bundle = composeSpatialEditorSourceBundle(authoringSource, [{
+        id: streamId,
+        publicKey: stream.publicKey,
+        endpoint: stream.endpoint,
+        transactionId: transaction.signature,
+        transactionTime: transaction.time,
+        transactionAmount: transaction.amount,
+        declarations: xyzdslResult.source,
+      }], authoringOriginsByLine);
+      const historicalDocument = createSpatialDocument(bundle.source, { originsByLine: bundle.originsByLine });
+
+      return historicalDocument.renderNodes.flatMap((node): SecondaryCameraSample[] => node.origin?.sourceKind === 'secondary'
+        ? [{
+          target: { streamId, cursorNamespace: node.namespacePath ?? node.id },
+          position: node.unwrappedTransform?.position ?? node.transform.position,
+        }]
+        : []);
+    });
+  }), [authoringOriginsByLine, authoringSource, secondaryTransactionStreams]);
   const secondaryCameraChoices = useMemo(() => {
     const choices = new Map<string, SecondaryCameraTarget>();
     document.renderNodes.forEach((node) => {
@@ -671,6 +700,7 @@ export default function App() {
         },
       };
     });
+    setSecondaryCameraDiscontinuity((revision) => revision + 1);
   }, [activeSecondaryTransactions, setActiveSecondaryTransactions]);
 
   const handleSecondaryPlaybackToggle = useCallback((publicKey: string) => {
@@ -774,6 +804,8 @@ export default function App() {
         },
       };
     });
+    // Seeking is a temporal discontinuity even when adjacent positions are close.
+    setSecondaryCameraDiscontinuity((revision) => revision + 1);
   }, [activeSecondaryTransactions, setActiveSecondaryTransactions]);
 
   const handleLoadSecondaryHistory = useCallback((publicKey: string) => {
@@ -797,6 +829,9 @@ export default function App() {
 
     fetchPublicKeyTransactions({ endpoint, publicKey, range: transactionRange, signal: controller.signal })
       .then((historicalTransactions) => {
+        if (!activeSecondaryTransactions[streamKey]?.replaying) {
+          setSecondaryCameraDiscontinuity((revision) => revision + 1);
+        }
         setActiveSecondaryTransactions((streams) => {
           const stream = streams[streamKey];
 
@@ -946,6 +981,8 @@ export default function App() {
         selectedNodeId={selectedSceneNodeId}
         onSelectNode={handleSelectNode}
         secondaryCameraTarget={simulationMode === 'stopped' ? undefined : secondaryCameraTarget}
+        secondaryCameraDiscontinuity={secondaryCameraDiscontinuity}
+        secondaryCameraHistorySamples={secondaryCameraHistorySamples}
       />
       <div className="simulation-controls" aria-label="Simulation controls">
         <span>Simulation: {simulationMode}</span>
