@@ -168,7 +168,7 @@ describe('secondary projection interactions', () => {
 
     expect(document.interactions).toMatchObject([{ state: 'probe', targetNamespace: 'Ball/' }]);
     expect(ball?.box.x).toBe(1.99);
-    expect(ball?.bounds.minX).toBe(2);
+    expect(ball?.bounds.minX).toBeCloseTo(1.99);
   });
 
   it('scales unequal valid transaction amounts before translating in the polar-opposite direction', () => {

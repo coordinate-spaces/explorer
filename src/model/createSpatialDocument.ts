@@ -5,7 +5,7 @@ import type { XyzDslBoxSpec, XyzDslDeclarationOrigin } from '../xyzdsl/types';
 import { canonicalNamespacePath } from '../xyzdsl/pathParser';
 import type { SpatialDocument } from './SpatialDocument';
 import type { SpatialNode } from './SpatialNode';
-import { boundsFromTransformedBox, resolveCollisions } from './collision';
+import { assignUnionGroups, boundsFromTransformedBox } from './collision';
 import { buildCsgExpressions } from './csg';
 import { geometryFromBox } from './geometry';
 import {
@@ -413,7 +413,9 @@ export function createSpatialDocument(source: string, options: CreateSpatialDocu
   const effectiveRenderable = flattenRenderable(effectiveTree);
   const physicalNodes = effectiveRenderable.filter((node) => node.origin?.sourceKind !== 'secondary');
   const sensorNodes = effectiveRenderable.filter((node) => node.origin?.sourceKind === 'secondary');
-  const groupedNodes = [...resolveCollisions(physicalNodes), ...sensorNodes];
+  // Authored documents preserve their baseline coordinates. World packing is a
+  // simulation concern and is represented by the supplied physics frame.
+  const groupedNodes = [...assignUnionGroups(physicalNodes), ...sensorNodes];
   const csg = buildCsgExpressions(groupedNodes);
   const renderNodes = csg.nodes.filter((node) => !node.csgConsumed && !node.csgExpressionId);
   const nodes = applyRenderableStateToTree(effectiveTree, csg.nodes);

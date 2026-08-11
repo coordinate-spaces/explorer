@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { XyzDslDeclarationOrigin } from '../xyzdsl/types';
+import { createSpatialDocument } from '../model/createSpatialDocument';
 import { AccumulativeSpatialTimeline, accumulativePhysicsFrameKey, spatialBaselineRevision } from './AccumulativeSpatialTimeline';
 
 function origins(cursorAmount = 1_000_000) {
@@ -33,6 +34,32 @@ function scopedOrigins() {
 }
 
 describe('AccumulativeSpatialTimeline', () => {
+  it('applies world collision packing only in simulation', () => {
+    const declaration = '"First/+0+1/+0+1/+0+1":""\n"Second/+0+1/+0+1/+0+1":""';
+    const authored = createSpatialDocument(declaration);
+    const simulated = new AccumulativeSpatialTimeline().compile(declaration).document;
+
+    expect(authored.renderNodes.map((node) => node.transform.position[0])).toEqual([0.5, 0.5]);
+    expect(simulated.renderNodes.map((node) => node.transform.position[0])).toEqual([0.5, 1.5]);
+  });
+
+  it('stacks primary objects vertically without moving or supporting them with cursors', () => {
+    const declaration = [
+      '"Ground/+0+1/+0+1/+0+1":""',
+      '"Floating/+0+1/+5+1/+0+1":""',
+      '"Cursor/+0+1/+3+1/+0+1":""',
+    ].join('\n');
+    const declarationOrigins = new Map<number, XyzDslDeclarationOrigin>([
+      [1, { sourceKind: 'baseline' }],
+      [2, { sourceKind: 'baseline' }],
+      [3, { sourceKind: 'secondary', streamId: 'cursor' }],
+    ]);
+    const frame = new AccumulativeSpatialTimeline().compile(declaration, declarationOrigins);
+
+    expect(frame.document.renderNodes.find((node) => node.namespacePath === 'Floating/')?.bounds.minY).toBe(1);
+    expect(frame.document.renderNodes.find((node) => node.namespacePath === 'Cursor/')?.bounds.minY).toBe(3);
+  });
+
   it('retains each explicit contact translation across transaction frames', () => {
     const timeline = new AccumulativeSpatialTimeline();
     const first = timeline.evaluate(source(6, '+2/+0/+0'), origins());

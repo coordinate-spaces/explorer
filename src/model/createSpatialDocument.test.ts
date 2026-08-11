@@ -63,7 +63,7 @@ describe('createSpatialDocument namespaced spatial declarations', () => {
     expect(document.renderNodes).toHaveLength(2);
     expect(document.renderNodes[1].material.color).toBe('brown');
     expect(document.renderNodes[1].material.metalness).toBe(0.2);
-    expect(document.renderNodes[1].transform.position).toEqual([4.5, 1.5, 7.5]);
+    expect(document.renderNodes[1].transform.position).toEqual([5.5, 1.5, 7.5]);
   });
 
   it('packs materialized descendants using the reference declaration order', () => {
@@ -78,7 +78,7 @@ describe('createSpatialDocument namespaced spatial declarations', () => {
     );
 
     expect(prior?.transform.position).toEqual([12, 1, 1]);
-    expect(materialized?.transform.position).toEqual([12, 3, 1]);
+    expect(materialized?.transform.position).toEqual([12, 1, 1]);
     expect(materialized?.metadata?.lineNumber).toBe(4);
   });
 
@@ -488,7 +488,7 @@ describe('createSpatialDocument namespaced spatial declarations', () => {
     expect(shade?.unionGroupId).toBe('union-1');
     expect(bulb?.unionGroupId).toBe('union-1');
     expect(global?.unionGroupId).toBeUndefined();
-    expect(global?.bounds.minY).toBe(2);
+    expect(global?.bounds.minY).toBe(0);
   });
 
   it('allows puff-only child geometry declarations without dropping inherited box-radius', () => {
@@ -531,8 +531,8 @@ describe('createSpatialDocument namespaced spatial declarations', () => {
     expect(document.csgExpressions).toHaveLength(1);
     expect(document.csgExpressions[0].base.geometry.kind).toBe('sphere');
     expect(document.renderNodes.map((node) => node.geometry.kind)).toEqual(['box']);
-    expect(document.renderNodes[0].bounds.maxX).toBe(document.csgExpressions[0].base.bounds.minX);
-    expect(document.csgExpressions[0].operations[0].tool.transform.position[0]).toBe(5.5);
+    expect(document.renderNodes[0].bounds.maxX).toBe(4);
+    expect(document.csgExpressions[0].operations[0].tool.transform.position[0]).toBe(2.5);
   });
 
   it('chains declaration-order boolean operations inside a concrete namespace scope', () => {

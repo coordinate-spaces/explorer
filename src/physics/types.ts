@@ -6,6 +6,10 @@ export type RigidBodyMode = 'dynamic' | 'kinematic' | 'static';
 
 export interface RigidBodyDefinition {
   id: string;
+  /** Bodies with the same entity id are packed and stacked as one rigid component. */
+  entityId?: string;
+  /** Authored entity order used for deterministic packing precedence. */
+  entityOrder?: number;
   bounds: SpatialBounds;
   position: Vector3Tuple;
   orientation?: QuaternionTuple;
