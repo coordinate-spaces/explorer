@@ -6,6 +6,12 @@ export type RigidBodyMode = 'dynamic' | 'kinematic' | 'static';
 
 export interface RigidBodyDefinition {
   id: string;
+  /** Bodies with the same entity id are packed and stacked as one rigid component. */
+  entityId?: string;
+  /** Authored entity order used for deterministic packing precedence. */
+  entityOrder?: number;
+  /** False for CSG tools that follow their entity without contributing collision volume. */
+  contributesToBounds?: boolean;
   bounds: SpatialBounds;
   position: Vector3Tuple;
   orientation?: QuaternionTuple;

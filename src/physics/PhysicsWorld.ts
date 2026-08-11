@@ -7,8 +7,10 @@ import type {
   RigidBodyState,
   Vector3Tuple,
 } from './types';
+import type { SpatialBounds } from '../model/SpatialNode';
 
 export const DEFAULT_PHYSICS_HZ = 60;
+export const DEFAULT_GRAVITY = -9.81;
 
 const vector = (value: readonly number[]): Vector3Tuple => [value[0], value[1], value[2]];
 const cloneState = (state: RigidBodyState): RigidBodyState => ({
@@ -19,7 +21,17 @@ const cloneState = (state: RigidBodyState): RigidBodyState => ({
   angularVelocity: vector(state.angularVelocity),
 });
 
-/** A renderer-independent, fixed-timestep state owner. Collision response is intentionally pluggable. */
+interface PhysicsEntity {
+  id: string;
+  bodyIds: string[];
+  bounds: SpatialBounds;
+  order: number;
+}
+
+const overlaps = (aMin: number, aMax: number, bMin: number, bMax: number): boolean =>
+  aMin < bMax && aMax > bMin;
+
+/** A renderer-independent, fixed-timestep state owner with deterministic world-space constraints. */
 export class PhysicsWorld {
   private definitions = new Map<string, RigidBodyDefinition>();
   private states = new Map<string, RigidBodyState>();
@@ -35,6 +47,16 @@ export class PhysicsWorld {
   get tick(): number { return this.currentTick; }
 
   reconcileDefinitions(next: readonly RigidBodyDefinition[]): void {
+    const modesByEntity = new Map<string, Set<string>>();
+    next.forEach((definition) => {
+      const entityId = definition.entityId ?? definition.id;
+      const modes = modesByEntity.get(entityId) ?? new Set<string>();
+      modes.add(definition.mode ?? 'dynamic');
+      modesByEntity.set(entityId, modes);
+    });
+    modesByEntity.forEach((modes, entityId) => {
+      if (modes.size > 1) throw new Error(`Physics entity ${entityId} cannot mix rigid body modes.`);
+    });
     const nextIds = new Set(next.map(({ id }) => id));
     [...this.definitions.keys()].filter((id) => !nextIds.has(id)).forEach((id) => {
       this.definitions.delete(id);
@@ -56,6 +78,7 @@ export class PhysicsWorld {
         });
       }
     });
+    this.resolveSpatialConstraints();
   }
 
   enqueueInputs(inputs: readonly PhysicsInput[]): void {
@@ -99,38 +122,159 @@ export class PhysicsWorld {
     const dt = 1 / this.ticksPerSecond;
     const inputs = [...(this.queuedInputs.get(tick) ?? [])].sort((a, b) =>
       (a.stableSourceOrder ?? 0) - (b.stableSourceOrder ?? 0) || a.bodyId.localeCompare(b.bodyId) || a.kind.localeCompare(b.kind));
-    const byBody = new Map<string, PhysicsInput[]>();
-    inputs.forEach((input) => byBody.set(input.bodyId, [...(byBody.get(input.bodyId) ?? []), input]));
-
-    [...this.states].sort(([a], [b]) => a.localeCompare(b)).forEach(([id, state]) => {
-      const definition = this.definitions.get(id)!;
-      const bodyInputs = byBody.get(id) ?? [];
-      const direct = bodyInputs.filter((input) => input.kind === 'teleport' || input.kind === 'kinematic-target').at(-1);
+    const entities = this.bodyIdsByEntity();
+    const skipVerticalSettling = new Set<string>();
+    [...entities].sort(([a], [b]) => a.localeCompare(b)).forEach(([, bodyIds]) => {
+      const bodyIdSet = new Set(bodyIds);
+      const entityInputs = inputs.filter((input) => bodyIdSet.has(input.bodyId));
+      const states = bodyIds.map((id) => this.states.get(id)!);
+      const definitions = bodyIds.map((id) => this.definitions.get(id)!);
+      const direct = entityInputs.filter((input) => input.kind === 'teleport' || input.kind === 'kinematic-target').at(-1);
       if (direct && 'position' in direct) {
-        state.position = vector(direct.position);
-        if (direct.kind === 'teleport' && direct.clearVelocity) state.linearVelocity = [0, 0, 0];
+        const targetState = this.states.get(direct.bodyId)!;
+        const delta = direct.position.map((value, axis) => value - targetState.position[axis]) as Vector3Tuple;
+        if (delta[1] > 0) skipVerticalSettling.add(this.definitions.get(direct.bodyId)?.entityId ?? direct.bodyId);
+        states.forEach((state) => {
+          state.position = state.position.map((value, axis) => value + delta[axis]) as Vector3Tuple;
+          if (direct.kind === 'teleport' && direct.clearVelocity) state.linearVelocity = [0, 0, 0];
+        });
       }
-      bodyInputs.forEach((input) => {
+      entityInputs.forEach((input) => {
         if (input.kind === 'translation') {
-          state.position = state.position.map((component, axis) => component + input.vector[axis]) as Vector3Tuple;
+          if (input.vector[1] > 0) skipVerticalSettling.add(this.definitions.get(input.bodyId)?.entityId ?? input.bodyId);
+          states.forEach((state) => {
+            state.position = state.position.map((component, axis) => component + input.vector[axis]) as Vector3Tuple;
+          });
         }
       });
-      if ((definition.mode ?? 'dynamic') === 'dynamic') {
-        const mass = definition.mass ?? 1;
-        bodyInputs.forEach((input) => {
+      const dynamic = (definitions[0].mode ?? 'dynamic') === 'dynamic';
+      if (dynamic) {
+        const velocity = vector(states[0].linearVelocity);
+        const entityMass = definitions
+          .filter((definition) => definition.contributesToBounds !== false)
+          .reduce((mass, definition) => mass + (definition.mass ?? 1), 0) || 1;
+        entityInputs.forEach((input) => {
           if (input.kind !== 'force' && input.kind !== 'impulse') return;
-          const scale = input.kind === 'force' ? dt / mass : 1 / mass;
-          state.linearVelocity = state.linearVelocity.map((component, axis) =>
-            component + input.vector[axis] * scale) as Vector3Tuple;
+          if (input.vector[1] > 0) skipVerticalSettling.add(this.definitions.get(input.bodyId)?.entityId ?? input.bodyId);
+          const scale = input.kind === 'force' ? dt / entityMass : 1 / entityMass;
+          input.vector.forEach((component, axis) => { velocity[axis] += component * scale; });
         });
-        const damping = Math.max(0, Math.min(1, definition.linearDamping ?? 0));
-        state.linearVelocity = state.linearVelocity.map((component) => component * Math.max(0, 1 - damping * dt)) as Vector3Tuple;
-        state.position = state.position.map((component, axis) => component + state.linearVelocity[axis] * dt) as Vector3Tuple;
+        velocity[1] += DEFAULT_GRAVITY * dt;
+        const damping = Math.max(0, Math.min(1, definitions[0].linearDamping ?? 0));
+        const dampedVelocity = velocity.map((component) => component * Math.max(0, 1 - damping * dt)) as Vector3Tuple;
+        states.forEach((state) => {
+          state.linearVelocity = vector(dampedVelocity);
+          state.position = state.position.map((component, axis) => component + dampedVelocity[axis] * dt) as Vector3Tuple;
+        });
       }
-      state.tick = tick;
-      state.sleeping = definition.mode === 'static' || Math.hypot(...state.linearVelocity) < 1e-9;
+      states.forEach((state, index) => {
+        state.tick = tick;
+        state.sleeping = definitions[index].mode === 'static' || Math.hypot(...state.linearVelocity) < 1e-9;
+      });
     });
+    this.resolveSpatialConstraints(skipVerticalSettling);
     this.queuedInputs.delete(tick);
     this.currentTick = tick;
+  }
+
+  private bodyIdsByEntity(): Map<string, string[]> {
+    const entities = new Map<string, string[]>();
+    this.definitions.forEach((definition, id) => {
+      const entityId = definition.entityId ?? id;
+      entities.set(entityId, [...(entities.get(entityId) ?? []), id]);
+    });
+    return entities;
+  }
+
+  private resolveSpatialConstraints(skipVerticalSettling = new Set<string>()): void {
+    const entitiesById = this.bodyIdsByEntity();
+    const boundsFor = (bodyIds: readonly string[]): SpatialBounds => bodyIds
+      .filter((id) => this.definitions.get(id)?.contributesToBounds !== false)
+      .reduce<SpatialBounds>((combined, id) => {
+        const definition = this.definitions.get(id)!;
+        const state = this.states.get(id)!;
+        const dx = state.position[0] - definition.position[0];
+        const dy = state.position[1] - definition.position[1];
+        const dz = state.position[2] - definition.position[2];
+        const bounds = {
+          minX: definition.bounds.minX + dx, maxX: definition.bounds.maxX + dx,
+          minY: definition.bounds.minY + dy, maxY: definition.bounds.maxY + dy,
+          minZ: definition.bounds.minZ + dz, maxZ: definition.bounds.maxZ + dz,
+        };
+        return {
+          minX: Math.min(combined.minX, bounds.minX), maxX: Math.max(combined.maxX, bounds.maxX),
+          minY: Math.min(combined.minY, bounds.minY), maxY: Math.max(combined.maxY, bounds.maxY),
+          minZ: Math.min(combined.minZ, bounds.minZ), maxZ: Math.max(combined.maxZ, bounds.maxZ),
+        };
+      }, { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity, minZ: Infinity, maxZ: -Infinity });
+    const entities = [...entitiesById]
+      .filter(([, bodyIds]) => bodyIds.some((id) => this.definitions.get(id)?.contributesToBounds !== false))
+      .map(([id, bodyIds]): PhysicsEntity => ({
+        id,
+        bodyIds,
+        bounds: boundsFor(bodyIds),
+        order: Math.min(...bodyIds.map((bodyId) => this.definitions.get(bodyId)?.entityOrder ?? 0)),
+      })).sort((a, b) => a.order - b.order || a.id.localeCompare(b.id));
+    const translate = (entity: PhysicsEntity, delta: Vector3Tuple): void => {
+      entity.bodyIds.forEach((id) => {
+        const state = this.states.get(id)!;
+        state.position = state.position.map((value, axis) => value + delta[axis]) as Vector3Tuple;
+      });
+      entity.bounds = boundsFor(entity.bodyIds);
+    };
+
+    // Pack overlaps in the horizontal plane only. Stable entity ordering makes the
+    // authored baseline the fixed obstacle and moves later entities.
+    const placed: PhysicsEntity[] = [];
+    entities.forEach((entity) => {
+      while (placed.some((obstacle) =>
+        overlaps(entity.bounds.minX, entity.bounds.maxX, obstacle.bounds.minX, obstacle.bounds.maxX) &&
+        overlaps(entity.bounds.minY, entity.bounds.maxY, obstacle.bounds.minY, obstacle.bounds.maxY) &&
+        overlaps(entity.bounds.minZ, entity.bounds.maxZ, obstacle.bounds.minZ, obstacle.bounds.maxZ))) {
+        const candidates = placed.flatMap((obstacle): Vector3Tuple[] => [
+          [obstacle.bounds.maxX - entity.bounds.minX, 0, 0],
+          [obstacle.bounds.minX - entity.bounds.maxX, 0, 0],
+          [0, 0, obstacle.bounds.maxZ - entity.bounds.minZ],
+          [0, 0, obstacle.bounds.minZ - entity.bounds.maxZ],
+        ]).sort((a, b) => Math.hypot(...a) - Math.hypot(...b));
+        const candidate = candidates.find((delta) => {
+          const moved = {
+            ...entity.bounds,
+            minX: entity.bounds.minX + delta[0], maxX: entity.bounds.maxX + delta[0],
+            minZ: entity.bounds.minZ + delta[2], maxZ: entity.bounds.maxZ + delta[2],
+          };
+          return !placed.some((obstacle) => overlaps(moved.minX, moved.maxX, obstacle.bounds.minX, obstacle.bounds.maxX) &&
+            overlaps(moved.minY, moved.maxY, obstacle.bounds.minY, obstacle.bounds.maxY) &&
+            overlaps(moved.minZ, moved.maxZ, obstacle.bounds.minZ, obstacle.bounds.maxZ));
+        });
+        if (!candidate) break;
+        translate(entity, candidate);
+      }
+      placed.push(entity);
+    });
+
+    // Resolve from low to high so only ground-connected entities can support a stack.
+    const grounded: PhysicsEntity[] = [];
+    [...entities].sort((a, b) => a.bounds.minY - b.bounds.minY || a.id.localeCompare(b.id)).forEach((entity) => {
+      const mode = this.definitions.get(entity.bodyIds[0])?.mode ?? 'dynamic';
+      if (mode !== 'dynamic') {
+        grounded.push(entity);
+        return;
+      }
+      const movingUp = entity.bodyIds.some((id) => (this.states.get(id)?.linearVelocity[1] ?? 0) > 0);
+      if (skipVerticalSettling.has(entity.id) || movingUp) return;
+      const supportY = grounded
+        .filter((support) => support.bounds.minY < entity.bounds.minY &&
+          overlaps(entity.bounds.minX, entity.bounds.maxX, support.bounds.minX, support.bounds.maxX) &&
+          overlaps(entity.bounds.minZ, entity.bounds.maxZ, support.bounds.minZ, support.bounds.maxZ))
+        .reduce((highest, support) => Math.max(highest, support.bounds.maxY), 0);
+      if (entity.bounds.minY !== supportY) translate(entity, [0, supportY - entity.bounds.minY, 0]);
+      entity.bodyIds.forEach((id) => {
+        const state = this.states.get(id)!;
+        if (state.linearVelocity[1] < 0) state.linearVelocity[1] = 0;
+        state.sleeping = Math.hypot(...state.linearVelocity) < 1e-9;
+      });
+      grounded.push(entity);
+    });
   }
 }

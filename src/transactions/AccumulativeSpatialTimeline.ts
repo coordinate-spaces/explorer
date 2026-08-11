@@ -50,6 +50,11 @@ function renderable(nodes: readonly SpatialNode[]): SpatialNode[] {
     .filter(Boolean) as SpatialNode[];
 }
 
+function physicsEntityId(node: SpatialNode): string {
+  const component = node.namespacePath?.split('/').filter(Boolean)[0];
+  return component ? `component:${component}` : `node:${node.id}`;
+}
+
 /** Transaction/playback-owned bridge from XYZDSL interaction declarations to persistent physics. */
 export class AccumulativeSpatialTimeline {
   readonly simulation = new SimulationTimeline();
@@ -58,10 +63,19 @@ export class AccumulativeSpatialTimeline {
 
   private reconcile(source: string, originsByLine?: ReadonlyMap<number, XyzDslDeclarationOrigin>): SpatialDocument {
     const authored = createSpatialDocument(source, { originsByLine, applyConditionalVariants: false });
+    const csgEntityByNodeId = new Map<string, string>();
+    authored.csgExpressions.forEach((expression) => {
+      const entityId = physicsEntityId(expression.base);
+      csgEntityByNodeId.set(expression.base.id, entityId);
+      expression.operations.forEach(({ tool }) => csgEntityByNodeId.set(tool.id, entityId));
+    });
     const definitions: RigidBodyDefinition[] = renderable(authored.nodes)
       .filter((node) => node.origin?.sourceKind !== 'secondary')
-      .map((node) => ({
+      .map((node, entityOrder) => ({
         id: node.id,
+        entityId: csgEntityByNodeId.get(node.id) ?? physicsEntityId(node),
+        entityOrder,
+        contributesToBounds: node.geometry.operation === undefined,
         bounds: node.bounds,
         position: [...(node.worldTransform ?? node.transform).position],
         mass: node.origin?.transactionAmount,
