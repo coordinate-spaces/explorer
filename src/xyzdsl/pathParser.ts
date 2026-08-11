@@ -11,7 +11,7 @@ const NAMESPACE_PATTERN = /^[A-Za-z0-9][A-Za-z0-9+]*$/;
 const DIRECTIVE_PATTERN = /^\+(?<name>[A-Za-z][A-Za-z0-9]*)$/;
 const DELTA_PATTERN = /^\+(?<magnitude>(?:0|[1-9]\d*)(?:c)?)$/;
 const WEIGHTED_TRANSLATION_SEGMENT = '+++';
-const SUPPORTED_INTERACTION_DIRECTIVES = new Set(['probe', 'breach', 'contact']);
+const SUPPORTED_INTERACTION_DIRECTIVES = new Set(['touch', 'breach']);
 
 function isAxisSegment(segment: string): boolean {
   const match = segment.match(AXIS_PATTERN);
@@ -150,7 +150,7 @@ export function parseXyzDslPath(source: string): XyzDslPathSpec {
   if (directiveEntries.length > 0) {
     directiveEntries.forEach(({ name }) => {
       if (!SUPPORTED_INTERACTION_DIRECTIVES.has(name)) {
-        throw new Error(`Unknown interaction directive "+${name}". Expected +probe, +breach, or +contact.`);
+        throw new Error(`Unknown interaction directive "+${name}". Expected +touch or +breach.`);
       }
     });
 
@@ -182,7 +182,7 @@ export function parseXyzDslPath(source: string): XyzDslPathSpec {
         return [];
       }
       return [{
-        name: match.groups.name as 'probe' | 'breach' | 'contact',
+        name: match.groups.name as 'touch' | 'breach',
         segmentIndex,
         scopeNamespace: [...namespace],
       }];

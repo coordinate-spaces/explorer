@@ -192,15 +192,11 @@ function weightedTranslateBox(
   fact: InteractionFact,
   targetWeight: number | undefined,
   space: CoordinateSpaceDimensions,
-  resolvePenetration = false,
 ): XyzDslBoxSpec {
   const direction = fact.normal.some(Boolean) ? fact.normal : fact.inferredDirection;
   const length = Math.hypot(...direction);
   const unitDirection = length > 0 ? direction.map((component) => component / length) : [1, 0, 0];
-  // Contact translation is also used for breaches. Applying the complete AABB
-  // exit distance handles containment, where overlap width alone is too small.
-  const distance = weightedTranslationDistance(fact.cursorWeight, targetWeight) +
-    (resolvePenetration ? fact.resolutionDistance ?? 0 : 0);
+  const distance = weightedTranslationDistance(fact.cursorWeight, targetWeight);
   return translateBoxWithinCoordinateSpace({
     ...box,
     source: `${box.source} (weighted conditional translation)`,
@@ -211,7 +207,7 @@ function variantsForNode(node: SpatialNode, variants: readonly ResolvedCondition
   return variants.flatMap((variant) => {
     if (variant.targetNamespacePath !== node.namespacePath) return [];
     const matchingFacts = facts.filter((fact) => variant.conditional.directives.every((directive) =>
-      (directive.name === 'contact' || fact.state === directive.name) &&
+      fact.state === directive.name &&
       fact.targetNamespace.startsWith(canonicalNamespacePath(directive.scopeNamespace)),
     ));
     const fact = matchingFacts.sort((a, b) =>
@@ -253,7 +249,6 @@ function applyConditionalVariants(
     matches.forEach(({ variant, fact }) => {
       const spatial = variant.conditional.spatialOverride;
       const physicsOwnsTranslation = accumulativePhysics &&
-        variant.conditional.directives.some((directive) => directive.name === 'contact') &&
         (spatial.mode === 'translation' || spatial.mode === 'weighted-translation');
       if (spatial.mode === 'absolute-box') {
         box = { ...spatial.box };
@@ -271,7 +266,6 @@ function applyConditionalVariants(
           fact,
           node.origin?.transactionAmount,
           space,
-          variant.conditional.directives.some((directive) => directive.name === 'contact'),
         );
         transformChanged = true;
         positionChanged = true;

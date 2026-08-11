@@ -16,8 +16,8 @@ export interface XyzDslBoxSpec {
   depth: number;
 }
 
-export type XyzDslInteractionState = 'probe' | 'breach';
-export type XyzDslInteractionDirective = XyzDslInteractionState | 'contact';
+export type XyzDslInteractionState = 'touch' | 'breach';
+export type XyzDslInteractionDirective = XyzDslInteractionState;
 
 export interface XyzDslDirectiveSpec {
   name: XyzDslInteractionDirective;

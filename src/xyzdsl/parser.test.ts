@@ -72,20 +72,20 @@ describe('parseBoxSpec', () => {
 
 describe('parseXyzDslDocument', () => {
   it('parses scoped interaction directives and all conditional coordinate modes', () => {
-    const result = parseXyzDslDocument(`"Rod/+probe" : "rotation: 90,90,0"
-"Machine/+probe/Lever/+4/+5/+9" : ""
+    const result = parseXyzDslDocument(`"Rod/+touch" : "rotation: 90,90,0"
+"Machine/+touch/Lever/+4/+5/+9" : ""
 "Rod/+breach/+9+1/+0+5/+0+1" : "color: red"
-"Ball/+probe/+++" : ""`);
+"Ball/+touch/+++" : ""`);
 
     expect(result.ok).toBe(true);
     expect(result.value?.[0].conditional).toMatchObject({
       targetNamespace: ['Rod'],
-      directives: [{ name: 'probe', scopeNamespace: ['Rod'] }],
+      directives: [{ name: 'touch', scopeNamespace: ['Rod'] }],
       spatialOverride: { mode: 'inherit' },
     });
     expect(result.value?.[1].conditional).toMatchObject({
       targetNamespace: ['Machine', 'Lever'],
-      directives: [{ name: 'probe', scopeNamespace: ['Machine'] }],
+      directives: [{ name: 'touch', scopeNamespace: ['Machine'] }],
       spatialOverride: { mode: 'translation', magnitude: [4, 5, 9] },
     });
     expect(result.value?.[2].conditional?.spatialOverride).toMatchObject({
@@ -94,14 +94,14 @@ describe('parseXyzDslDocument', () => {
     });
     expect(result.value?.[3].conditional).toMatchObject({
       targetNamespace: ['Ball'],
-      directives: [{ name: 'probe', scopeNamespace: ['Ball'] }],
+      directives: [{ name: 'touch', scopeNamespace: ['Ball'] }],
       spatialOverride: { mode: 'weighted-translation' },
     });
   });
 
   it('rejects unknown and unscoped interaction directives', () => {
     expect(parseXyzDslDocument('"Rod/+hover" : ""').diagnostics[0].message).toContain('Unknown interaction directive');
-    expect(parseXyzDslDocument('"+probe/+1/+2/+3" : ""').diagnostics[0].message).toContain('require a target namespace');
+    expect(parseXyzDslDocument('"+touch/+1/+2/+3" : ""').diagnostics[0].message).toContain('require a target namespace');
   });
   it('parses composed object declarations with geometry and material properties', () => {
     const result = parseXyzDslDocument(EXAMPLE);
@@ -159,7 +159,16 @@ describe('parseXyzDslDocument', () => {
     );
     expect(leadingPlusResult.ok).toBe(false);
     expect(leadingPlusResult.diagnostics[0].message).toBe(
-      'Unknown interaction directive "+Room". Expected +probe, +breach, or +contact.',
+      'Unknown interaction directive "+Room". Expected +touch or +breach.',
+    );
+  });
+
+  it.each(['probe', 'contact'])('rejects the removed +%s interaction directive', (directive) => {
+    const result = parseXyzDslDocument(`"Rod/+${directive}" : ""`);
+
+    expect(result.ok).toBe(false);
+    expect(result.diagnostics[0].message).toBe(
+      `Unknown interaction directive "+${directive}". Expected +touch or +breach.`,
     );
   });
 

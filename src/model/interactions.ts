@@ -13,7 +13,7 @@ export interface InteractionFact {
   transactionId?: string;
   transactionTime?: number;
   normal: [number, number, number];
-  /** Per-axis direction away from the cursor, used when a contact normal is zero. */
+  /** Per-axis direction away from the cursor, used when an interaction normal is zero. */
   inferredDirection: [number, number, number];
   penetration?: number;
   /** Minimum target translation required to separate a breached AABB. */
@@ -146,7 +146,7 @@ function breachDetails(target: SpatialBounds, cursor: SpatialBounds): Pick<Inter
   };
 }
 
-function probeDetails(target: SpatialBounds, cursor: SpatialBounds, tolerance: number): Pick<InteractionFact, 'normal' | 'separation'> | undefined {
+function touchDetails(target: SpatialBounds, cursor: SpatialBounds, tolerance: number): Pick<InteractionFact, 'normal' | 'separation'> | undefined {
   const gaps = [
     Math.max(target.minX - cursor.maxX, cursor.minX - target.maxX, 0),
     Math.max(target.minY - cursor.maxY, cursor.minY - target.maxY, 0),
@@ -179,8 +179,8 @@ export class AabbInteractionNarrowPhase implements InteractionNarrowPhase {
     if (boundsOverlap(target.bounds, cursorBounds)) {
       return { state: 'breach' as const, inferredDirection, ...breachDetails(target.bounds, cursorBounds) };
     }
-    const probe = probeDetails(target.bounds, cursorBounds, tolerance);
-    return probe ? { state: 'probe' as const, inferredDirection, ...probe } : undefined;
+    const touch = touchDetails(target.bounds, cursorBounds, tolerance);
+    return touch ? { state: 'touch' as const, inferredDirection, ...touch } : undefined;
   }
 }
 
@@ -227,8 +227,8 @@ export function evaluateInteractions(
       transactionTime: cursor.origin?.transactionTime,
       cursorWeight: cursor.origin?.transactionAmount,
     };
-    const contact = narrowPhase.evaluate(target, cursorBounds, tolerance);
-    return contact ? [{ ...common, ...contact }] : [];
+    const interaction = narrowPhase.evaluate(target, cursorBounds, tolerance);
+    return interaction ? [{ ...common, ...interaction }] : [];
     });
   });
 }
