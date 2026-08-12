@@ -9,7 +9,13 @@ import { Lighting } from './Lighting';
 import { ContentPrimitive } from './ContentPrimitive';
 import { CsgPrimitive } from './CsgPrimitive';
 import { SpatialPrimitive } from './SpatialPrimitive';
-import { SecondaryCameraMotionTracker, type SecondaryCameraSample, type SecondaryCameraTarget } from './secondaryCamera';
+import {
+  constrainPointOutsideBounds,
+  forwardBoundsExit,
+  SecondaryCameraMotionTracker,
+  type SecondaryCameraSample,
+  type SecondaryCameraTarget,
+} from './secondaryCamera';
 
 interface SceneRootProps {
   document: SpatialDocument;
@@ -56,22 +62,33 @@ function SecondaryCursorCamera({
   }, [camera]);
 
   useFrame((_, delta) => {
-    const center = node.transform.position;
     const motion = tracker.snapshot(target);
     const heading = new Vector3(...motion.heading);
     const dimensions = node.geometry.dimensions;
     const clearance = Math.max(0.12, Math.min(0.6, Math.max(...dimensions) * 0.55));
-    const desired = new Vector3(...center)
-      .addScaledVector(heading, -clearance)
-      .add(new Vector3(0, Math.min(clearance * 0.3, 0.2), 0));
+    const forwardMargin = Math.max(0.02, Math.min(0.1, Math.max(...dimensions) * 0.05));
+    const surfacePosition = new Vector3(...forwardBoundsExit(node.bounds, motion.heading, forwardMargin));
+    const biasedPosition = surfacePosition.clone().add(new Vector3(0, Math.min(clearance * 0.3, 0.2), 0));
+    const desired = biasedPosition.x >= node.bounds.minX && biasedPosition.x <= node.bounds.maxX
+      && biasedPosition.y >= node.bounds.minY && biasedPosition.y <= node.bounds.maxY
+      && biasedPosition.z >= node.bounds.minZ && biasedPosition.z <= node.bounds.maxZ
+      ? surfacePosition
+      : biasedPosition;
     const smoothing = 1 - Math.exp(-10 * delta);
 
     const mustSnap = firstFrame.current
       || previousDiscontinuity.current !== discontinuity
       || previousMotionDiscontinuity.current !== motion.discontinuity;
     if (mustSnap) camera.position.copy(desired);
-    else camera.position.lerp(desired, smoothing);
-    camera.lookAt(new Vector3(...center).add(heading));
+    else {
+      camera.position.lerp(desired, smoothing);
+      camera.position.fromArray(constrainPointOutsideBounds(
+        camera.position.toArray(),
+        node.bounds,
+        desired.toArray(),
+      ));
+    }
+    camera.lookAt(camera.position.clone().add(heading));
     camera.updateProjectionMatrix();
     firstFrame.current = false;
     previousDiscontinuity.current = discontinuity;
