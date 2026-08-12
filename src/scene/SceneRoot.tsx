@@ -10,6 +10,7 @@ import { ContentPrimitive } from './ContentPrimitive';
 import { CsgPrimitive } from './CsgPrimitive';
 import { SpatialPrimitive } from './SpatialPrimitive';
 import {
+  constrainPointOutsideBounds,
   forwardBoundsExit,
   SecondaryCameraMotionTracker,
   type SecondaryCameraSample,
@@ -79,7 +80,14 @@ function SecondaryCursorCamera({
       || previousDiscontinuity.current !== discontinuity
       || previousMotionDiscontinuity.current !== motion.discontinuity;
     if (mustSnap) camera.position.copy(desired);
-    else camera.position.lerp(desired, smoothing);
+    else {
+      camera.position.lerp(desired, smoothing);
+      camera.position.fromArray(constrainPointOutsideBounds(
+        camera.position.toArray(),
+        node.bounds,
+        desired.toArray(),
+      ));
+    }
     camera.lookAt(camera.position.clone().add(heading));
     camera.updateProjectionMatrix();
     firstFrame.current = false;

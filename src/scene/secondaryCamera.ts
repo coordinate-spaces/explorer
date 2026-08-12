@@ -62,6 +62,27 @@ export function forwardBoundsExit(
   return center.map((component, axis) => component + heading[axis] * distanceWithMargin) as Vector3Tuple;
 }
 
+/** Keeps a smoothed point outside bounds while preserving unaffected axes. */
+export function constrainPointOutsideBounds(
+  point: Vector3Tuple,
+  bounds: SpatialBounds,
+  safePoint: Vector3Tuple,
+): Vector3Tuple {
+  const minimums = [bounds.minX, bounds.minY, bounds.minZ];
+  const maximums = [bounds.maxX, bounds.maxY, bounds.maxZ];
+  const isInside = point.every((component, axis) => component >= minimums[axis] && component <= maximums[axis]);
+  if (!isInside) return [...point];
+
+  const escapeAxis = safePoint.findIndex((component, axis) => (
+    component < minimums[axis] || component > maximums[axis]
+  ));
+  if (escapeAxis < 0) return [...safePoint];
+
+  const constrained = [...point] as Vector3Tuple;
+  constrained[escapeAxis] = safePoint[escapeAxis];
+  return constrained;
+}
+
 /** Retains movement history independently for every secondary cursor. */
 export class SecondaryCameraMotionTracker {
   private positions = new Map<string, Vector3Tuple>();

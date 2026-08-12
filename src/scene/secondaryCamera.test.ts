@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { forwardBoundsExit, SecondaryCameraMotionTracker } from './secondaryCamera';
+import {
+  constrainPointOutsideBounds,
+  forwardBoundsExit,
+  SecondaryCameraMotionTracker,
+} from './secondaryCamera';
 
 describe('forwardBoundsExit', () => {
   const box = { minX: -1, maxX: 1, minY: -1, maxY: 1, minZ: -1, maxZ: 1 };
@@ -37,6 +41,27 @@ describe('forwardBoundsExit', () => {
       && result[1] >= box.minY && result[1] <= box.maxY
       && result[2] >= box.minZ && result[2] <= box.maxZ;
     expect(inside).toBe(false);
+  });
+});
+
+describe('constrainPointOutsideBounds', () => {
+  const movedBox = { minX: -0.4, maxX: 0.6, minY: -0.5, maxY: 0.5, minZ: -0.5, maxZ: 0.5 };
+
+  it('keeps an ordinary smoothed update outside the current cursor bounds', () => {
+    const oldCamera = [0.55, 0.1, 0] as [number, number, number];
+    const desired = [0.65, 0.2, 0] as [number, number, number];
+    const smoothed = oldCamera.map((component, axis) => (
+      component + (desired[axis] - component) * 0.1
+    )) as [number, number, number];
+
+    const constrained = constrainPointOutsideBounds(smoothed, movedBox, desired);
+    expect(constrained[0]).toBe(0.65);
+    expect(constrained[1]).toBeCloseTo(0.11);
+    expect(constrained[2]).toBe(0);
+  });
+
+  it('does not disturb a smoothed point that is already outside', () => {
+    expect(constrainPointOutsideBounds([0.61, 0.1, 0], movedBox, [0.65, 0.2, 0])).toEqual([0.61, 0.1, 0]);
   });
 });
 
