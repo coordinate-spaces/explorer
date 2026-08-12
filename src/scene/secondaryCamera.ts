@@ -1,3 +1,5 @@
+import type { SpatialBounds } from '../model/SpatialNode';
+
 export type Vector3Tuple = [number, number, number];
 
 export interface SecondaryCameraTarget {
@@ -33,6 +35,31 @@ function normalized(vector: Vector3Tuple): Vector3Tuple {
   return length > 0
     ? vector.map((component) => component / length) as Vector3Tuple
     : [1, 0, 0];
+}
+
+/**
+ * Finds the forward intersection of a ray starting at the center of an
+ * axis-aligned world-space bounds, then advances it by `safetyMargin`.
+ *
+ * A zero vector uses the camera's positive-X fallback. Zero-size axes are
+ * valid: when the ray points through one, the exit distance is zero.
+ */
+export function forwardBoundsExit(
+  bounds: SpatialBounds,
+  normalizedHeading: Vector3Tuple,
+  safetyMargin = 0,
+): Vector3Tuple {
+  const minimums = [bounds.minX, bounds.minY, bounds.minZ];
+  const maximums = [bounds.maxX, bounds.maxY, bounds.maxZ];
+  const center = minimums.map((minimum, axis) => (minimum + maximums[axis]) / 2) as Vector3Tuple;
+  const heading = normalized(normalizedHeading);
+  const distances = heading.map((component, axis) => component === 0
+    ? Number.POSITIVE_INFINITY
+    : Math.max(0, (maximums[axis] - minimums[axis]) / 2) / Math.abs(component));
+  const exitDistance = Math.min(...distances);
+  const distanceWithMargin = (Number.isFinite(exitDistance) ? exitDistance : 0) + Math.max(0, safetyMargin);
+
+  return center.map((component, axis) => component + heading[axis] * distanceWithMargin) as Vector3Tuple;
 }
 
 /** Retains movement history independently for every secondary cursor. */
