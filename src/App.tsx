@@ -254,7 +254,10 @@ export default function App() {
         setTipHeight(height);
         setTransactionRange((range) => ({
           ...range,
+          // UI ranges name inclusive block heights; the request serializer turns
+          // this into the protocol's exclusive upper boundary (height + 1).
           startHeight: height,
+          // Requests run backwards, so never leave the lower bound above the tip.
           endHeight: Math.min(range.endHeight, height),
           limit: DEFAULT_TRANSACTION_RANGE.limit,
         }));
