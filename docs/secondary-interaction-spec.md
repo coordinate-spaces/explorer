@@ -236,9 +236,9 @@ Authoring tools SHOULD expose the effective state, base state, active directive,
 
 ### 13.1 Simulation cursor camera
 
-During simulation, a viewer MAY select a secondary cursor as the active camera. Camera selection MUST use the cursor's complete `(streamId, cursorNamespace)` identity so equally named cursors from different streams remain independent. The camera faces the latest nonzero transaction-to-transaction movement direction and retains that heading while the cursor is stationary. Direction MUST be derived from unwrapped authored positions so crossing a periodic coordinate seam does not reverse the heading. When a camera is selected after movement, its heading SHOULD be initialized from the selected stream's previous and current transaction frames. Before any movement history exists, it uses positive X as a deterministic fallback.
+During simulation, a viewer MAY select a secondary cursor as the active camera. Camera selection MUST use the cursor's complete `(streamId, cursorNamespace)` identity so equally named cursors from different streams remain independent. The camera MUST occupy the cursor's local positive-XYZ corner and face equidistantly along its local positive X, Y, and Z axes, away from the cursor origin. The camera pose inherits only the cursor's current world translation and rotation; transaction history and direction of travel MUST NOT affect its heading.
 
-Implementations SHOULD place the camera slightly behind the cursor rather than inside its geometry, use a near clipping plane suitable for tight spaces, and smooth ordinary live updates. Playback seeks and other large discontinuities SHOULD snap instead of interpolating through intervening geometry. If the selected cursor disappears or simulation stops, the viewer MUST return to its ordinary camera controls.
+Implementations SHOULD place the camera just beyond the corner by a small safety margin so the cursor cannot occlude the view, and use a near clipping plane suitable for tight spaces. If the selected cursor disappears or simulation stops, the viewer MUST return to its ordinary camera controls.
 
 ## 14. Examples
 
