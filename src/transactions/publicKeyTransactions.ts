@@ -7,6 +7,14 @@ export interface PublicKeyTransactionRequest {
   signal?: AbortSignal;
 }
 
+/**
+ * The Cruzbit history request walks backwards from an exclusive start boundary.
+ * TransactionRange deliberately remains an inclusive, UI-facing block range.
+ */
+export function exclusiveTransactionStartHeight(range: Pick<TransactionRange, 'startHeight'>): number {
+  return range.startHeight + 1;
+}
+
 export function normalizeEndpoint(endpoint: string): string {
   const trimmed = endpoint.trim();
 
@@ -140,7 +148,7 @@ export function fetchPublicKeyTransactions({
       type: 'get_public_key_transactions',
       body: {
         public_key: publicKey,
-        start_height: range.startHeight,
+        start_height: exclusiveTransactionStartHeight(range),
         end_height: range.endHeight,
         limit: range.limit,
       },
