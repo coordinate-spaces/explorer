@@ -27,7 +27,6 @@ export const DEFAULT_LOCAL_CURSOR_POSE: LocalCursorPose = {
 };
 
 const clamp = (value: number, minimum: number, maximum: number) => Math.min(Math.max(value, minimum), maximum);
-const wrap = (value: number, span: number) => span > 0 ? ((value % span) + span) % span : 0;
 
 export function advanceLocalCursor(
   pose: LocalCursorPose,
@@ -50,9 +49,13 @@ export function advanceLocalCursor(
   return {
     ...pose,
     position: [
-      wrap(pose.position[0] + dx, coordinateSpace.width),
+      // Preserve the emitted cursor's unwrapped coordinates. Secondary cursor
+      // wrapping belongs to spatial-document projection, exactly as it does for
+      // remote cursor declarations. XYZDSL path offsets are unsigned, so zero is
+      // the only input-space boundary applied here.
+      Math.max(0, pose.position[0] + dx),
       clamp(pose.position[1] + input.up * distance, 0, maxY),
-      wrap(pose.position[2] + dz, coordinateSpace.depth),
+      Math.max(0, pose.position[2] + dz),
     ],
     rotation: [pitch, yaw, 0],
     sequence: pose.sequence + 1,
