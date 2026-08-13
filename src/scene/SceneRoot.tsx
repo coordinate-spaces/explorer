@@ -13,12 +13,20 @@ import {
   secondaryCameraPose,
   type SecondaryCameraTarget,
 } from './secondaryCamera';
+import { LocalCursorControls } from './LocalCursorControls';
+import type { LocalCursorInput } from '../simulation/localCursor';
 
 interface SceneRootProps {
   document: SpatialDocument;
   selectedNodeId?: string;
   onSelectNode?: (id: string | undefined) => void;
   secondaryCameraTarget?: SecondaryCameraTarget;
+  localCursorControl?: {
+    enabled: boolean;
+    captured: boolean;
+    onCaptureChange: (captured: boolean) => void;
+    onInput: (input: LocalCursorInput) => void;
+  };
 }
 
 const DEFAULT_ORBIT_TARGET: [number, number, number] = [6, 5, 4];
@@ -62,6 +70,7 @@ export function SceneRoot({
   selectedNodeId,
   onSelectNode,
   secondaryCameraTarget,
+  localCursorControl,
 }: SceneRootProps) {
   const orbitTarget = useMemo(() => {
     const selectedNode = selectedOrbitNode(spatialDocument, selectedNodeId);
@@ -84,6 +93,11 @@ export function SceneRoot({
     >
       <color attach="background" args={['#151820']} />
       <PerspectiveCamera makeDefault position={[14, 11, 18]} fov={45} near={0.02} />
+      {localCursorControl ? <LocalCursorControls
+        enabled={localCursorControl.enabled}
+        onCaptureChange={localCursorControl.onCaptureChange}
+        onInput={localCursorControl.onInput}
+      /> : null}
       {secondaryCameraNode && secondaryCameraTarget ? (
         <SecondaryCursorCamera
           node={secondaryCameraNode}
@@ -106,7 +120,7 @@ export function SceneRoot({
           <SpatialPrimitive key={node.id} isSelected={node.id === selectedNodeId} node={node} onSelect={onSelectNode} />
         )
       ))}
-      <OrbitControls enabled={!secondaryCameraNode} target={orbitTarget} maxPolarAngle={Math.PI} />
+      <OrbitControls enabled={!secondaryCameraNode && !localCursorControl?.captured} target={orbitTarget} maxPolarAngle={Math.PI} />
     </Canvas>
   );
 }

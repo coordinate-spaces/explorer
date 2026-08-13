@@ -17,6 +17,8 @@ export interface ComposeTransactionSecondaryStream {
   transactionId?: string;
   transactionTime?: number;
   transactionAmount?: number;
+  /** Local development cursors may opt out of remote namespace-consumer filtering. */
+  bypassNamespacePolicy?: boolean;
 }
 
 export interface ComposedXyzDslSource {
@@ -119,7 +121,7 @@ export function composeTransactionSources(
     const cursor = clampCursor(stream.playbackCursor ?? options.playbackCursor, lines.length);
     const visibleLines = lines.slice(0, cursor);
 
-    if (policy === 'append') {
+    if (policy === 'append' || stream.bypassNamespacePolicy) {
       return visibleLines;
     }
 
@@ -161,7 +163,7 @@ export function composeTransactionSourceBundle(
     const declarationLines = declarationSources(stream.declarations);
     const cursor = clampCursor(stream.playbackCursor ?? options.playbackCursor, declarationLines.length);
     declarationLines.slice(0, cursor).forEach((line) => {
-      const accepted = policy === 'append' ? line : secondaryConsumerLine(line, primaryNamespaces);
+      const accepted = policy === 'append' || stream.bypassNamespacePolicy ? line : secondaryConsumerLine(line, primaryNamespaces);
       if (accepted) {
         append(accepted, {
           sourceKind: 'secondary',

@@ -63,6 +63,16 @@ describe('composeTransactionSources', () => {
 
     expect(result).toBe('"+0+1/+0+1/+0+1" : ""');
   });
+
+  it('honors namespace bypass for transport-free streams in string composition', () => {
+    const localCursor = '"LocalCursor/+0+1/+0+1/+0+1" : "rotation: 0,45,0"';
+    const result = composeTransactionSources(primary, [{
+      declarations: localCursor,
+      bypassNamespacePolicy: true,
+    }]);
+
+    expect(result).toBe(`${primary}\n${localCursor}`);
+  });
 });
 
 describe('composeSpatialEditorSources', () => {
@@ -121,11 +131,34 @@ describe('composeSpatialEditorSources', () => {
     expect(bundle.originsByLine.get(2)).toMatchObject({ sourceKind: 'secondary', streamId: 'stream-a', transactionTime: 42 });
   });
 
+  it('admits a transport-free local cursor while retaining secondary provenance', () => {
+    const bundle = composeSpatialEditorSourceBundle('"Table/+0+1/+0+1/+0+1" : ""', [{
+      id: 'local-simulation',
+      transactionId: 'local-frame-1',
+      declarations: '"LocalCursor/+0+1/+0+1/+0+1" : "rotation: 0,45,0"',
+      bypassNamespacePolicy: true,
+    }]);
+    expect(bundle.source).toContain('LocalCursor/');
+    expect(bundle.originsByLine.get(2)).toMatchObject({
+      sourceKind: 'secondary', streamId: 'local-simulation', transactionId: 'local-frame-1',
+    });
+    expect(bundle.originsByLine.get(2)?.publicKey).toBeUndefined();
+  });
+
   it('applies namespace-filtered projections after the document', () => {
     const document = '"Table/" : "color: white"';
     expect(composeSpatialEditorSources(document, [
       { declarations: '"Lamp/+0+1/+0+1/+0+1" : "color: yellow"\n"Table/+0+1/+0+1/+0+1" : "color: blue"' },
     ])).toBe(`${document}\n"Table/+0+1/+0+1/+0+1" : "color: blue"`);
+  });
+
+  it('honors namespace bypass through the spatial editor string wrapper', () => {
+    const document = '"Table/" : "color: white"';
+    const localCursor = '"LocalCursor/+0+1/+0+1/+0+1" : ""';
+    expect(composeSpatialEditorSources(document, [{
+      declarations: localCursor,
+      bypassNamespacePolicy: true,
+    }])).toBe(`${document}\n${localCursor}`);
   });
 
 });
