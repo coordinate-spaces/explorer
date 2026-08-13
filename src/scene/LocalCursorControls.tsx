@@ -32,7 +32,11 @@ export function LocalCursorControls({ enabled, onCaptureChange, onInput }: Local
       }
     };
     const capture = () => onCaptureChange(document.pointerLockElement === element);
-    const clear = () => keys.current.clear();
+    const clear = () => {
+      keys.current.clear();
+      mouse.current = [0, 0];
+      elapsed.current = 0;
+    };
     const click = () => element.requestPointerLock();
     element.addEventListener('click', click);
     window.addEventListener('keydown', keydown);
@@ -47,7 +51,7 @@ export function LocalCursorControls({ enabled, onCaptureChange, onInput }: Local
       window.removeEventListener('mousemove', mousemove);
       window.removeEventListener('blur', clear);
       document.removeEventListener('pointerlockchange', capture);
-      keys.current.clear();
+      clear();
       if (document.pointerLockElement === element) document.exitPointerLock();
       onCaptureChange(false);
     };
