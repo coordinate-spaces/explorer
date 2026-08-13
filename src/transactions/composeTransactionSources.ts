@@ -121,7 +121,7 @@ export function composeTransactionSources(
     const cursor = clampCursor(stream.playbackCursor ?? options.playbackCursor, lines.length);
     const visibleLines = lines.slice(0, cursor);
 
-    if (policy === 'append') {
+    if (policy === 'append' || stream.bypassNamespacePolicy) {
       return visibleLines;
     }
 

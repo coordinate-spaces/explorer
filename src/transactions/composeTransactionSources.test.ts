@@ -63,6 +63,16 @@ describe('composeTransactionSources', () => {
 
     expect(result).toBe('"+0+1/+0+1/+0+1" : ""');
   });
+
+  it('honors namespace bypass for transport-free streams in string composition', () => {
+    const localCursor = '"LocalCursor/+0+1/+0+1/+0+1" : "rotation: 0,45,0"';
+    const result = composeTransactionSources(primary, [{
+      declarations: localCursor,
+      bypassNamespacePolicy: true,
+    }]);
+
+    expect(result).toBe(`${primary}\n${localCursor}`);
+  });
 });
 
 describe('composeSpatialEditorSources', () => {
@@ -140,6 +150,15 @@ describe('composeSpatialEditorSources', () => {
     expect(composeSpatialEditorSources(document, [
       { declarations: '"Lamp/+0+1/+0+1/+0+1" : "color: yellow"\n"Table/+0+1/+0+1/+0+1" : "color: blue"' },
     ])).toBe(`${document}\n"Table/+0+1/+0+1/+0+1" : "color: blue"`);
+  });
+
+  it('honors namespace bypass through the spatial editor string wrapper', () => {
+    const document = '"Table/" : "color: white"';
+    const localCursor = '"LocalCursor/+0+1/+0+1/+0+1" : ""';
+    expect(composeSpatialEditorSources(document, [{
+      declarations: localCursor,
+      bypassNamespacePolicy: true,
+    }])).toBe(`${document}\n${localCursor}`);
   });
 
 });
