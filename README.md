@@ -206,3 +206,14 @@ Texture descriptors inherit through namespace declarations and `ref`. Referencin
 ```
 
 See [docs/implementation-plan.md](docs/implementation-plan.md) for architecture details and the feature roadmap.
+
+## Local cursor simulation
+
+The viewer can exercise secondary-cursor interactions without a remote public key or WebSocket overlay:
+
+1. In **Simulation**, choose **Local cursor** as the source and select **Start simulation**.
+2. Click the 3D scene to capture the pointer. Use **W/A/S/D** to move relative to cursor heading, **Space/Shift** (or **E/Q**) to move vertically, and the mouse to change yaw and pitch.
+3. Press **Escape** to release the pointer. Pause freezes local emissions; **Stop and reset** removes the synthetic cursor and restores the authored baseline.
+4. Use the camera selector to remain in orbit view or choose `LocalCursor/ · local-simulation` for the existing cursor camera.
+
+At a fixed 30 Hz input cadence, controls are integrated into a complete, valid XYZDSL declaration containing absolute X/Y/Z bounds and a `rotation: x,y,z` property. The declaration is composed locally with `secondary` provenance and a synthetic frame ID, so it uses the same parser, wrapping, touch/breach evaluation, and accumulative simulation path as a remote cursor while bypassing transaction transport entirely. X/Z positions wrap within the coordinate space, Y is clamped, and path coordinates are emitted in centiunits.

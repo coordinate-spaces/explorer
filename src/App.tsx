@@ -25,6 +25,7 @@ import { useRealtimePublicKeyTransactions } from './transactions/useRealtimePubl
 import { XyzDslDrawer } from './ui/XyzDslDrawer';
 import { SelectedNodeInspector } from './ui/SelectedNodeInspector';
 import { usePersistentState } from './ui/usePersistentState';
+import { advanceLocalCursor, DEFAULT_LOCAL_CURSOR_POSE, LOCAL_CURSOR_STREAM_ID, localCursorXyzDsl, type LocalCursorInput } from './simulation/localCursor';
 
 const INITIAL_XYZDSL = `"+2+4/+0+6/+1+3" : "geometry: cylinder; color: 0x333333; metalness: 0.8; roughness: 0.2"
 "+2+4/+7+6/+0+10c" : "geometry: cone; color: yellow; metalness: 0.2; roughness: 0.5"
@@ -181,6 +182,9 @@ export default function App() {
   const [appMode, setAppMode] = useState<'viewer' | 'editor'>('viewer');
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [simulationMode, setSimulationMode] = useState<'stopped' | 'running' | 'paused'>('stopped');
+  const [simulationSource, setSimulationSource] = useState<'remote' | 'local'>('remote');
+  const [localCursorPose, setLocalCursorPose] = useState(DEFAULT_LOCAL_CURSOR_POSE);
+  const [localCursorCaptured, setLocalCursorCaptured] = useState(false);
   const [secondaryCameraTarget, setSecondaryCameraTarget] = useState<SecondaryCameraTarget | undefined>();
   const [selectedNodeId, setSelectedNodeId] = useState<string | undefined>();
   const [selectedLeafNodeId, setSelectedLeafNodeId] = useState<string | undefined>();
@@ -561,13 +565,20 @@ export default function App() {
     () => originsForEditedSource(authoringSource, primaryRemoteBaselineSource, transactionXyzDsl.originsByLine),
     [authoringSource, primaryRemoteBaselineSource, transactionXyzDsl.originsByLine],
   );
+  const localCursorStream = useMemo(() => ({
+    id: LOCAL_CURSOR_STREAM_ID,
+    transactionId: `local-frame-${localCursorPose.sequence}`,
+    transactionTime: localCursorPose.sequence,
+    declarations: localCursorXyzDsl(localCursorPose),
+    bypassNamespacePolicy: true,
+  }), [localCursorPose]);
   const renderedBundle = useMemo(
     () => composeSpatialEditorSourceBundle(
       authoringSource,
-      simulationMode === 'stopped' ? [] : secondaryTransactionOverlayStreams,
+      simulationMode === 'stopped' ? [] : simulationSource === 'local' ? [localCursorStream] : secondaryTransactionOverlayStreams,
       authoringOriginsByLine,
     ),
-    [authoringOriginsByLine, authoringSource, secondaryTransactionOverlayStreams, simulationMode],
+    [authoringOriginsByLine, authoringSource, localCursorStream, secondaryTransactionOverlayStreams, simulationMode, simulationSource],
   );
   const renderedSource = renderedBundle.source;
   const baselineRevision = useMemo(() => spatialBaselineRevision(authoringSource), [authoringSource]);
@@ -624,17 +635,23 @@ export default function App() {
     accumulativeTimelineRef.current = new AccumulativeSpatialTimeline(baselineRevision);
     simulationBaselineRevisionRef.current = baselineRevision;
     evaluatedPhysicsFrameRef.current = undefined;
+    if (simulationSource === 'local') setLocalCursorPose({ ...DEFAULT_LOCAL_CURSOR_POSE, position: [...DEFAULT_LOCAL_CURSOR_POSE.position], rotation: [...DEFAULT_LOCAL_CURSOR_POSE.rotation], size: [...DEFAULT_LOCAL_CURSOR_POSE.size] });
     setAppMode('viewer');
     setDrawerOpen(false);
     setSimulationMode('running');
-  }, [baselineRevision]);
+  }, [baselineRevision, simulationSource]);
 
   const stopSimulation = useCallback(() => {
     accumulativeTimelineRef.current = undefined;
     simulationBaselineRevisionRef.current = undefined;
     evaluatedPhysicsFrameRef.current = undefined;
+    setLocalCursorCaptured(false);
     setSimulationMode('stopped');
   }, []);
+  const handleLocalCursorInput = useCallback((input: LocalCursorInput) => {
+    if (simulationMode !== 'running' || simulationSource !== 'local') return;
+    setLocalCursorPose((pose) => advanceLocalCursor(pose, input, document.coordinateSpace));
+  }, [document.coordinateSpace, simulationMode, simulationSource]);
   const selectedNode = useMemo(
     () => findNodeById(document.nodes, selectedNodeId) ?? findNodeByLineNumber(document.nodes, selectedLineNumber),
     [document.nodes, selectedLineNumber, selectedNodeId],
@@ -935,7 +952,7 @@ export default function App() {
 
   return (
     <main className={`app-shell app-shell--${appMode}`}>
-      {simulationMode !== 'stopped' ? validSecondaryKeyReferences.map((reference) => (
+      {simulationMode !== 'stopped' && simulationSource === 'remote' ? validSecondaryKeyReferences.map((reference) => (
         <SecondaryRealtimeSubscription
           key={streamKeyForSecondaryReference(reference)}
           reference={reference}
@@ -949,17 +966,38 @@ export default function App() {
         selectedNodeId={selectedSceneNodeId}
         onSelectNode={handleSelectNode}
         secondaryCameraTarget={simulationMode === 'stopped' ? undefined : secondaryCameraTarget}
+        localCursorControl={simulationMode !== 'stopped' && simulationSource === 'local' ? {
+          enabled: simulationMode === 'running',
+          captured: localCursorCaptured,
+          onCaptureChange: setLocalCursorCaptured,
+          onInput: handleLocalCursorInput,
+        } : undefined}
       />
       <div className="simulation-controls" aria-label="Simulation controls">
         <span>Simulation: {simulationMode}</span>
         {simulationMode === 'stopped' ? (
-          <button type="button" onClick={startSimulation}>Start simulation</button>
+          <>
+            <label className="simulation-camera-control">Source
+              <select aria-label="Simulation source" value={simulationSource} onChange={(event) => setSimulationSource(event.target.value as 'remote' | 'local')}>
+                <option value="remote">Remote overlays</option>
+                <option value="local">Local cursor</option>
+              </select>
+            </label>
+            <button type="button" onClick={startSimulation}>Start simulation</button>
+          </>
         ) : (
           <>
             <button type="button" onClick={() => setSimulationMode((mode) => mode === 'running' ? 'paused' : 'running')}>
               {simulationMode === 'running' ? 'Pause' : 'Resume'}
             </button>
             <button type="button" onClick={stopSimulation}>Stop and reset</button>
+            {simulationSource === 'local' ? (
+              <span className="local-cursor-status" title="Click the scene to capture the mouse; press Escape to release.">
+                {localCursorCaptured ? 'Mouse captured' : 'Click scene · WASD · Space/Shift · mouse'} · frame {localCursorPose.sequence}
+                {' · '}XYZ {localCursorPose.position.map((value) => value.toFixed(2)).join(', ')}
+                {' · '}{document.interactions?.length ?? 0} interaction{document.interactions?.length === 1 ? '' : 's'}
+              </span>
+            ) : null}
             <label className="simulation-camera-control">
               Camera
               <select

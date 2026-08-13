@@ -80,12 +80,21 @@ button {
   background: rgb(13 17 23 / 82%);
   box-shadow: 0 14px 45px rgb(0 0 0 / 24%);
   backdrop-filter: blur(14px);
+  max-width: calc(100vw - 2rem);
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .simulation-controls span {
   color: #bfdbfe;
   font-size: 0.8rem;
   text-transform: capitalize;
+}
+
+.simulation-controls .local-cursor-status {
+  max-width: 22rem;
+  color: #67e8f9;
+  text-transform: none;
 }
 
 .simulation-controls button {

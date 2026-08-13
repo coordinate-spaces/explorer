@@ -160,6 +160,12 @@ Secondary cursors are sensors by default. They MUST NOT participate in baseline 
 
 ## 8. Stream and cursor identity
 
+### 8.1 Local simulation adapter
+
+Development viewers MAY synthesize secondary cursor frames from direct keyboard and pointer input. Each committed frame MUST be a valid, complete spatial declaration and MUST carry stable secondary `(streamId, cursorNamespace)` identity plus a monotonically changing local frame identity. Mouse orientation is encoded through the ordinary XYZDSL `rotation` property; device events themselves are not spatial declarations.
+
+Local adapters bypass remote transport, public keys, endpoints, transaction history, and transport validation, but MUST NOT bypass parsing, coordinate-space wrapping, interaction evaluation, or sensor semantics. Input events SHOULD be sampled at a fixed simulation cadence rather than advancing persistent effects at browser event or render frequency. Pausing MUST stop emissions, and stopping MUST remove the local cursor and restore the unmodified authored baseline.
+
 An interaction MUST retain which secondary controller caused it. Cursor identity is the pair:
 
 ```txt
