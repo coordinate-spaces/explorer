@@ -1,5 +1,6 @@
 import type { InteractionFact } from '../model/interactions';
 import { PhysicsWorld } from '../physics/PhysicsWorld';
+import type { RigidBodyWorld } from '../physics/RigidBodyWorld';
 import type { PhysicsFrame, PhysicsInput, PhysicsSnapshot, RigidBodyDefinition, Vector3Tuple } from '../physics/types';
 import { interactionTransitions } from './interactionTimeline';
 import type { InteractionTransition } from './interactionTimeline';
@@ -58,9 +59,11 @@ export class SimulationTimeline {
     bindings: PhysicsDirectiveBinding[];
   }>();
 
-  constructor(readonly world = new PhysicsWorld()) {
+  constructor(readonly world: RigidBodyWorld = new PhysicsWorld()) {
     this.snapshots.set(0, { physics: world.snapshot(), facts: [], bindings: [] });
   }
+
+  dispose(): void { this.world.dispose(); }
 
   private invalidateSnapshotsAfter(tick: number): void {
     [...this.snapshots.keys()]

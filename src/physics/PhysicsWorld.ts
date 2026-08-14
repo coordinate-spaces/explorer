@@ -8,6 +8,7 @@ import type {
   Vector3Tuple,
 } from './types';
 import type { SpatialBounds } from '../model/SpatialNode';
+import type { RigidBodyWorld } from './RigidBodyWorld';
 
 export const DEFAULT_PHYSICS_HZ = 60;
 export const DEFAULT_GRAVITY = -9.81;
@@ -32,7 +33,8 @@ const overlaps = (aMin: number, aMax: number, bMin: number, bMax: number): boole
   aMin < bMax && aMax > bMin;
 
 /** A renderer-independent, fixed-timestep state owner with deterministic world-space constraints. */
-export class PhysicsWorld {
+/** @deprecated Compatibility solver. New simulations should use RapierPhysicsWorld. */
+export class PhysicsWorld implements RigidBodyWorld {
   private definitions = new Map<string, RigidBodyDefinition>();
   private states = new Map<string, RigidBodyState>();
   private queuedInputs = new Map<number, PhysicsInput[]>();
@@ -114,6 +116,12 @@ export class PhysicsWorld {
     this.currentTick = snapshot.tick;
     this.definitions = new Map(snapshot.definitions.map((definition) => [definition.id, { ...definition }]));
     this.states = new Map(snapshot.states.map((state) => [state.id, cloneState(state)]));
+    this.queuedInputs.clear();
+  }
+
+  dispose(): void {
+    this.definitions.clear();
+    this.states.clear();
     this.queuedInputs.clear();
   }
 

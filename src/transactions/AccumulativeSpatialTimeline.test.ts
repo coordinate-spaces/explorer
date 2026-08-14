@@ -34,13 +34,13 @@ function scopedOrigins() {
 }
 
 describe('AccumulativeSpatialTimeline', () => {
-  it('applies world collision packing only in simulation', () => {
+  it('preserves authored poses until the rigid-body world advances', () => {
     const declaration = '"First/+0+1/+0+1/+0+1":""\n"Second/+0+1/+0+1/+0+1":""';
     const authored = createSpatialDocument(declaration);
     const simulated = new AccumulativeSpatialTimeline().compile(declaration).document;
 
     expect(authored.renderNodes.map((node) => node.transform.position[0])).toEqual([0.5, 0.5]);
-    expect(simulated.renderNodes.map((node) => node.transform.position[0])).toEqual([0.5, 1.5]);
+    expect(simulated.renderNodes.map((node) => node.transform.position[0])).toEqual([0.5, 0.5]);
   });
 
   it('keeps anonymous CSG tools attached to their selected base during simulation packing', () => {
@@ -67,7 +67,7 @@ describe('AccumulativeSpatialTimeline', () => {
     expect(frame.document.renderNodes.find((node) => node.namespacePath === 'Neighbor/')?.bounds.minX).toBe(5);
   });
 
-  it('stacks primary objects vertically without moving or supporting them with cursors', () => {
+  it('does not run an implicit settling step during compilation', () => {
     const declaration = [
       '"Ground/+0+1/+0+1/+0+1":""',
       '"Floating/+0+1/+5+1/+0+1":""',
@@ -80,7 +80,7 @@ describe('AccumulativeSpatialTimeline', () => {
     ]);
     const frame = new AccumulativeSpatialTimeline().compile(declaration, declarationOrigins);
 
-    expect(frame.document.renderNodes.find((node) => node.namespacePath === 'Floating/')?.bounds.minY).toBe(1);
+    expect(frame.document.renderNodes.find((node) => node.namespacePath === 'Floating/')?.bounds.minY).toBe(5);
     expect(frame.document.renderNodes.find((node) => node.namespacePath === 'Cursor/')?.bounds.minY).toBe(3);
   });
 
@@ -211,6 +211,6 @@ describe('AccumulativeSpatialTimeline', () => {
     const frame = timeline.evaluate(source, scopedOrigins());
     const lever = frame.document.renderNodes.find((node) => node.namespacePath === 'Machine/Lever/');
 
-    expect(lever?.transform.position[0]).toBe(3.5);
+    expect(lever?.transform.position[0]).toBeCloseTo(3.5);
   });
 });

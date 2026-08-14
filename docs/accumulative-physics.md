@@ -1,5 +1,30 @@
 # Accumulative physics
 
+## Current backend
+
+Runtime simulations use Rapier through the engine-neutral `RigidBodyWorld`
+contract. Spatial nodes are compiled into stable compound-body/collider
+definitions before reconciliation; renderer code receives only immutable poses
+and never sees Rapier handles. The former AABB solver remains temporarily as a
+compatibility/test backend while remaining interaction queries are migrated.
+
+Project coordinates are treated as metres, physics ticks as seconds divided by
+the configured tick rate, mass as kilograms, force as newtons, and impulse as
+newton-seconds. Transaction amounts are not physical units: until an authored
+mass/density DSL property is introduced, positive transaction amounts remain a
+legacy mass input and should not be used for calibrated simulations.
+
+Rapier is the sole runtime authority for gravity, contacts, restitution,
+friction, sleeping, and rigid-body pose. Compilation deliberately performs no
+implicit settling step. A playback owner should drive the world with
+`FixedStepSimulationRunner`; its interpolation alpha is presentation-only and
+must never be fed back into physics or interaction evaluation.
+
+The next migration boundary is collider-backed interaction sensing. Secondary
+cursors still use the existing deterministic AABB query contract, so sensor and
+contact-manifold facts must be moved behind the physics adapter before the AABB
+narrow phase can be retired completely.
+
 Interaction directives remain declarative sensors when compiled directly with
 `createSpatialDocument`. The application transaction pipeline now gives the spatial
 relative and weighted overrides on `+touch` and `+breach` accumulative semantics:
