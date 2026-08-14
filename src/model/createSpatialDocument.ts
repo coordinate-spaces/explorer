@@ -21,6 +21,7 @@ import { CENTIUNITS_PER_UNIT } from './units';
 import { dimensionsFromNodes, translateBoxWithinCoordinateSpace, wrapCoordinate } from './coordinateSpace';
 import type { CoordinateSpaceDimensions } from './coordinateSpace';
 import type { PhysicsFrame } from '../physics/types';
+import { Euler, Quaternion } from 'three';
 
 export interface CreateSpatialDocumentOptions {
   originsByLine?: ReadonlyMap<number, XyzDslDeclarationOrigin>;
@@ -45,6 +46,10 @@ function applyPhysicsFrame(nodes: SpatialNode[], frame: PhysicsFrame | undefined
     const translateTransform = (transform: SpatialTransform | undefined) => transform && ({
       ...transform,
       position: transform.position.map((value, axis) => value + delta[axis]) as [number, number, number],
+      rotation: (() => {
+        const euler = new Euler().setFromQuaternion(new Quaternion(...state.orientation), 'XYZ');
+        return [euler.x, euler.y, euler.z] as [number, number, number];
+      })(),
     });
     return {
       ...node,

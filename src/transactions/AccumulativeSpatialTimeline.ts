@@ -1,7 +1,8 @@
 import { createSpatialDocument } from '../model/createSpatialDocument';
 import type { SpatialDocument } from '../model/SpatialDocument';
 import type { SpatialNode } from '../model/SpatialNode';
-import type { RigidBodyDefinition } from '../physics/types';
+import { compilePhysicsScene } from '../physics/compilePhysicsScene';
+import { RapierPhysicsWorld } from '../physics/RapierPhysicsWorld';
 import { parseXyzDslDocument } from '../xyzdsl/parser';
 import { canonicalNamespacePath } from '../xyzdsl/pathParser';
 import { resolveXyzDslDocument } from '../xyzdsl/resolveDocument';
@@ -50,37 +51,19 @@ function renderable(nodes: readonly SpatialNode[]): SpatialNode[] {
     .filter(Boolean) as SpatialNode[];
 }
 
-function physicsEntityId(node: SpatialNode): string {
-  const component = node.namespacePath?.split('/').filter(Boolean)[0];
-  return component ? `component:${component}` : `node:${node.id}`;
-}
-
 /** Transaction/playback-owned bridge from XYZDSL interaction declarations to persistent physics. */
 export class AccumulativeSpatialTimeline {
-  readonly simulation = new SimulationTimeline();
+  readonly simulation: SimulationTimeline;
 
-  constructor(readonly baselineRevision = 'baseline') {}
+  constructor(readonly baselineRevision = 'baseline') {
+    this.simulation = new SimulationTimeline(new RapierPhysicsWorld());
+  }
+
+  dispose(): void { this.simulation.dispose(); }
 
   private reconcile(source: string, originsByLine?: ReadonlyMap<number, XyzDslDeclarationOrigin>): SpatialDocument {
     const authored = createSpatialDocument(source, { originsByLine, applyConditionalVariants: false });
-    const csgEntityByNodeId = new Map<string, string>();
-    authored.csgExpressions.forEach((expression) => {
-      const entityId = physicsEntityId(expression.base);
-      csgEntityByNodeId.set(expression.base.id, entityId);
-      expression.operations.forEach(({ tool }) => csgEntityByNodeId.set(tool.id, entityId));
-    });
-    const definitions: RigidBodyDefinition[] = renderable(authored.nodes)
-      .filter((node) => node.origin?.sourceKind !== 'secondary')
-      .map((node, entityOrder) => ({
-        id: node.id,
-        entityId: csgEntityByNodeId.get(node.id) ?? physicsEntityId(node),
-        entityOrder,
-        contributesToBounds: node.geometry.operation === undefined,
-        bounds: node.bounds,
-        position: [...(node.worldTransform ?? node.transform).position],
-        mass: node.origin?.transactionAmount,
-        revision: this.baselineRevision,
-      }));
+    const definitions = compilePhysicsScene(authored, this.baselineRevision);
     this.simulation.reconcileDefinitions(definitions);
     return authored;
   }

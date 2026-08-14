@@ -3,6 +3,21 @@ import type { SpatialBounds } from '../model/SpatialNode';
 export type Vector3Tuple = [number, number, number];
 export type QuaternionTuple = [number, number, number, number];
 export type RigidBodyMode = 'dynamic' | 'kinematic' | 'static';
+export type ColliderShape = 'cuboid' | 'ball' | 'cylinder' | 'capsule';
+
+export interface ColliderDefinition {
+  id: string;
+  bodyId: string;
+  shape: ColliderShape;
+  dimensions: Vector3Tuple;
+  offset: Vector3Tuple;
+  orientation?: QuaternionTuple;
+  sensor?: boolean;
+  friction?: number;
+  restitution?: number;
+  collisionGroups?: number;
+  solverGroups?: number;
+}
 
 export interface RigidBodyDefinition {
   id: string;
@@ -21,6 +36,12 @@ export interface RigidBodyDefinition {
   restitution?: number;
   friction?: number;
   revision?: string;
+  colliders?: ColliderDefinition[];
+  gravityScale?: number;
+  ccd?: boolean;
+  canSleep?: boolean;
+  enabledTranslations?: [boolean, boolean, boolean];
+  enabledRotations?: [boolean, boolean, boolean];
 }
 
 export interface RigidBodyState {
@@ -51,6 +72,8 @@ export interface PhysicsFrame {
 }
 
 export interface PhysicsSnapshot {
+  schemaVersion?: 1;
+  backend?: string;
   tick: number;
   states: RigidBodyState[];
   definitions: RigidBodyDefinition[];

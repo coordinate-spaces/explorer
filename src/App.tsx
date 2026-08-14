@@ -614,6 +614,7 @@ export default function App() {
       return;
     }
     if (simulationBaselineRevisionRef.current !== baselineRevision) {
+      accumulativeTimelineRef.current?.dispose();
       accumulativeTimelineRef.current = undefined;
       simulationBaselineRevisionRef.current = undefined;
       evaluatedPhysicsFrameRef.current = undefined;
@@ -632,6 +633,7 @@ export default function App() {
   }, [baselineRevision, renderedBundle, simulationMode]);
 
   const startSimulation = useCallback(() => {
+    accumulativeTimelineRef.current?.dispose();
     accumulativeTimelineRef.current = new AccumulativeSpatialTimeline(baselineRevision);
     simulationBaselineRevisionRef.current = baselineRevision;
     evaluatedPhysicsFrameRef.current = undefined;
@@ -642,6 +644,7 @@ export default function App() {
   }, [baselineRevision, simulationSource]);
 
   const stopSimulation = useCallback(() => {
+    accumulativeTimelineRef.current?.dispose();
     accumulativeTimelineRef.current = undefined;
     simulationBaselineRevisionRef.current = undefined;
     evaluatedPhysicsFrameRef.current = undefined;
