@@ -43,23 +43,20 @@ function applyPhysicsFrame(nodes: SpatialNode[], frame: PhysicsFrame | undefined
     if (!state) return node;
     const current = (node.worldTransform ?? node.transform).position;
     const delta = state.position.map((value, axis) => value - current[axis]) as [number, number, number];
+    const euler = new Euler().setFromQuaternion(new Quaternion(...state.orientation), 'XYZ');
+    const rotation: [number, number, number] = [euler.x, euler.y, euler.z];
     const translateTransform = (transform: SpatialTransform | undefined) => transform && ({
       ...transform,
       position: transform.position.map((value, axis) => value + delta[axis]) as [number, number, number],
-      rotation: (() => {
-        const euler = new Euler().setFromQuaternion(new Quaternion(...state.orientation), 'XYZ');
-        return [euler.x, euler.y, euler.z] as [number, number, number];
-      })(),
+      rotation,
     });
+    const transform = translateTransform(node.transform)!;
+    const worldTransform = translateTransform(node.worldTransform);
     return {
       ...node,
-      bounds: {
-        minX: node.bounds.minX + delta[0], maxX: node.bounds.maxX + delta[0],
-        minY: node.bounds.minY + delta[1], maxY: node.bounds.maxY + delta[1],
-        minZ: node.bounds.minZ + delta[2], maxZ: node.bounds.maxZ + delta[2],
-      },
-      transform: translateTransform(node.transform)!,
-      worldTransform: translateTransform(node.worldTransform),
+      bounds: boundsFromTransformedBox(node.baseBox ?? node.box, worldTransform ?? transform),
+      transform,
+      worldTransform,
     };
   });
 }

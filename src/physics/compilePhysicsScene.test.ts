@@ -15,4 +15,11 @@ describe('compilePhysicsScene', () => {
 "Shape/Cut/+1+2/+1+2/+1+2" : "operation: subtraction"`));
     expect(definitions.find(({ id }) => id.includes('Cut'))?.colliders).toEqual([]);
   });
+
+  it('uses effective world scale for fitted reference colliders', () => {
+    const document = createSpatialDocument(`"Panel/" : ""
+"Panel/Part/+0+4/+0+2/+0+2" : ""
+"Copy/+10+8/+0+4/+0+1" : "ref: Panel/; ref-scale: true"`);
+    expect(compilePhysicsScene(document)[0].colliders?.[0].dimensions).toEqual([8, 4, 1]);
+  });
 });

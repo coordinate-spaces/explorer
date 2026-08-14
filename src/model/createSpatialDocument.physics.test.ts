@@ -23,4 +23,15 @@ describe('physics document overlay', () => {
     const document = createSpatialDocument('"Box/+0+1/+0+1/+0+1" : ""', { physicsFrame: { tick: 1, states: new Map([[id, state]]) } });
     expect(document.renderNodes[0].transform.rotation[1]).toBeCloseTo(Math.PI / 2);
   });
+
+  it('recomputes interaction bounds from the completed orientation', () => {
+    const source = '"Rod/+0+4/+0+1/+0+1" : ""';
+    const baseline = createSpatialDocument(source);
+    const id = baseline.renderNodes[0].id;
+    const halfTurn = Math.sin(Math.PI / 4);
+    const state: RigidBodyState = { id, position: [2, 0.5, 0.5], orientation: [0, halfTurn, 0, halfTurn], linearVelocity: [0, 0, 0], angularVelocity: [0, 0, 0], sleeping: false, tick: 1 };
+    const node = createSpatialDocument(source, { physicsFrame: { tick: 1, states: new Map([[id, state]]) } }).renderNodes[0];
+    expect(node.bounds.maxX - node.bounds.minX).toBeCloseTo(1);
+    expect(node.bounds.maxZ - node.bounds.minZ).toBeCloseTo(4);
+  });
 });

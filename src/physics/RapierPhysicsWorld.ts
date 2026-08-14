@@ -1,17 +1,21 @@
 import RAPIER from '@dimforge/rapier3d-compat';
 import type { RigidBodyWorld } from './RigidBodyWorld';
 import type { ColliderDefinition, PhysicsFrame, PhysicsInput, PhysicsSnapshot, RigidBodyDefinition, RigidBodyState, Vector3Tuple } from './types';
+import { Quaternion, Vector3 } from 'three';
 
 await RAPIER.init();
 
 const tuple = ({ x, y, z }: { x: number; y: number; z: number }): Vector3Tuple => [x, y, z];
+const quaternion = (value: readonly number[] | undefined): Quaternion => new Quaternion(...(value ?? [0, 0, 0, 1]) as [number, number, number, number]);
+const quaternionTuple = (value: Quaternion): [number, number, number, number] => [value.x, value.y, value.z, value.w];
+interface MemberLocalPose { position: Vector3Tuple; orientation: [number, number, number, number] }
 
 /** Rapier-backed fixed-timestep world. Stable authored IDs never expose engine handles. */
 export class RapierPhysicsWorld implements RigidBodyWorld {
   private world = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
   private definitions = new Map<string, RigidBodyDefinition>();
   private bodyByEntity = new Map<string, RAPIER.RigidBody>();
-  private memberOffsets = new Map<string, Vector3Tuple>();
+  private memberLocalPoses = new Map<string, MemberLocalPose>();
   private queuedInputs = new Map<number, PhysicsInput[]>();
   private currentTick = 0;
 
@@ -28,7 +32,7 @@ export class RapierPhysicsWorld implements RigidBodyWorld {
     this.world.createCollider(RAPIER.ColliderDesc.cuboid(100_000, 0.05, 100_000).setFriction(0.8), body);
   }
 
-  private colliderDesc(collider: ColliderDefinition): RAPIER.ColliderDesc {
+  private colliderDesc(collider: ColliderDefinition, mass: number): RAPIER.ColliderDesc {
     const [x, y, z] = collider.dimensions;
     const desc = collider.shape === 'ball'
       ? RAPIER.ColliderDesc.ball(Math.min(x, y, z) / 2)
@@ -39,6 +43,7 @@ export class RapierPhysicsWorld implements RigidBodyWorld {
           : RAPIER.ColliderDesc.cuboid(x / 2, y / 2, z / 2);
     desc.setTranslation(...collider.offset).setSensor(collider.sensor ?? false)
       .setFriction(collider.friction ?? 0.7).setRestitution(collider.restitution ?? 0);
+    if (collider.sensor) desc.setDensity(0); else desc.setMass(mass);
     if (collider.orientation) desc.setRotation({ x: collider.orientation[0], y: collider.orientation[1], z: collider.orientation[2], w: collider.orientation[3] });
     if (collider.collisionGroups !== undefined) desc.setCollisionGroups(collider.collisionGroups);
     if (collider.solverGroups !== undefined) desc.setSolverGroups(collider.solverGroups);
@@ -61,7 +66,7 @@ export class RapierPhysicsWorld implements RigidBodyWorld {
     this.world.timestep = 1 / this.ticksPerSecond;
     this.addGround();
     this.definitions = new Map(next.map((definition) => [definition.id, { ...definition }]));
-    this.bodyByEntity.clear(); this.memberOffsets.clear();
+    this.bodyByEntity.clear(); this.memberLocalPoses.clear();
 
     const groups = new Map<string, RigidBodyDefinition[]>();
     next.forEach((definition) => {
@@ -88,15 +93,28 @@ export class RapierPhysicsWorld implements RigidBodyWorld {
       if (anchor.enabledTranslations) body.setEnabledTranslations(...anchor.enabledTranslations, false);
       if (anchor.enabledRotations) body.setEnabledRotations(...anchor.enabledRotations, false);
       this.bodyByEntity.set(entityId, body);
+      const mass = members.reduce((sum, member) => sum + (member.mass && member.mass > 0 ? member.mass : 1), 0);
+      const massColliderCount = members.flatMap((member) => member.colliders ?? []).filter((collider) => !collider.sensor).length;
+      const colliderMass = massColliderCount ? mass / massColliderCount : 0;
+      const authoredAnchorOrientation = quaternion(anchor.orientation);
+      const inverseAnchorOrientation = authoredAnchorOrientation.clone().invert();
       members.forEach((member) => {
-        const offset = member.position.map((value, axis) => value - anchor.position[axis]) as Vector3Tuple;
-        this.memberOffsets.set(member.id, offset);
+        const worldOffset = new Vector3(...member.position).sub(new Vector3(...anchor.position));
+        const localPosition = worldOffset.applyQuaternion(inverseAnchorOrientation);
+        const localOrientation = inverseAnchorOrientation.clone().multiply(quaternion(member.orientation));
+        const localPose: MemberLocalPose = { position: [localPosition.x, localPosition.y, localPosition.z], orientation: quaternionTuple(localOrientation) };
+        this.memberLocalPoses.set(member.id, localPose);
         (member.colliders ?? []).forEach((collider) => {
-          this.world.createCollider(this.colliderDesc({ ...collider, offset: collider.offset.map((value, axis) => value + offset[axis]) as Vector3Tuple }), body);
+          const colliderOffset = new Vector3(...collider.offset).applyQuaternion(localOrientation).add(localPosition);
+          const colliderOrientation = localOrientation.clone().multiply(quaternion(collider.orientation));
+          this.world.createCollider(this.colliderDesc({
+            ...collider,
+            offset: [colliderOffset.x, colliderOffset.y, colliderOffset.z],
+            orientation: quaternionTuple(colliderOrientation),
+          }, colliderMass), body);
         });
       });
-      const mass = members.reduce((sum, member) => sum + (member.mass && member.mass > 0 ? member.mass : 1), 0);
-      if (mode === 'dynamic') body.setAdditionalMass(mass, false);
+      if (mode === 'dynamic' && massColliderCount === 0) body.setAdditionalMass(mass, false);
     });
   }
 
@@ -122,8 +140,9 @@ export class RapierPhysicsWorld implements RigidBodyWorld {
         else if (input.kind === 'impulse') body.applyImpulse({ x: input.vector[0], y: input.vector[1], z: input.vector[2] }, true);
         else if (input.kind === 'translation') { const p = body.translation(); body.setTranslation({ x: p.x + input.vector[0], y: p.y + input.vector[1], z: p.z + input.vector[2] }, true); }
         else if ('position' in input) {
-          const offset = this.memberOffsets.get(input.bodyId) ?? [0, 0, 0];
-          const target = { x: input.position[0] - offset[0], y: input.position[1] - offset[1], z: input.position[2] - offset[2] };
+          const localPose = this.memberLocalPoses.get(input.bodyId) ?? { position: [0, 0, 0] as Vector3Tuple, orientation: [0, 0, 0, 1] as [number, number, number, number] };
+          const offset = new Vector3(...localPose.position).applyQuaternion(quaternionTupleToThree(body.rotation()));
+          const target = { x: input.position[0] - offset.x, y: input.position[1] - offset.y, z: input.position[2] - offset.z };
           if (input.kind === 'kinematic-target') body.setNextKinematicTranslation(target); else body.setTranslation(target, true);
           if (input.kind === 'teleport' && input.clearVelocity) { body.setLinvel({ x: 0, y: 0, z: 0 }, true); body.setAngvel({ x: 0, y: 0, z: 0 }, true); }
         }
@@ -137,10 +156,12 @@ export class RapierPhysicsWorld implements RigidBodyWorld {
     const states = new Map<string, RigidBodyState>();
     this.definitions.forEach((definition, id) => {
       const body = this.bodyFor(id); if (!body) return;
-      const p = tuple(body.translation()); const offset = this.memberOffsets.get(id) ?? [0, 0, 0];
-      const q = body.rotation();
-      states.set(id, { id, position: p.map((value, axis) => value + offset[axis]) as Vector3Tuple,
-        orientation: [q.x, q.y, q.z, q.w], linearVelocity: tuple(body.linvel()), angularVelocity: tuple(body.angvel()), sleeping: body.isSleeping(), tick: this.currentTick });
+      const p = tuple(body.translation()); const localPose = this.memberLocalPoses.get(id) ?? { position: [0, 0, 0] as Vector3Tuple, orientation: [0, 0, 0, 1] as [number, number, number, number] };
+      const bodyOrientation = quaternionTupleToThree(body.rotation());
+      const offset = new Vector3(...localPose.position).applyQuaternion(bodyOrientation);
+      const orientation = bodyOrientation.clone().multiply(quaternion(localPose.orientation));
+      states.set(id, { id, position: [p[0] + offset.x, p[1] + offset.y, p[2] + offset.z],
+        orientation: quaternionTuple(orientation), linearVelocity: tuple(body.linvel()), angularVelocity: tuple(body.angvel()), sleeping: body.isSleeping(), tick: this.currentTick });
     });
     return { tick: this.currentTick, states };
   }
@@ -157,9 +178,11 @@ export class RapierPhysicsWorld implements RigidBodyWorld {
       restoredEntities.add(entityId);
       const state = states.get(definition.id); const body = this.bodyByEntity.get(entityId);
       if (!state || !body) return;
-      const offset = this.memberOffsets.get(definition.id) ?? [0, 0, 0];
-      body.setTranslation({ x: state.position[0] - offset[0], y: state.position[1] - offset[1], z: state.position[2] - offset[2] }, false);
-      body.setRotation({ x: state.orientation[0], y: state.orientation[1], z: state.orientation[2], w: state.orientation[3] }, false);
+      const localPose = this.memberLocalPoses.get(definition.id) ?? { position: [0, 0, 0] as Vector3Tuple, orientation: [0, 0, 0, 1] as [number, number, number, number] };
+      const bodyOrientation = quaternion(state.orientation).multiply(quaternion(localPose.orientation).invert());
+      const offset = new Vector3(...localPose.position).applyQuaternion(bodyOrientation);
+      body.setTranslation({ x: state.position[0] - offset.x, y: state.position[1] - offset.y, z: state.position[2] - offset.z }, false);
+      body.setRotation(bodyOrientation, false);
       body.setLinvel({ x: state.linearVelocity[0], y: state.linearVelocity[1], z: state.linearVelocity[2] }, false);
       body.setAngvel({ x: state.angularVelocity[0], y: state.angularVelocity[1], z: state.angularVelocity[2] }, false);
       if (state.sleeping) body.sleep();
@@ -167,5 +190,9 @@ export class RapierPhysicsWorld implements RigidBodyWorld {
     this.currentTick = snapshot.tick;
     this.queuedInputs.clear();
   }
-  dispose(): void { this.world.free(); this.definitions.clear(); this.bodyByEntity.clear(); this.queuedInputs.clear(); }
+  dispose(): void { this.world.free(); this.definitions.clear(); this.bodyByEntity.clear(); this.memberLocalPoses.clear(); this.queuedInputs.clear(); }
+}
+
+function quaternionTupleToThree(value: { x: number; y: number; z: number; w: number }): Quaternion {
+  return new Quaternion(value.x, value.y, value.z, value.w);
 }

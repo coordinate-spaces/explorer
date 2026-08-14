@@ -35,7 +35,9 @@ export function compilePhysicsScene(document: SpatialDocument, revision = 'basel
     .map((node, entityOrder): RigidBodyDefinition => {
       const transform = node.worldTransform ?? node.transform;
       const q = new Quaternion().setFromEuler(new Euler(...transform.rotation, 'XYZ'));
-      const dimensions = [...node.geometry.dimensions] as Vector3Tuple;
+      // The resolved world transform contains reference/materialization scaling;
+      // geometry dimensions still describe the unscaled template primitive.
+      const dimensions = transform.scale.map(Math.abs) as Vector3Tuple;
       const collider: ColliderDefinition = {
         id: `collider:${node.id}`,
         bodyId: node.id,

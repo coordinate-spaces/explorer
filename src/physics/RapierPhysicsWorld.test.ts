@@ -25,4 +25,40 @@ describe('RapierPhysicsWorld', () => {
     expect(world.frame().states.get('box')!.position).toEqual(body.position);
     world.dispose();
   });
+
+  it('uses the declared total mass independently of collider volume', () => {
+    const world = new RapierPhysicsWorld();
+    const small = { ...body, position: [0, 20, 0] as [number, number, number], gravityScale: 0 };
+    const large: RigidBodyDefinition = { ...body, id: 'large', position: [20, 20, 0], gravityScale: 0,
+      colliders: [{ id: 'large-collider', bodyId: 'large', shape: 'cuboid', dimensions: [10, 10, 10], offset: [0, 0, 0] }] };
+    world.reconcileDefinitions([small, large]);
+    world.enqueueInputs([
+      { kind: 'impulse', bodyId: 'box', tick: 1, vector: [2, 0, 0] },
+      { kind: 'impulse', bodyId: 'large', tick: 1, vector: [2, 0, 0] },
+    ]);
+    const frame = world.step();
+    expect(frame.states.get('box')!.linearVelocity[0]).toBeCloseTo(frame.states.get('large')!.linearVelocity[0]);
+    world.dispose();
+  });
+
+  it('composes each compound member local pose with the body pose', () => {
+    const halfTurn = Math.sin(Math.PI / 4);
+    const anchor = { ...body, id: 'anchor', entityId: 'compound', mode: 'static' as const, position: [0, 1, 0] as [number, number, number], orientation: [0, halfTurn, 0, halfTurn] as [number, number, number, number] };
+    const member = { ...body, id: 'member', entityId: 'compound', mode: 'static' as const, position: [1, 1, 0] as [number, number, number], orientation: [0, 0, 0, 1] as [number, number, number, number] };
+    const world = new RapierPhysicsWorld(); world.reconcileDefinitions([anchor, member]);
+    expect(world.frame().states.get('member')!.position[0]).toBeCloseTo(member.position[0]);
+    expect(world.frame().states.get('member')!.position[1]).toBeCloseTo(member.position[1]);
+    expect(world.frame().states.get('member')!.position[2]).toBeCloseTo(member.position[2]);
+    expect(world.frame().states.get('member')!.orientation[1]).toBeCloseTo(0);
+
+    const snapshot = world.snapshot();
+    const anchorState = snapshot.states.find(({ id }) => id === 'anchor')!;
+    anchorState.orientation = [0, 0, 0, 1];
+    world.restore(snapshot);
+    const rotatedMember = world.frame().states.get('member')!;
+    expect(rotatedMember.position[0]).toBeCloseTo(0);
+    expect(rotatedMember.position[2]).toBeCloseTo(1);
+    expect(rotatedMember.orientation[1]).toBeCloseTo(-halfTurn);
+    world.dispose();
+  });
 });
