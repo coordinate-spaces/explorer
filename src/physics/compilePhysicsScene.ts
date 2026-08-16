@@ -53,10 +53,18 @@ export function compilePhysicsScene(document: SpatialDocument, revision = 'basel
   // All secondary primitives are compiled: ordinary cursors are zero-mass sensors,
   // while the explicit physical-body opt-in retains ordinary rigid-body semantics.
   const candidates = flatten(document.nodes);
+  const physicsEntityId = (node: SpatialNode): string => {
+    const baseId = csgEntityByNodeId.get(node.id) ?? entityId(node);
+    if (node.origin?.sourceKind !== 'secondary') return baseId;
+    // Sensor proxies and opted-in physical members cannot share one Rapier body:
+    // their body modes, mass, solver participation, and state lifetimes differ.
+    return `${baseId}:${node.physics?.['physical-body'] === true ? 'physical' : 'cursor-sensor'}`;
+  };
   const modeByEntity = new Map<string, NonNullable<RigidBodyDefinition['mode']>>();
   candidates.forEach((node) => {
-    const id = csgEntityByNodeId.get(node.id) ?? entityId(node);
-    const mode = node.physics?.['physics-mode'] ?? 'dynamic';
+    const id = physicsEntityId(node);
+    const mode = node.origin?.sourceKind === 'secondary' && node.physics?.['physical-body'] !== true
+      ? 'kinematic' : (node.physics?.['physics-mode'] ?? 'dynamic');
     const established = modeByEntity.get(id);
     if (!established) modeByEntity.set(id, mode);
     else if (established !== mode) diagnose({
@@ -70,7 +78,7 @@ export function compilePhysicsScene(document: SpatialDocument, revision = 'basel
       const physics = node.physics ?? { diagnostics: [] };
       const cursor = node.origin?.sourceKind === 'secondary';
       const physicalCursor = cursor && physics['physical-body'] === true;
-      const compiledEntityId = csgEntityByNodeId.get(node.id) ?? entityId(node);
+      const compiledEntityId = physicsEntityId(node);
       const q = new Quaternion().setFromEuler(new Euler(...transform.rotation, 'XYZ'));
       // The resolved world transform contains reference/materialization scaling;
       // geometry dimensions still describe the unscaled template primitive.
@@ -87,7 +95,7 @@ export function compilePhysicsScene(document: SpatialDocument, revision = 'basel
         // Default cursors see baseline (group 1) but not group 2 cursors. Baseline
         // sees both. Explicit authored groups always win.
         collisionGroups: physics['collision-groups'] ?? (cursor ? (2 << 16) | 1 : (1 << 16) | 3),
-        solverGroups: physics['solver-groups'] ?? (cursor ? 0 : undefined),
+        solverGroups: physics['solver-groups'] ?? (cursor && !physicalCursor ? 0 : undefined),
         interactionRole: cursor ? 'cursor' : 'target',
       };
       const unsupportedCollider = node.geometry.operation === 'subtraction' || node.geometry.operation === 'intersection';
@@ -99,12 +107,12 @@ export function compilePhysicsScene(document: SpatialDocument, revision = 'basel
         id: node.id,
         entityId: compiledEntityId,
         entityOrder,
-        contributesToBounds: !cursor && node.geometry.operation === undefined,
+        contributesToBounds: (!cursor || physicalCursor) && node.geometry.operation === undefined,
         bounds: node.bounds,
         position: [...transform.position],
         orientation: [q.x, q.y, q.z, q.w],
         mass: physics.mass,
-        mode: physicalCursor ? modeByEntity.get(compiledEntityId) : cursor ? 'kinematic' : modeByEntity.get(compiledEntityId),
+        mode: modeByEntity.get(compiledEntityId),
         linearDamping: physics['linear-damping'],
         gravityScale: physics['gravity-scale'],
         ccd: physics.ccd,
@@ -123,6 +131,7 @@ export function compilePhysicsScene(document: SpatialDocument, revision = 'basel
           transactionTime: node.origin?.transactionTime,
           weight: node.origin?.transactionAmount,
         },
+        retainsPhysicsState: !cursor || physicalCursor,
       };
     });
 }

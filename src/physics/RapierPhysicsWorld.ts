@@ -171,7 +171,7 @@ export class RapierPhysicsWorld implements RigidBodyWorld {
     this.definitions.forEach((definition, id) => {
       // Cursor sensors are authored per transaction frame. Publishing them as
       // retained simulation state would overwrite the next authored cursor pose.
-      if ((definition.colliders?.length ?? 0) > 0 && definition.colliders!.every((collider) => collider.interactionRole === 'cursor' && collider.sensor)) return;
+      if (definition.retainsPhysicsState === false) return;
       const body = this.bodyFor(id); if (!body) return;
       const p = tuple(body.translation()); const localPose = this.memberLocalPoses.get(id) ?? { position: [0, 0, 0] as Vector3Tuple, orientation: [0, 0, 0, 1] as [number, number, number, number] };
       const bodyOrientation = quaternionTupleToThree(body.rotation());

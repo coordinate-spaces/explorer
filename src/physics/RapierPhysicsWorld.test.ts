@@ -112,4 +112,19 @@ describe('RapierPhysicsWorld', () => {
     expect(world.frame().states.get('target')!.linearVelocity).toEqual([0, 0, 0]);
     world.dispose();
   });
+
+  it('retains simulated state and snapshots for opted-in physical sensor bodies', () => {
+    const physicalSensor = queryBody('physical-sensor', 0, 'cursor');
+    physicalSensor.mode = 'dynamic';
+    physicalSensor.position = [0, 5, 0];
+    physicalSensor.retainsPhysicsState = true;
+    const world = new RapierPhysicsWorld(); world.reconcileDefinitions([physicalSensor]);
+    const moved = world.step(10).states.get(physicalSensor.id)!;
+    expect(moved.position[1]).toBeLessThan(5);
+    const snapshot = world.snapshot();
+    world.step(20);
+    world.restore(snapshot);
+    expect(world.frame().states.get(physicalSensor.id)).toEqual(moved);
+    world.dispose();
+  });
 });

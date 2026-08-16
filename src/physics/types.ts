@@ -76,6 +76,8 @@ export interface RigidBodyDefinition {
   revision?: string;
   colliders?: ColliderDefinition[];
   interactionIdentity?: InteractionIdentity;
+  /** False for transaction-authored cursor proxies whose pose must not outlive their authored frame. */
+  retainsPhysicsState?: boolean;
   gravityScale?: number;
   ccd?: boolean;
   canSleep?: boolean;
