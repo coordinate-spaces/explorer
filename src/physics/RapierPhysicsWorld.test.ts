@@ -61,4 +61,55 @@ describe('RapierPhysicsWorld', () => {
     expect(rotatedMember.orientation[1]).toBeCloseTo(-halfTurn);
     world.dispose();
   });
+
+  const queryBody = (id: string, x: number, role: 'target' | 'cursor', shape: 'cuboid' | 'ball' | 'cylinder' = 'cuboid', dimensions: [number, number, number] = [2, 2, 2]): RigidBodyDefinition => ({
+    id, mode: role === 'cursor' ? 'kinematic' : 'static', position: [x, 10, 0],
+    bounds: { minX: x - 1, maxX: x + 1, minY: 9, maxY: 11, minZ: -1, maxZ: 1 },
+    interactionIdentity: { id, namespace: `${id}/`, ...(role === 'cursor' ? { streamId: 'stream-a' } : {}) },
+    colliders: [{ id: `${id}-collider`, bodyId: id, shape, dimensions, offset: [0, 0, 0], sensor: role === 'cursor',
+      interactionRole: role, collisionGroups: role === 'cursor' ? (2 << 16) | 1 : (1 << 16) | 3 }],
+  });
+
+  it.each([
+    ['sphere', 'ball' as const],
+    ['cylinder', 'cylinder' as const],
+    ['rotated box', 'cuboid' as const],
+  ])('uses exact Rapier geometry for %s touch, tolerance, and penetration', (_label, shape) => {
+    const target = queryBody('target', 0, 'target', shape);
+    if (_label === 'rotated box') target.orientation = [0, Math.sin(Math.PI / 8), 0, Math.cos(Math.PI / 8)];
+    const touchingX = _label === 'rotated box' ? 1 + Math.SQRT2 : 2;
+    const cursor = queryBody('cursor', touchingX, 'cursor', shape);
+    const world = new RapierPhysicsWorld(); world.reconcileDefinitions([target, cursor]);
+    expect(world.queryInteractions({ tolerance: 0 })[0]?.state).toBe('touch');
+    world.reconcileDefinitions([target, { ...cursor, position: [touchingX + 0.0005, 10, 0] }]);
+    expect(world.queryInteractions({ tolerance: 0.001 })[0]?.separation).toBeLessThanOrEqual(0.001);
+    world.reconcileDefinitions([target, { ...cursor, position: [1.5, 10, 0] }]);
+    expect(world.queryInteractions()[0]).toMatchObject({ state: 'breach', penetration: expect.any(Number), resolutionDistance: expect.any(Number) });
+    world.dispose();
+  });
+
+  it('aggregates compound pairs deterministically and restores replay-safe query identity', () => {
+    const target = queryBody('target', 0, 'target');
+    target.colliders!.push({ ...target.colliders![0], id: 'target-collider-b', offset: [0.25, 0, 0] });
+    const cursor = queryBody('cursor', 1.5, 'cursor');
+    const world = new RapierPhysicsWorld(); world.reconcileDefinitions([target, cursor]);
+    const before = world.queryInteractions(); const snapshot = world.snapshot();
+    expect(before).toHaveLength(1);
+    expect(world.queryInteractions()).toEqual(before);
+    world.restore(snapshot);
+    expect(world.queryInteractions()).toEqual(before);
+    world.dispose();
+  });
+
+  it('keeps sensors impulse-free, honors filtering, and resolves periodic images without duplicates', () => {
+    const target = queryBody('target', -4.5, 'target');
+    const cursor = queryBody('cursor', 4.5, 'cursor');
+    const world = new RapierPhysicsWorld(); world.reconcileDefinitions([target, cursor]);
+    expect(world.queryInteractions({ periodicSpace: { width: 10, depth: 10 } })).toHaveLength(1);
+    const filtered = { ...cursor, colliders: [{ ...cursor.colliders![0], collisionGroups: (2 << 16) | 4 }] };
+    world.reconcileDefinitions([target, filtered]);
+    expect(world.queryInteractions({ periodicSpace: { width: 10, depth: 10 } })).toEqual([]);
+    expect(world.frame().states.get('target')!.linearVelocity).toEqual([0, 0, 0]);
+    world.dispose();
+  });
 });

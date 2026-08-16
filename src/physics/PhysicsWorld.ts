@@ -1,5 +1,7 @@
 import type {
   PhysicsFrame,
+  InteractionQueryOptions,
+  InteractionQueryResult,
   PhysicsInput,
   PhysicsSnapshot,
   QuaternionTuple,
@@ -103,6 +105,9 @@ export class PhysicsWorld implements RigidBodyWorld {
   frame(): PhysicsFrame {
     return { tick: this.currentTick, states: new Map([...this.states].map(([id, state]) => [id, cloneState(state)])) };
   }
+
+  /** The deprecated constraint solver has no geometry narrow phase. */
+  queryInteractions(_options: InteractionQueryOptions = {}): readonly InteractionQueryResult[] { return Object.freeze([]); }
 
   snapshot(): PhysicsSnapshot {
     return {

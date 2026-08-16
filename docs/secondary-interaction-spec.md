@@ -146,11 +146,11 @@ The final three `+offset+size` segments replace the complete effective X/Y/Z box
 
 ### 7.1 Touch
 
-`touch` means that cursor and target faces touch, or are within the configured touch tolerance, without positive-volume overlap. A face touch requires positive overlap on the other two axes. Edge-only, corner-only, or diagonally nearby bounds MUST NOT count as a touch.
+`touch` means that cursor and target geometry has zero or near-zero shape distance within the configured touch tolerance, without positive shape penetration. Geometry-aware closest-point queries make valid curved-surface, edge, and corner contact a touch when their Euclidean separation is within tolerance; an AABB-only diagonal is not sufficient.
 
 ### 7.2 Breach
 
-`breach` means that cursor and target have positive-volume overlap. The initial implementation uses transformed world-space AABBs and selects the deterministic minimum target-exit translation across both directions of every axis for its interaction normal.
+`breach` means that cursor and target have positive shape penetration. Contact manifolds are authoritative for ordinary colliders and exact shape-contact queries supply sensor data when Rapier intentionally emits no sensor manifold. Normals always point from the cursor toward the target; penetration and resolution distance describe the selected geometric contact along that normal.
 
 ### 7.3 Evaluation space and feedback
 

@@ -17,6 +17,44 @@ export interface ColliderDefinition {
   restitution?: number;
   collisionGroups?: number;
   solverGroups?: number;
+  /** Logical interaction role; unlike an engine handle this survives rebuilds and replay. */
+  interactionRole?: 'target' | 'cursor';
+}
+
+/** Stable provenance needed to construct the public InteractionFact without backend data. */
+export interface InteractionIdentity {
+  id: string;
+  namespace: string;
+  streamId?: string;
+  transactionId?: string;
+  transactionTime?: number;
+  weight?: number;
+}
+
+/** Immutable, engine-neutral narrow-phase result for one logical cursor/target pair. */
+export interface InteractionQueryResult {
+  tick: number;
+  state: 'touch' | 'breach';
+  target: InteractionIdentity;
+  cursor: InteractionIdentity & { streamId: string };
+  targetColliderId: string;
+  cursorColliderId: string;
+  /** Unit vector pointing out of the cursor and toward the target. */
+  normal: Vector3Tuple;
+  /** Per-axis target-center direction, used only when the geometric normal is degenerate. */
+  inferredDirection: Vector3Tuple;
+  /** Positive shape overlap depth along the representative geometric contact normal. */
+  penetration?: number;
+  /** Target translation distance along `normal` needed to resolve the representative contact. */
+  resolutionDistance?: number;
+  /** Shortest geometry-to-geometry distance for a non-penetrating touch. */
+  separation?: number;
+}
+
+export interface InteractionQueryOptions {
+  tolerance?: number;
+  /** Periodic X/Z dimensions. The nearest image is selected without changing stable identity. */
+  periodicSpace?: { width: number; depth: number };
 }
 
 export interface RigidBodyDefinition {
@@ -37,6 +75,7 @@ export interface RigidBodyDefinition {
   friction?: number;
   revision?: string;
   colliders?: ColliderDefinition[];
+  interactionIdentity?: InteractionIdentity;
   gravityScale?: number;
   ccd?: boolean;
   canSleep?: boolean;
