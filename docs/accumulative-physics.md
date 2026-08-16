@@ -32,7 +32,7 @@ are normalized to lowercase.
 | Property | Accepted grammar | Default | Unit / meaning |
 | --- | --- | --- | --- |
 | `physics-mode` | `dynamic \| static \| kinematic` | `dynamic` | Rigid-body mode. |
-| `mass` | finite number `> 0` | `1` in the backend when omitted | kilograms (kg), total authored mass rather than density or volume-derived mass. |
+| `mass` | finite number `> 0` | `1` per compiled member when omitted; compound body mass is the member sum | kilograms (kg), authored member mass rather than density or volume-derived mass. |
 | `density` | reserved; any authored value is diagnosed and ignored | none | Reserved for a future mass model; it is not currently a synonym for `mass`. |
 | `friction` | finite number in `[0, 1]` | `0.7` | dimensionless collider coefficient. |
 | `restitution` | finite number in `[0, 1]` | `0` | dimensionless collider coefficient. |
@@ -73,8 +73,9 @@ wins deterministically and compilation emits a line diagnostic.
 
 Secondary declarations enter the Rapier scene as kinematic, non-state-retaining
 sensor proxies for interaction queries. They may explicitly set
-`physical-body: true`; an opted-in collider still defaults to `sensor: true`,
-unless `sensor: false` is authored.
+`physical-body: true`; an opted-in collider defaults to `sensor: false` and uses
+Rapier's default solver groups unless the author explicitly overrides those
+properties.
 Box, sphere, cylinder, and cone primitives compile to their matching Rapier
 shapes, and union compounds retain one positive collider per primitive.
 Subtraction/intersection CSG tools are omitted with a diagnostic: a Rapier
@@ -87,24 +88,26 @@ stage may provide exact or explicitly documented approximations.
 Unsupported or unknown visual geometry otherwise uses the existing box/cuboid
 physics approximation. This fallback must not be used for subtraction or
 intersection tools: those colliders are omitted rather than silently adding
-positive volume. Unsupported CSG tools remain renderable, and their omission diagnostic is
-carried into the compiled spatial document.
+positive volume. Unsupported CSG tools remain renderable, and their omission
+diagnostic is carried into the compiled spatial document.
 
 ### Transaction-amount migration
 
 Transaction `amount` metadata is not physics syntax, has no mass unit, and is
 never copied into `mass`, density, collider mass, force, or impulse. Existing
 documents that relied on an amount-shaped value must author `mass: <kg>`
-explicitly. When `mass` is absent, the rigid-body backend uses `1 kg`, regardless
-of transaction amount.
+explicitly. When `mass` is absent, the backend contributes `1 kg` for each
+compiled member; a compound body's resulting mass is the sum of its member
+masses. Neither fallback depends on transaction amount.
 
 The only retained amount conversion is the explicit weighted `+++` interaction
 at the transaction boundary. Its translation distance is
-`cursor amount / target amount / 100` project metres. This is legacy interaction
-weighting, not a physical force or mass conversion. Missing or unusable weights
-therefore follow the interaction directive's existing behavior rather than
-altering body mass. Future force/impulse syntax must state newtons or
-newton-seconds explicitly and must not infer those values from transaction
+`cursor amount / target amount / 100` project units. One project unit is `0.1 m`,
+so equal valid weights produce `0.01` project units, or `1 mm`. This is legacy
+interaction weighting, not a physical force or mass conversion. Missing or
+unusable weights therefore follow the interaction directive's existing behavior
+rather than altering body mass. Future force/impulse syntax must state newtons
+or newton-seconds explicitly and must not infer those values from transaction
 amounts.
 
 Rapier is the sole runtime authority for gravity, contacts, restitution,
@@ -156,9 +159,10 @@ with `clearVelocity` selected explicitly, rather than inferred from recompilatio
 
 Static bodies do not integrate. Kinematic bodies accept explicit targets.
 Dynamic bodies accept force and impulse inputs. Invalid mass is rejected by the
-parser and missing mass uses the backend default (`1` kg). Applications that
-need transaction weighting must perform a documented conversion before authoring
-`mass`; the compiler does not infer one.
+parser. A missing member mass contributes the backend default (`1` kg), and a
+compound body sums its members. Applications that need transaction weighting
+must perform a documented conversion before authoring `mass`; the compiler does
+not infer one.
 
 ## Spatial scalability
 
