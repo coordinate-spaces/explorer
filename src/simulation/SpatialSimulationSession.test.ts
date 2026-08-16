@@ -1,9 +1,19 @@
 import { describe, expect, it } from 'vitest';
 import { spatialBaselineRevision } from '../transactions/AccumulativeSpatialTimeline';
 import { SpatialSimulationSession } from './SpatialSimulationSession';
+import type { XyzDslDeclarationOrigin } from '../xyzdsl/types';
 
 const fallingBody = '"Body/+0+1/+10+1/+0+1":"physics-mode: dynamic; can-sleep: false"';
 const bodyY = (session: SpatialSimulationSession) => session.frame().document.renderNodes[0].transform.position[1];
+
+const contactSource = (cursorX: number) => [
+  '"Target/+0+2/+0+2/+0+2":"physics-mode: static"',
+  `"Cursor/+${cursorX}+1/+0+1/+0+1":""`,
+].join('\n');
+const contactOrigins = () => new Map<number, XyzDslDeclarationOrigin>([
+  [1, { sourceKind: 'baseline' }],
+  [2, { sourceKind: 'secondary', streamId: 'local-cursor' }],
+]);
 
 describe('application spatial simulation session', () => {
   it('advances gravity while authored input is idle', () => {
@@ -38,7 +48,64 @@ describe('application spatial simulation session', () => {
   });
   it('does not advance when a completed authored frame is reread or recompiled', () => {
     const session = new SpatialSimulationSession(fallingBody); session.start(); session.advance(1 / 60);
-    const tick = session.frame().tick; session.setInput(fallingBody); session.setInput(fallingBody);
+    const tick = session.frame().tick;
+    const published = session.frame();
+    expect(session.setInput(fallingBody)).toBe(published);
+    expect(session.setInput(fallingBody)).toBe(published);
     expect(session.frame().tick).toBe(tick);
+  });
+
+  it('keeps a stationary cursor in contact queries while fixed steps continue', () => {
+    const origins = contactOrigins();
+    const session = new SpatialSimulationSession(contactSource(1), origins);
+    session.start();
+
+    session.advance(1 / 60);
+    const first = session.frame().document.interactions?.find(({ streamId }) => streamId === 'local-cursor');
+    session.advance(1 / 15);
+    const later = session.frame().document.interactions?.find(({ streamId }) => streamId === 'local-cursor');
+
+    expect(first?.state).toBeDefined();
+    expect(later?.state).toBe(first?.state);
+    expect(session.frame().tick).toBe(5);
+  });
+
+  it('reconciles cursor movement as authored kinematic input without adding physics ticks', () => {
+    const origins = contactOrigins();
+    const moved = new SpatialSimulationSession(contactSource(1), origins);
+    const idle = new SpatialSimulationSession(contactSource(1), origins);
+    moved.start(); idle.start();
+    moved.advance(1 / 30); idle.advance(1 / 30);
+    const tickBeforeMovement = moved.frame().tick;
+
+    moved.setInput(contactSource(4), origins);
+    expect(moved.frame().tick).toBe(tickBeforeMovement);
+    expect(moved.frame().document.renderNodes.find(({ origin }) => origin?.sourceKind === 'secondary')?.box.x).toBe(4);
+
+    moved.advance(1 / 10); idle.advance(1 / 10);
+    expect(moved.frame().tick).toBe(idle.frame().tick);
+  });
+
+  it('continues through idle updates and stops only while explicitly paused or disposed', () => {
+    const session = new SpatialSimulationSession(fallingBody);
+    session.start();
+    session.advance(1 / 30);
+    const runningTick = session.frame().tick;
+    session.advance(1 / 30);
+    expect(session.frame().tick).toBeGreaterThan(runningTick);
+
+    session.pause();
+    const pausedTick = session.frame().tick;
+    expect(session.advance(1)).toBeUndefined();
+    expect(session.frame().tick).toBe(pausedTick);
+
+    session.resume();
+    session.advance(1 / 60);
+    expect(session.frame().tick).toBe(pausedTick + 1);
+
+    session.dispose();
+    const stoppedTick = session.frame().tick;
+    expect(session.advance(1)).toBeUndefined();
+    expect(session.frame().tick).toBe(stoppedTick);
   });
 });
