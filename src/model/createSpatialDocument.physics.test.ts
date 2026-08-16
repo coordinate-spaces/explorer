@@ -3,6 +3,18 @@ import { createSpatialDocument } from './createSpatialDocument';
 import type { RigidBodyState } from '../physics/types';
 
 describe('physics document overlay', () => {
+  it('requires either injected interaction facts or the explicitly named AABB compatibility path', () => {
+    const source = '"Target/+0+4/+0+4/+0+4":"geometry: sphere"\n"Cursor/+3+4/+0+4/+3+4":"geometry: sphere"';
+    const originsByLine = new Map([
+      [1, { sourceKind: 'baseline' as const }],
+      [2, { sourceKind: 'secondary' as const, streamId: 'cursor' }],
+    ]);
+
+    expect(createSpatialDocument(source, { originsByLine }).interactions).toEqual([]);
+    expect(createSpatialDocument(source, { originsByLine, interactionFacts: [] }).interactions).toEqual([]);
+    expect(createSpatialDocument(source, { originsByLine, aabbInteractionCompatibility: true }).interactions)
+      .toMatchObject([{ state: 'breach' }]);
+  });
   it('propagates inherited and referenced physics independently from material', () => {
     const document = createSpatialDocument('"Template/" : "mass: 4; friction: .3"\n"Template/Part/+0+1/+0+1/+0+1" : "ccd: true"\n"Copy/+2+1/+0+1/+0+1" : "ref: Template/"');
     expect(document.renderNodes[0].physics).toMatchObject({ mass: 4, friction: .3, ccd: true });

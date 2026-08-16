@@ -34,6 +34,8 @@ export interface CreateSpatialDocumentOptions {
   applyConditionalVariants?: boolean;
   /** Completed facts that triggered this frame, supplied when physics has already stepped. */
   interactionFacts?: readonly InteractionFact[];
+  /** Explicit legacy/reference path for model tests that intentionally exercise AABB interaction evaluation. */
+  aabbInteractionCompatibility?: boolean;
 }
 
 function applyPhysicsFrame(nodes: SpatialNode[], frame: PhysicsFrame | undefined): SpatialNode[] {
@@ -407,7 +409,9 @@ export function createSpatialDocument(source: string, options: CreateSpatialDocu
   const positionedTree = applyRenderableStateToTree(wrappedTree, positionedRenderable);
   const interactions = options.interactionFacts
     ? [...options.interactionFacts]
-    : evaluateInteractions(positionedRenderable, options.probeTolerance, coordinateSpace);
+    : options.aabbInteractionCompatibility
+      ? evaluateInteractions(positionedRenderable, options.probeTolerance, coordinateSpace)
+      : [];
   const effectiveTree = options.applyConditionalVariants === false
     ? positionedTree
     : applyConditionalVariants(positionedTree, resolved.variants, interactions, coordinateSpace, undefined, false, options.accumulativePhysics);
