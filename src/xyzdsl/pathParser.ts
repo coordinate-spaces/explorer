@@ -10,6 +10,7 @@ const AXIS_NUMBER_CANDIDATE_PATTERN = /^(?:\d+(?:c)?|\d+p\d+)$/;
 const NAMESPACE_PATTERN = /^[A-Za-z0-9][A-Za-z0-9+]*$/;
 const DIRECTIVE_PATTERN = /^\+(?<name>[A-Za-z][A-Za-z0-9]*)$/;
 const DELTA_PATTERN = /^\+(?<magnitude>(?:0|[1-9]\d*)(?:c)?)$/;
+const INTENT_COMPONENT_PATTERN = /^(?<sign>[+-])(?<magnitude>(?:0|[1-9]\d*)(?:c)?)$/;
 const WEIGHTED_TRANSLATION_SEGMENT = '+++';
 const SUPPORTED_INTERACTION_DIRECTIVES = new Set(['touch', 'breach']);
 
@@ -113,6 +114,33 @@ export function parsePathBoxSpec(source: string): XyzDslBoxSpec {
   }
 
   return parseBoxSegments(segments, source);
+}
+
+export interface XyzDslIntentPathSuffix {
+  definitionNamespace: string[];
+  coordinates: [number, number, number];
+}
+
+/** Parses the signed tuple reserved for intent, without changing conditional magnitudes. */
+export function parseIntentCoordinateSuffix(source: string): XyzDslIntentPathSuffix {
+  const segments = source.trim().split('/');
+  if (segments.at(-1) === '') throw new Error('Intent declarations cannot use declaration-only namespace paths.');
+  if (segments.length < 4) {
+    throw new Error('Intent declarations require a named definition followed by three signed coordinate components.');
+  }
+  const coordinateSegments = segments.slice(-3);
+  if (!coordinateSegments.every((segment) => INTENT_COMPONENT_PATTERN.test(segment))) {
+    throw new Error('Intent coordinates must end with exactly three components using +number or -number syntax.');
+  }
+  const definitionNamespace = segments.slice(0, -3);
+  validateNamespaceSegments(definitionNamespace);
+  if (definitionNamespace.length === 0) throw new Error('Intent declarations cannot use anonymous paths.');
+  const coordinates = coordinateSegments.map((segment) => {
+    const match = segment.match(INTENT_COMPONENT_PATTERN)!;
+    const value = parsePathNumber(match.groups!.magnitude);
+    return match.groups!.sign === '-' ? -value : value;
+  }) as [number, number, number];
+  return { definitionNamespace, coordinates };
 }
 
 export function normalizeNamespacePath(path: string): string {

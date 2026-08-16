@@ -22,6 +22,7 @@ import { dimensionsFromNodes, translateBoxWithinCoordinateSpace, wrapCoordinate 
 import type { CoordinateSpaceDimensions } from './coordinateSpace';
 import type { PhysicsFrame } from '../physics/types';
 import { Euler, Quaternion } from 'three';
+import { composeAbsoluteTranslation } from '../xyzdsl/resolveTranslationIntent';
 
 export interface CreateSpatialDocumentOptions {
   originsByLine?: ReadonlyMap<number, XyzDslDeclarationOrigin>;
@@ -173,10 +174,11 @@ function wrapSecondaryCursors(
 
 function translateBox(box: XyzDslBoxSpec, magnitude: [number, number, number], fact: InteractionFact, space: CoordinateSpaceDimensions): XyzDslBoxSpec {
   const signs = magnitude.map((_, axis) => fact.normal[axis] || fact.inferredDirection[axis] || 1) as [number, number, number];
+  const vector = magnitude.map((value, axis) => value * signs[axis]) as [number, number, number];
   return translateBoxWithinCoordinateSpace({
     ...box,
     source: `${box.source} (conditional translation)`,
-  }, magnitude.map((value, axis) => value * signs[axis]) as [number, number, number], space);
+  }, composeAbsoluteTranslation([0, 0, 0], vector), space);
 }
 
 export const MIN_TRANSACTION_AMOUNT = 1_000_000;

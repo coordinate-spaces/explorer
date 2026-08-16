@@ -164,6 +164,10 @@ Secondary cursors are sensors by default. They MUST NOT participate in baseline 
 
 Development viewers MAY synthesize secondary cursor frames from direct keyboard and pointer input. Each committed frame MUST be a valid, complete spatial declaration and MUST carry stable secondary `(streamId, cursorNamespace)` identity plus a monotonically changing local frame identity. Mouse orientation is encoded through the ordinary XYZDSL `rotation` property; device events themselves are not spatial declarations.
 
+### Intent coordinates
+
+`intent: absolute` and `intent: relative` are the only intent-coordinate interpretation modes. Absolute pointers remain unwrapped in periodic space. Relative displacement accumulates against the previous unwrapped absolute pointer; crossing an X or Z boundary therefore neither reverses nor shortens the requested movement. Wrapping is a rendering and interaction-query concern, not intent arithmetic.
+
 Local adapters bypass remote transport, public keys, endpoints, transaction history, and transport validation, but MUST NOT bypass parsing, coordinate-space wrapping, interaction evaluation, or sensor semantics. Like remote streams, local adapters MUST emit unwrapped X/Z coordinates; the shared spatial-document projection owns periodic wrapping for rendering and interaction evaluation. Input events SHOULD be sampled at a fixed simulation cadence rather than advancing persistent effects at browser event or render frequency. Pausing MUST stop emissions, and stopping MUST remove the local cursor and restore the unmodified authored baseline.
 
 An interaction MUST retain which secondary controller caused it. Cursor identity is the pair:

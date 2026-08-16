@@ -4,6 +4,7 @@ import type { RigidBodyWorld } from '../physics/RigidBodyWorld';
 import type { PhysicsFrame, PhysicsInput, PhysicsSnapshot, RigidBodyDefinition, Vector3Tuple } from '../physics/types';
 import { interactionTransitions } from './interactionTimeline';
 import type { InteractionTransition } from './interactionTimeline';
+import { composeAbsoluteTranslation } from '../xyzdsl/resolveTranslationIntent';
 
 export interface PhysicsDirectiveBinding {
   targetId: string;
@@ -113,7 +114,8 @@ export class SimulationTimeline {
       let vector: Vector3Tuple;
       if (binding.mode === 'translation') {
         const signs = (binding.vector ?? [0, 0, 0]).map((_, axis) => fact.normal[axis] || fact.inferredDirection[axis] || 1);
-        vector = (binding.vector ?? [0, 0, 0]).map((value, axis) => value * signs[axis]) as Vector3Tuple;
+        const signed = (binding.vector ?? [0, 0, 0]).map((value, axis) => value * signs[axis]) as Vector3Tuple;
+        vector = composeAbsoluteTranslation([0, 0, 0], signed);
       } else {
         const unit = direction(fact);
         const cursorWeight = Number.isFinite(fact.cursorWeight) && fact.cursorWeight! > 0 ? fact.cursorWeight! : 1_000_000;

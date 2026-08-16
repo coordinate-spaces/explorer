@@ -1,6 +1,6 @@
 import type { AxisName, XyzDslAxisSpec, XyzDslBoxSpec, ParseDiagnostic, ParseResult, SpatialObject, XyzDslDeclarationOrigin } from './types';
 import { parseObjectProperties } from './objectDeclarationParser';
-import { parseXyzDslPath, parsePathAxisSpec, parsePathBoxSpec, parsePathNumber } from './pathParser';
+import { canonicalNamespacePath, parseIntentCoordinateSuffix, parseXyzDslPath, parsePathAxisSpec, parsePathBoxSpec, parsePathNumber } from './pathParser';
 
 const DECLARATION_PATTERN = /^\s*"(?<box>[^"]+)"\s*:\s*"(?<properties>[^"]*)"\s*$/;
 
@@ -34,8 +34,20 @@ export function parseXyzDslDeclaration(line: string, lineNumber = 1, origin?: Xy
   }
 
   try {
-    const path = parseXyzDslPath(match.groups.box);
     const properties = parseObjectProperties(match.groups.properties);
+    if (properties.intentDeclared && (/\/+touch(?:\/|$)/.test(match.groups.box) || /\/+breach(?:\/|$)/.test(match.groups.box))) {
+      throw new Error('Intent is incompatible with +touch and +breach conditional variants.');
+    }
+    const intentPath = properties.intentDeclared ? parseIntentCoordinateSuffix(match.groups.box) : undefined;
+    const path = intentPath ? {
+      source: match.groups.box,
+      namespace: intentPath.definitionNamespace,
+      canonicalPath: canonicalNamespacePath(intentPath.definitionNamespace),
+      isDeclarationOnly: true,
+    } : parseXyzDslPath(match.groups.box);
+    if (properties.intentMode && origin?.sourceKind !== 'secondary') {
+      properties.diagnostics.push('Intent is incompatible with primary-baseline geometry and requires a secondary declaration origin.');
+    }
 
     return {
       ok: true,
@@ -55,6 +67,12 @@ export function parseXyzDslDeclaration(line: string, lineNumber = 1, origin?: Xy
         lineNumber,
         conditional: path.conditional,
         origin,
+        ...(properties.intentMode && intentPath && origin ? { intent: {
+          mode: properties.intentMode,
+          definitionNamespace: intentPath.definitionNamespace,
+          coordinates: intentPath.coordinates,
+          origin,
+        } } : {}),
       },
       diagnostics: properties.diagnostics.map((message) => ({ line: lineNumber, source: line, message })),
     };

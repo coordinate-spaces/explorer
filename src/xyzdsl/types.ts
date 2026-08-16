@@ -49,6 +49,19 @@ export interface XyzDslDeclarationOrigin {
   transactionAmount?: number;
 }
 
+export type XyzDslIntentMode = 'absolute' | 'relative';
+
+export interface XyzDslIntentSpec {
+  mode: XyzDslIntentMode;
+  definitionNamespace: string[];
+  coordinates: [number, number, number];
+  origin: XyzDslDeclarationOrigin;
+}
+
+export interface XyzDslResolvedIntentFrame extends XyzDslIntentSpec {
+  absolutePointer: [number, number, number];
+}
+
 export interface XyzDslPathSpec {
   source: string;
   namespace: string[];
@@ -156,6 +169,7 @@ export interface SpatialObject {
   declarationOnly: boolean;
   lineNumber: number;
   origin?: XyzDslDeclarationOrigin;
+  intent?: XyzDslIntentSpec;
   conditional?: XyzDslConditionalSpec;
   unionGroupId?: string;
 }

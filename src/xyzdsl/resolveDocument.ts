@@ -9,8 +9,10 @@ import type {
   XyzDslTransformSpec,
   ParseDiagnostic,
   SpatialObject,
+  XyzDslResolvedIntentFrame,
 } from './types';
 import { canonicalNamespacePath } from './pathParser';
+import { resolveTranslationIntent } from './resolveTranslationIntent';
 
 export interface ResolvedSpatialObject extends SpatialObject {
   box: XyzDslBoxSpec;
@@ -464,11 +466,13 @@ function scaleToFit(
 export function resolveXyzDslDocument(objects: SpatialObject[]): {
   objects: ResolvedSpatialObject[];
   variants: ResolvedConditionalVariant[];
+  intents: XyzDslResolvedIntentFrame[];
   diagnostics: ParseDiagnostic[];
 } {
   const diagnostics: ParseDiagnostic[] = [];
   const ordinaryObjects = objects.filter((object) => !object.conditional);
   const conditionalObjects = objects.filter((object) => object.conditional);
+  const intentObjects = objects.filter((object) => object.intent);
   const effectiveObjects = latestNamedEntries(ordinaryObjects);
   const instances = effectiveObjects.filter(
     (object) => !object.declarationOnly && object.box,
@@ -693,6 +697,32 @@ export function resolveXyzDslDocument(objects: SpatialObject[]): {
     }];
   });
 
+  const pointers = new Map<string, [number, number, number]>();
+  const seenFrames = new Set<string>();
+  const intents = [...intentObjects].sort((left, right) =>
+    (left.origin?.transactionTime ?? 0) - (right.origin?.transactionTime ?? 0) ||
+    (left.origin?.sourceOrder ?? left.lineNumber) - (right.origin?.sourceOrder ?? right.lineNumber),
+  ).flatMap((object): XyzDslResolvedIntentFrame[] => {
+    const intent = object.intent!;
+    const streamId = intent.origin.streamId ?? intent.origin.publicKey ?? 'secondary';
+    const namespacePath = canonicalNamespacePath(intent.definitionNamespace);
+    const identity = `${streamId}::${namespacePath}`;
+    const frameIdentity = `${identity}::${intent.origin.transactionId ?? `${intent.origin.transactionTime ?? ''}:${intent.origin.sourceOrder ?? object.lineNumber}`}`;
+    if (seenFrames.has(frameIdentity)) return [];
+    seenFrames.add(frameIdentity);
+    const definition = ordinaryObjects.find((candidate) =>
+      candidate.origin?.sourceKind !== 'secondary' && candidate.box &&
+      canonicalNamespacePath(candidate.namespace) === namespacePath);
+    const anchor = definition?.box ? [definition.box.x, definition.box.y, definition.box.z] as [number, number, number] : undefined;
+    const result = resolveTranslationIntent(intent, pointers.get(identity), anchor);
+    if (!result.frame) {
+      diagnostics.push({ line: object.lineNumber, source: object.source, message: result.diagnostic! });
+      return [];
+    }
+    pointers.set(identity, result.frame.absolutePointer);
+    return [result.frame];
+  });
+
   return {
     objects: allObjects.map((object) => ({
       ...object,
@@ -702,6 +732,7 @@ export function resolveXyzDslDocument(objects: SpatialObject[]): {
         !hasMaterializedChildInstance(object, renderEligibleObjects),
     })),
     variants,
+    intents,
     diagnostics,
   };
 }
