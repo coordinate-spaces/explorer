@@ -542,7 +542,8 @@ describe('createSpatialDocument namespaced spatial declarations', () => {
 "Mug/Handle/+680c+110c/+155c+110c/+135c+130c" : "box-radius: 0.18; operation: union"
 "Mug/HandleHole/+700c+70c/+175c+70c/+155c+90c" : "box-radius: 0.12; operation: subtraction"`);
 
-    expect(document.diagnostics).toEqual([]);
+    expect(document.diagnostics).toHaveLength(2);
+    expect(document.diagnostics.every(({ message }) => message.includes('subtraction CSG tools'))).toBe(true);
     expect(document.csgExpressions).toHaveLength(1);
     expect(document.csgExpressions[0].scopePath).toBe('Mug/');
     expect(document.csgExpressions[0].base.namespacePath).toBe('Mug/Body/');

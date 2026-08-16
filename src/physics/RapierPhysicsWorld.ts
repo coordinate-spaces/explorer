@@ -38,6 +38,8 @@ export class RapierPhysicsWorld implements RigidBodyWorld {
       ? RAPIER.ColliderDesc.ball(Math.min(x, y, z) / 2)
       : collider.shape === 'cylinder'
         ? RAPIER.ColliderDesc.cylinder(y / 2, Math.min(x, z) / 2)
+        : collider.shape === 'cone'
+          ? RAPIER.ColliderDesc.cone(y / 2, Math.min(x, z) / 2)
         : collider.shape === 'capsule'
           ? RAPIER.ColliderDesc.capsule(Math.max(0, y / 2 - Math.min(x, z) / 2), Math.min(x, z) / 2)
           : RAPIER.ColliderDesc.cuboid(x / 2, y / 2, z / 2);

@@ -3,6 +3,7 @@ import type {
   XyzDslContentSpec,
   XyzDslGeometrySpec,
   XyzDslMaterialSpec,
+  XyzDslPhysicsSpec,
   XyzDslTextureChannel,
   XyzDslTextureSpec,
   XyzDslTransformSpec,
@@ -33,6 +34,7 @@ export interface ResolvedConditionalVariant extends Omit<SpatialObject, 'box'> {
 
 interface ResolvedProperties {
   material: XyzDslMaterialSpec;
+  physics: XyzDslPhysicsSpec;
   geometry: XyzDslGeometrySpec;
   transform: XyzDslTransformSpec;
   content: XyzDslContentSpec;
@@ -102,10 +104,16 @@ export function mergeXyzDslMaterialSpecs(
 
 const DEFAULT_PROPERTIES: ResolvedProperties = {
   material: { diagnostics: [] },
+  physics: { diagnostics: [], 'physics-mode': 'dynamic', friction: 0.7, restitution: 0, 'linear-damping': 0, 'gravity-scale': 1, ccd: false, 'can-sleep': true, 'lock-translations': [false, false, false], 'lock-rotations': [false, false, false] },
   geometry: { kind: 'box', diagnostics: [] },
   transform: { rotation: [0, 0, 0], diagnostics: [] },
   content: { diagnostics: [] },
 };
+
+/** Physics inherits and overrides one declared field at a time. */
+export function mergeXyzDslPhysicsSpecs(base: XyzDslPhysicsSpec, override: XyzDslPhysicsSpec): XyzDslPhysicsSpec {
+  return { ...base, ...override, diagnostics: [] };
+}
 
 export function mergeXyzDslGeometrySpecs(
   base: XyzDslGeometrySpec,
@@ -168,12 +176,14 @@ function mergeProperties(
   options: { includeTransform?: boolean } = {},
 ): ResolvedProperties {
   const overrideMaterial = override.material;
+  const overridePhysics = override.physics;
   const overrideGeometry = override.geometry;
   const overrideTransform = override.transform;
   const includeTransform = options.includeTransform ?? true;
 
   return {
     material: mergeXyzDslMaterialSpecs(base.material, overrideMaterial),
+    physics: mergeXyzDslPhysicsSpecs(base.physics, overridePhysics),
     geometry: mergeXyzDslGeometrySpecs(base.geometry, overrideGeometry),
     content: mergeXyzDslContentSpecs(base.content, override.content),
     transform:
@@ -499,6 +509,7 @@ export function resolveXyzDslDocument(objects: SpatialObject[]): {
       parentNamespacePath,
       renderable: false,
       material: properties.material,
+      physics: properties.physics,
       geometry: properties.geometry,
       transform: properties.transform,
       content: properties.content,
@@ -522,6 +533,7 @@ export function resolveXyzDslDocument(objects: SpatialObject[]): {
   );
 
   resolvedObjects.forEach((object, objectIndex) => {
+    const authoredInstance = instances[objectIndex];
     if (
       !object.reference.targetPath ||
       !hasConcreteAncestorInstance(object, concreteNamespaces)
@@ -584,12 +596,14 @@ export function resolveXyzDslDocument(objects: SpatialObject[]): {
       const properties = mergeResolvedProperties(
         {
           material: object.material,
+          physics: object.physics,
           geometry: object.geometry,
           transform: object.transform,
           content: object.content,
         },
         {
           material: resolvedDescendant.material,
+          physics: resolvedDescendant.physics,
           geometry: resolvedDescendant.geometry,
           transform: resolvedDescendant.transform,
           content: resolvedDescendant.content,
@@ -603,6 +617,9 @@ export function resolveXyzDslDocument(objects: SpatialObject[]): {
         namespacePath: canonicalNamespacePath(namespace),
         parentNamespacePath: canonicalNamespacePath(namespace.slice(0, -1)),
         material: properties.material,
+        // Resolved template descendants carry defaults. Reapply only fields
+        // authored on the ref instance so those defaults cannot erase them.
+        physics: mergeXyzDslPhysicsSpecs(properties.physics, authoredInstance.physics),
         geometry: properties.geometry,
         transform: properties.transform,
         content: properties.content,
@@ -668,6 +685,7 @@ export function resolveXyzDslDocument(objects: SpatialObject[]): {
       targetNamespacePath,
       properties: {
         material: object.material,
+        physics: object.physics,
         geometry: object.geometry,
         transform: object.transform,
         content: object.content,

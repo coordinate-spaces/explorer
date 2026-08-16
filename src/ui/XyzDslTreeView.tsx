@@ -102,6 +102,8 @@ function TreeItem({
           {reference ? <em>ref {reference}</em> : null}
           {node.geometry.operation ? <em>operation {node.geometry.operation}</em> : null}
           {node.unionGroupId ? <em>{node.unionGroupId}</em> : null}
+          {node.physics?.['physics-mode'] ? <em>physics {node.physics['physics-mode']}</em> : null}
+          {node.physics?.sensor ? <em>sensor</em> : null}
           {csgLabel ? <em>{csgLabel}</em> : null}
         </div>
       </div>
@@ -178,6 +180,7 @@ export function XyzDslTreeView({ document, selectedNodeId, onSelectNode }: XyzDs
         <p>No valid definitions yet.</p>
       ) : (
         <>
+          {document.diagnostics.length > 0 ? <div className="xyzdsl-csg-summary" aria-label="Definition diagnostics"><h3>Diagnostics</h3><ul>{document.diagnostics.map((diagnostic, index) => <li key={`${diagnostic.line}-${index}`}>line {diagnostic.line}: {diagnostic.message}</li>)}</ul></div> : null}
           {document.csgExpressions.length > 0 ? (
             <div className="xyzdsl-csg-summary" aria-label="Boolean composition summary">
               <h3>Boolean composition expressions</h3>

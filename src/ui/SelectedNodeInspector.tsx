@@ -93,6 +93,16 @@ export function SelectedNodeInspector({
         </div> : null}
       </dl>
 
+      <details className="inspector-section" open>
+        <summary><strong>Physics</strong></summary>
+        <dl>
+          {Object.entries(node.physics ?? {}).filter(([key]) => key !== 'diagnostics').map(([key, value]) => (
+            <div key={key}><dt>{key}</dt><dd>{Array.isArray(value) ? value.map((entry, axis) => entry ? ['x', 'y', 'z'][axis] : '').filter(Boolean).join(', ') || 'none' : String(value)}</dd></div>
+          ))}
+          {(node.physics?.diagnostics.length ?? 0) > 0 ? <div><dt>Diagnostics</dt><dd>{node.physics!.diagnostics.join(' ')}</dd></div> : null}
+        </dl>
+      </details>
+
       {selectionPath.length > 1 ? (
         <nav className="inspector-selection-path" aria-label="Selection hierarchy">
           <strong>Hierarchy</strong>

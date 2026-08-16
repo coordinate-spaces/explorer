@@ -9,10 +9,46 @@ and never sees Rapier handles. The former AABB solver remains temporarily as a
 compatibility/test backend while remaining interaction queries are migrated.
 
 Project coordinates are treated as metres, physics ticks as seconds divided by
-the configured tick rate, mass as kilograms, force as newtons, and impulse as
-newton-seconds. Transaction amounts are not physical units: until an authored
-mass/density DSL property is introduced, positive transaction amounts remain a
-legacy mass input and should not be used for calibrated simulations.
+the configured tick rate, `mass` as kilograms, force as newtons, and impulse as
+newton-seconds. `mass` is the one supported mass model. `density` is reserved and
+diagnosed; if it is added later, an explicit `mass` will take precedence.
+Transaction amounts are never kilograms and are no longer copied to rigid-body
+mass. They remain inputs only to the explicitly weighted `+++` interaction
+conversion at the transaction boundary.
+
+## XYZDSL physics properties
+
+Physics is an independent property group, not part of visual material. The
+initial vocabulary is: `physics-mode: dynamic | static | kinematic`; `mass` in
+kg (finite and strictly positive); `friction` and `restitution` in `[0,1]`;
+`linear-damping` in inverse seconds (non-negative); dimensionless
+`gravity-scale`; strict booleans `ccd`, `can-sleep`, `sensor`, and
+`physical-body`; `lock-translations` and `lock-rotations` as `none`, `all`, or a
+comma-separated subset of `x,y,z`; and unsigned 32-bit `collision-groups` and
+`solver-groups`. Defaults preserve the previous runtime: dynamic, friction
+`0.7`, restitution/damping `0`, gravity scale `1`, CCD off, sleeping on, and no
+axis locks.
+
+Every field inherits independently through ancestor namespace declarations and
+ordered references. A concrete declaration and an active conditional variant
+override only fields they declare; an omitted field never clears the inherited
+physics object. Material-like collider coefficients (`friction`,
+`restitution`, groups, and `sensor`) are resolved per primitive and applied to
+that primitive's collider. Body fields apply to the compound entity. When
+compound primitives conflict on `physics-mode`, the first declaration's mode
+wins deterministically and compilation emits a line diagnostic.
+
+Secondary declarations default to sensors for interaction queries and do not
+enter the Rapier scene. They may explicitly set `physical-body: true`; their
+collider still defaults to `sensor: true`, unless `sensor: false` is authored.
+Box, sphere, cylinder, and cone primitives compile to their matching Rapier
+shapes, and union compounds retain one positive collider per primitive.
+Subtraction/intersection CSG tools are omitted with a diagnostic: a Rapier
+compound is a union of positive volumes, so it cannot express subtraction, and
+the renderer-neutral CSG model does not retain a triangulated or convex-decomposed
+intersection mesh. Treating either tool as an ordinary positive collider would
+materially change the authored solid. A future mesh/decomposition compilation
+stage may provide exact or explicitly documented approximations.
 
 Rapier is the sole runtime authority for gravity, contacts, restitution,
 friction, sleeping, and rigid-body pose. Compilation deliberately performs no
@@ -61,9 +97,10 @@ pose and velocity. An authored reset must be expressed as a `teleport` input,
 with `clearVelocity` selected explicitly, rather than inferred from recompilation.
 
 Static bodies do not integrate. Kinematic bodies accept explicit targets.
-Dynamic bodies accept force and impulse inputs. Invalid or missing mass defaults
-to `1`; applications should define a project-specific transaction-amount-to-mass
-conversion before exposing physics bindings in XYZDSL.
+Dynamic bodies accept force and impulse inputs. Invalid mass is rejected by the
+parser and missing mass uses the backend default (`1` kg). Applications that
+need transaction weighting must perform a documented conversion before authoring
+`mass`; the compiler does not infer one.
 
 ## Spatial scalability
 

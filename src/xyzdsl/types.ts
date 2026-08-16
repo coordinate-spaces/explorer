@@ -101,6 +101,29 @@ export interface XyzDslMaterialSpec {
   diagnostics: string[];
 }
 
+export type XyzDslPhysicsMode = 'dynamic' | 'static' | 'kinematic';
+
+/** Authored/resolved physics, deliberately separate from visual material. */
+export interface XyzDslPhysicsSpec {
+  'physics-mode'?: XyzDslPhysicsMode;
+  /** Explicit rigid-body mass in kilograms. */
+  mass?: number;
+  friction?: number;
+  restitution?: number;
+  'linear-damping'?: number;
+  'gravity-scale'?: number;
+  ccd?: boolean;
+  'can-sleep'?: boolean;
+  'lock-translations'?: [boolean, boolean, boolean];
+  'lock-rotations'?: [boolean, boolean, boolean];
+  sensor?: boolean;
+  /** Allows a secondary-stream declaration to be emitted into the physics world. */
+  'physical-body'?: boolean;
+  'collision-groups'?: number;
+  'solver-groups'?: number;
+  diagnostics: string[];
+}
+
 export interface XyzDslTransformSpec {
   rotation: [number, number, number];
   diagnostics: string[];
@@ -125,6 +148,7 @@ export interface SpatialObject {
   namespace: string[];
   box?: XyzDslBoxSpec;
   material: XyzDslMaterialSpec;
+  physics: XyzDslPhysicsSpec;
   geometry: XyzDslGeometrySpec;
   transform: XyzDslTransformSpec;
   reference: XyzDslReferenceSpec;

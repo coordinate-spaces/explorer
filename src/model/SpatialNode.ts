@@ -1,4 +1,4 @@
-import type { XyzDslBoxSpec, XyzDslContentSpec, XyzDslMaterialSpec } from '../xyzdsl/types';
+import type { XyzDslBoxSpec, XyzDslContentSpec, XyzDslMaterialSpec, XyzDslPhysicsSpec } from '../xyzdsl/types';
 import type { SpatialGeometry } from './geometry';
 import type { SpatialTransform } from './transform';
 import type { InteractionFact } from './interactions';
@@ -19,6 +19,7 @@ export interface SpatialNode {
   box: XyzDslBoxSpec;
   bounds: SpatialBounds;
   material: XyzDslMaterialSpec;
+  physics: XyzDslPhysicsSpec;
   content?: XyzDslContentSpec;
   geometry: SpatialGeometry;
   transform: SpatialTransform;
