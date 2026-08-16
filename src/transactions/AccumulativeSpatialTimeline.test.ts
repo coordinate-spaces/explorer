@@ -81,6 +81,27 @@ describe('AccumulativeSpatialTimeline', () => {
     const definition = timeline.simulation.world.snapshot().definitions.find(({ id }) => id.includes('Target'));
     expect(definition?.colliders?.[0].shape).toBe('ball');
     expect(definition?.orientation).not.toEqual([0, 0, 0, 1]);
+    const simulatedOrientation = timeline.simulation.world.frame().states.get(definition!.id)?.orientation;
+    definition?.orientation?.forEach((component, index) => expect(simulatedOrientation?.[index]).toBeCloseTo(component));
+  });
+
+  it('installs a first-frame conditional absolute pose after querying the authored pose', () => {
+    const source = [
+      '"Target/+0+2/+0+2/+0+2":""',
+      '"Target/+touch/+9+2/+0+2/+0+2":""',
+      '"Cursor/+2+1/+0+2/+0+2":""',
+    ].join('\n');
+    const declarationOrigins = new Map<number, XyzDslDeclarationOrigin>([
+      [1, { sourceKind: 'baseline' }], [2, { sourceKind: 'baseline' }],
+      [3, { sourceKind: 'secondary', streamId: 'cursor' }],
+    ]);
+    const timeline = new AccumulativeSpatialTimeline();
+
+    timeline.compile(source, declarationOrigins);
+    const definition = timeline.simulation.world.snapshot().definitions.find(({ id }) => id.includes('Target'))!;
+
+    expect(definition.position).toEqual([10, 1, 1]);
+    expect(timeline.simulation.world.frame().states.get(definition.id)?.position).toEqual(definition.position);
   });
   it('preserves authored poses until the rigid-body world advances', () => {
     const declaration = '"First/+0+1/+0+1/+0+1":""\n"Second/+0+1/+0+1/+0+1":""';

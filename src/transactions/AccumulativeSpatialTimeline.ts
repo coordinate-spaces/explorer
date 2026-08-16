@@ -65,8 +65,11 @@ function withCompilerDiagnostics(document: SpatialDocument, compiled: SpatialDoc
 function withColliderStateById(nodes: readonly SpatialNode[], conditionalById: ReadonlyMap<string, SpatialNode>): SpatialNode[] {
   return nodes.map((node) => {
     const conditional = conditionalById.get(node.id);
+    const conditionalPosition = conditional && ['x', 'y', 'z', 'width', 'height', 'depth']
+      .some((key) => conditional.box[key as keyof typeof conditional.box] !== node.box[key as keyof typeof node.box]);
     const copyTransform = (base: SpatialNode['transform'], override: SpatialNode['transform']) => ({
       ...base,
+      ...(conditionalPosition ? { position: override.position } : {}),
       rotation: override.rotation,
       scale: override.scale,
     });
@@ -74,6 +77,7 @@ function withColliderStateById(nodes: readonly SpatialNode[], conditionalById: R
       ...node,
       ...(conditional ? {
         box: conditional.box,
+        ...(conditionalPosition ? { bounds: conditional.bounds } : {}),
         physics: conditional.physics,
         geometry: conditional.geometry,
         transform: copyTransform(node.transform, conditional.transform),
@@ -122,6 +126,7 @@ export class AccumulativeSpatialTimeline {
     facts: InteractionFact[];
   } {
     const retainedFrame = this.simulation.world.frame();
+    const retainedSnapshot = this.simulation.world.snapshot();
     const authored = createSpatialDocument(source, {
       originsByLine,
       physicsFrame: retainedFrame,
@@ -142,6 +147,10 @@ export class AccumulativeSpatialTimeline {
     // Copy collider state without replacing retained positions in the authored tree.
     const conditionalById = new Map(renderable(conditional.nodes).map((node) => [node.id, node]));
     const effective = { ...authored, nodes: withColliderStateById(authored.nodes, conditionalById) };
+    // The authored reconciliation exists only to run the pre-variant query. Do
+    // not let its temporary poses become the "previous" state preserved while
+    // installing effective conditional definitions.
+    this.simulation.world.restore(retainedSnapshot);
     const definitions = compilePhysicsScene(effective, this.baselineRevision);
     this.simulation.reconcileDefinitions(definitions);
     return { authored, effective, facts };
