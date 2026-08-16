@@ -25,9 +25,16 @@ describe('application spatial simulation session', () => {
   });
   it('reconstructs playback from its baseline and selected authored frame', () => {
     const revision = spatialBaselineRevision(fallingBody);
-    const first = new SpatialSimulationSession(fallingBody, undefined, revision); first.start(); first.advance(0.1);
-    const sought = new SpatialSimulationSession(fallingBody, undefined, revision); sought.start(); sought.advance(0.1);
-    expect(sought.frame().tick).toBe(first.frame().tick); expect(bodyY(sought)).toBeCloseTo(bodyY(first), 8);
+    const sought = new SpatialSimulationSession(fallingBody, undefined, revision);
+    sought.start(); sought.advance(0.5);
+    expect(sought.frame().tick).toBeGreaterThan(0);
+    sought.reconstruct(fallingBody);
+    expect(sought.frame().tick).toBe(0);
+
+    const fresh = new SpatialSimulationSession(fallingBody, undefined, revision); fresh.start();
+    sought.advance(0.1); fresh.advance(0.1);
+    expect(sought.frame().tick).toBe(fresh.frame().tick);
+    expect(bodyY(sought)).toBeCloseTo(bodyY(fresh), 8);
   });
   it('does not advance when a completed authored frame is reread or recompiled', () => {
     const session = new SpatialSimulationSession(fallingBody); session.start(); session.advance(1 / 60);

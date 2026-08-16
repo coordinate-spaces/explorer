@@ -585,6 +585,8 @@ export default function App() {
   const baselineRevision = useMemo(() => spatialBaselineRevision(authoringSource), [authoringSource]);
   const simulationSessionRef = useRef<SpatialSimulationSession | undefined>(undefined);
   const simulationBaselineRevisionRef = useRef<string | undefined>(undefined);
+  const [simulationReconstruction, setSimulationReconstruction] = useState(0);
+  const appliedSimulationReconstructionRef = useRef(0);
   const [document, setDocument] = useState(() => createSpatialDocument(renderedBundle.source, {
     originsByLine: renderedBundle.originsByLine,
   }));
@@ -622,9 +624,13 @@ export default function App() {
       return;
     }
     simulationSessionRef.current ??= new SpatialSimulationSession(renderedBundle.source, renderedBundle.originsByLine, baselineRevision);
-    const frame = simulationSessionRef.current.setInput(renderedBundle.source, renderedBundle.originsByLine);
+    const reconstruct = appliedSimulationReconstructionRef.current !== simulationReconstruction;
+    const frame = reconstruct
+      ? simulationSessionRef.current.reconstruct(renderedBundle.source, renderedBundle.originsByLine)
+      : simulationSessionRef.current.setInput(renderedBundle.source, renderedBundle.originsByLine);
+    appliedSimulationReconstructionRef.current = simulationReconstruction;
     setDocument(frame.document);
-  }, [baselineRevision, renderedBundle, simulationMode]);
+  }, [baselineRevision, renderedBundle, simulationMode, simulationReconstruction]);
 
   useEffect(() => {
     const session = simulationSessionRef.current;
@@ -684,7 +690,7 @@ export default function App() {
 
 
   const handleSecondaryReplay = useCallback((publicKey: string) => {
-    simulationSessionRef.current?.resetTiming();
+    setSimulationReconstruction((revision) => revision + 1);
     const streamKey = Object.keys(activeSecondaryTransactions).find((key) => activeSecondaryTransactions[key]?.reference.publicKey === publicKey) ?? '';
 
     setActiveSecondaryTransactions((streams) => {
@@ -788,9 +794,9 @@ export default function App() {
     publicKey: string,
     playbackIndex: number,
   ) => {
-    // A seek changes authored input discontinuously; never carry a partial
-    // wall-clock interval from the formerly selected frame across it.
-    simulationSessionRef.current?.resetTiming();
+    // Rebuild after React composes the sought authored frame. Clearing only the
+    // wall-clock accumulator would retain poses, velocities, and prior facts.
+    setSimulationReconstruction((revision) => revision + 1);
     const streamKey = Object.keys(activeSecondaryTransactions).find((key) => activeSecondaryTransactions[key]?.reference.publicKey === publicKey) ?? '';
 
     setActiveSecondaryTransactions((streams) => {

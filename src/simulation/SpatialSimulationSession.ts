@@ -9,16 +9,22 @@ interface AuthoredInput {
 
 /** Owns wall-clock timing and the mutable timeline for one application simulation run. */
 export class SpatialSimulationSession {
-  readonly timeline: AccumulativeSpatialTimeline;
+  timeline: AccumulativeSpatialTimeline;
+  private readonly baselineRevision: string;
   private input: AuthoredInput;
   private runner: FixedStepSimulationRunner;
   private published: AccumulativeSpatialFrame;
   private running = false;
 
   constructor(source: string, originsByLine?: ReadonlyMap<number, XyzDslDeclarationOrigin>, baselineRevision = 'baseline') {
+    this.baselineRevision = baselineRevision;
     this.input = { source, originsByLine };
     this.timeline = new AccumulativeSpatialTimeline(baselineRevision);
     this.published = this.timeline.compile(source, originsByLine);
+    this.runner = this.createRunner();
+  }
+
+  private createRunner(): FixedStepSimulationRunner {
     const target = {
       ticksPerSecond: this.timeline.simulation.world.ticksPerSecond,
       frame: () => this.timeline.simulation.world.frame(),
@@ -27,7 +33,7 @@ export class SpatialSimulationSession {
         return this.timeline.simulation.world.frame();
       },
     };
-    this.runner = new FixedStepSimulationRunner(target);
+    return new FixedStepSimulationRunner(target);
   }
 
   frame(): AccumulativeSpatialFrame { return this.published; }
@@ -35,6 +41,16 @@ export class SpatialSimulationSession {
   setInput(source: string, originsByLine?: ReadonlyMap<number, XyzDslDeclarationOrigin>): AccumulativeSpatialFrame {
     this.input = { source, originsByLine };
     this.published = this.timeline.compile(source, originsByLine);
+    return this.published;
+  }
+
+  /** Rebuilds physics, interaction history, and timing at an authored discontinuity. */
+  reconstruct(source: string, originsByLine?: ReadonlyMap<number, XyzDslDeclarationOrigin>): AccumulativeSpatialFrame {
+    this.timeline.dispose();
+    this.input = { source, originsByLine };
+    this.timeline = new AccumulativeSpatialTimeline(this.baselineRevision);
+    this.published = this.timeline.compile(source, originsByLine);
+    this.runner = this.createRunner();
     return this.published;
   }
 
