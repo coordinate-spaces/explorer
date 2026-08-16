@@ -1,6 +1,12 @@
 import type { PhysicsFrame } from '../physics/types';
 import type { RigidBodyWorld } from '../physics/RigidBodyWorld';
 
+export interface FixedStepTarget {
+  readonly ticksPerSecond: number;
+  frame(): PhysicsFrame;
+  step(): PhysicsFrame;
+}
+
 export interface FixedStepResult {
   previous: PhysicsFrame;
   current: PhysicsFrame;
@@ -14,7 +20,7 @@ export class FixedStepSimulationRunner {
   private accumulator = 0;
   private lastFrame: PhysicsFrame;
 
-  constructor(readonly world: RigidBodyWorld, readonly maximumStepsPerUpdate = 8) {
+  constructor(readonly world: FixedStepTarget | RigidBodyWorld, readonly maximumStepsPerUpdate = 8) {
     if (!Number.isInteger(maximumStepsPerUpdate) || maximumStepsPerUpdate < 1) throw new Error('Maximum physics steps must be a positive integer.');
     this.lastFrame = world.frame();
   }

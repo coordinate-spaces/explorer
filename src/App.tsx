@@ -2,7 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { canEditDeclarationLine, moveDeclarationPath, resizeDeclarationPath, rotateDeclarationPath, updateDeclarationProperty } from './xyzdsl/editXyzDslSource';
 import type { AxisName } from './xyzdsl/types';
 import { createSpatialDocument } from './model/createSpatialDocument';
-import { AccumulativeSpatialTimeline, accumulativePhysicsFrameKey, spatialBaselineRevision } from './transactions/AccumulativeSpatialTimeline';
+import { spatialBaselineRevision } from './transactions/AccumulativeSpatialTimeline';
+import { SpatialSimulationSession } from './simulation/SpatialSimulationSession';
 import type { SpatialNode } from './model/SpatialNode';
 import {
   findNodeById,
@@ -582,9 +583,10 @@ export default function App() {
   );
   const renderedSource = renderedBundle.source;
   const baselineRevision = useMemo(() => spatialBaselineRevision(authoringSource), [authoringSource]);
-  const accumulativeTimelineRef = useRef<AccumulativeSpatialTimeline | undefined>(undefined);
+  const simulationSessionRef = useRef<SpatialSimulationSession | undefined>(undefined);
   const simulationBaselineRevisionRef = useRef<string | undefined>(undefined);
-  const evaluatedPhysicsFrameRef = useRef<string | undefined>(undefined);
+  const [simulationReconstruction, setSimulationReconstruction] = useState(0);
+  const appliedSimulationReconstructionRef = useRef(0);
   const [document, setDocument] = useState(() => createSpatialDocument(renderedBundle.source, {
     originsByLine: renderedBundle.originsByLine,
   }));
@@ -614,40 +616,54 @@ export default function App() {
       return;
     }
     if (simulationBaselineRevisionRef.current !== baselineRevision) {
-      accumulativeTimelineRef.current?.dispose();
-      accumulativeTimelineRef.current = undefined;
+      simulationSessionRef.current?.dispose();
+      simulationSessionRef.current = undefined;
       simulationBaselineRevisionRef.current = undefined;
-      evaluatedPhysicsFrameRef.current = undefined;
       setSimulationMode('stopped');
       setDocument(createSpatialDocument(renderedBundle.source, { originsByLine: renderedBundle.originsByLine }));
       return;
     }
-    accumulativeTimelineRef.current ??= new AccumulativeSpatialTimeline(baselineRevision);
-    const frameKey = accumulativePhysicsFrameKey(renderedBundle.source, renderedBundle.originsByLine, baselineRevision);
-    const isNewTransactionFrame = simulationMode === 'running' && frameKey !== undefined && frameKey !== evaluatedPhysicsFrameRef.current;
-    if (isNewTransactionFrame) evaluatedPhysicsFrameRef.current = frameKey;
-    const frame = isNewTransactionFrame
-      ? accumulativeTimelineRef.current.evaluate(renderedBundle.source, renderedBundle.originsByLine)
-      : accumulativeTimelineRef.current.compile(renderedBundle.source, renderedBundle.originsByLine);
+    simulationSessionRef.current ??= new SpatialSimulationSession(renderedBundle.source, renderedBundle.originsByLine, baselineRevision);
+    const reconstruct = appliedSimulationReconstructionRef.current !== simulationReconstruction;
+    const frame = reconstruct
+      ? simulationSessionRef.current.reconstruct(renderedBundle.source, renderedBundle.originsByLine)
+      : simulationSessionRef.current.setInput(renderedBundle.source, renderedBundle.originsByLine);
+    appliedSimulationReconstructionRef.current = simulationReconstruction;
     setDocument(frame.document);
-  }, [baselineRevision, renderedBundle, simulationMode]);
+  }, [baselineRevision, renderedBundle, simulationMode, simulationReconstruction]);
+
+  useEffect(() => {
+    const session = simulationSessionRef.current;
+    if (!session || simulationMode === 'stopped') return;
+    if (simulationMode === 'paused') { session.pause(); return; }
+    session.resume();
+    let previous = performance.now();
+    let request = 0;
+    const animate = (now: number) => {
+      const frame = session.advance((now - previous) / 1000);
+      previous = now;
+      if (frame) setDocument(frame.document);
+      request = requestAnimationFrame(animate);
+    };
+    request = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(request);
+  }, [simulationMode]);
 
   const startSimulation = useCallback(() => {
-    accumulativeTimelineRef.current?.dispose();
-    accumulativeTimelineRef.current = new AccumulativeSpatialTimeline(baselineRevision);
+    simulationSessionRef.current?.dispose();
+    simulationSessionRef.current = new SpatialSimulationSession(renderedBundle.source, renderedBundle.originsByLine, baselineRevision);
+    simulationSessionRef.current.start();
     simulationBaselineRevisionRef.current = baselineRevision;
-    evaluatedPhysicsFrameRef.current = undefined;
     if (simulationSource === 'local') setLocalCursorPose({ ...DEFAULT_LOCAL_CURSOR_POSE, position: [...DEFAULT_LOCAL_CURSOR_POSE.position], rotation: [...DEFAULT_LOCAL_CURSOR_POSE.rotation], size: [...DEFAULT_LOCAL_CURSOR_POSE.size] });
     setAppMode('viewer');
     setDrawerOpen(false);
     setSimulationMode('running');
-  }, [baselineRevision, simulationSource]);
+  }, [baselineRevision, renderedBundle, simulationSource]);
 
   const stopSimulation = useCallback(() => {
-    accumulativeTimelineRef.current?.dispose();
-    accumulativeTimelineRef.current = undefined;
+    simulationSessionRef.current?.dispose();
+    simulationSessionRef.current = undefined;
     simulationBaselineRevisionRef.current = undefined;
-    evaluatedPhysicsFrameRef.current = undefined;
     setLocalCursorCaptured(false);
     setSimulationMode('stopped');
   }, []);
@@ -674,6 +690,7 @@ export default function App() {
 
 
   const handleSecondaryReplay = useCallback((publicKey: string) => {
+    setSimulationReconstruction((revision) => revision + 1);
     const streamKey = Object.keys(activeSecondaryTransactions).find((key) => activeSecondaryTransactions[key]?.reference.publicKey === publicKey) ?? '';
 
     setActiveSecondaryTransactions((streams) => {
@@ -777,6 +794,9 @@ export default function App() {
     publicKey: string,
     playbackIndex: number,
   ) => {
+    // Rebuild after React composes the sought authored frame. Clearing only the
+    // wall-clock accumulator would retain poses, velocities, and prior facts.
+    setSimulationReconstruction((revision) => revision + 1);
     const streamKey = Object.keys(activeSecondaryTransactions).find((key) => activeSecondaryTransactions[key]?.reference.publicKey === publicKey) ?? '';
 
     setActiveSecondaryTransactions((streams) => {

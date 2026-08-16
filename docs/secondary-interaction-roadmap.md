@@ -14,7 +14,11 @@ For each compiled document, the application currently:
 4. Applies matching conditional variants to produce effective boxes, transforms, materials, and bounds.
 5. Excludes secondary sensor nodes from baseline collision packing.
 
-This pipeline evaluates the selected transaction frame. It does not yet maintain an interaction timeline between document compilations.
+Rapier collider-backed sensing and the application runtime migration are both
+complete, but are distinct milestones. `SpatialSimulationSession` now retains
+the accumulative timeline and advances it from bounded fixed wall-clock ticks;
+transaction arrival only replaces deterministic authored input. General
+application-visible transition effects described below remain incomplete.
 
 ## Task 6: temporal interaction transitions
 
@@ -29,7 +33,9 @@ This pipeline evaluates the selected transaction frame. It does not yet maintain
 
 ### Not implemented
 
-- `App.tsx` retains `AccumulativeSpatialTimeline`, which owns prior facts and calls `interactionTransitions` while interaction motion advances. Transitions are not yet exposed as general application effects.
+- `App.tsx` retains `SpatialSimulationSession`, which owns
+  `AccumulativeSpatialTimeline`, prior facts, pause/resume timing, and fixed-tick
+  advancement. Transitions are not yet exposed as general application effects.
 - Playback seeking does not reconstruct transition state by replaying the transaction prefix or loading a cached snapshot.
 - There is no timeline owner that orders evaluations by transaction time and stable source order.
 - Cursor disappearance, target deletion, stream disconnection, backward seeking, and replay restart do not currently emit application-visible transition events.
