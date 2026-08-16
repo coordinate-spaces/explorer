@@ -3,6 +3,11 @@ import { createSpatialDocument } from './createSpatialDocument';
 import type { RigidBodyState } from '../physics/types';
 
 describe('physics document overlay', () => {
+  it('propagates inherited and referenced physics independently from material', () => {
+    const document = createSpatialDocument('"Template/" : "mass: 4; friction: .3"\n"Template/Part/+0+1/+0+1/+0+1" : "ccd: true"\n"Copy/+2+1/+0+1/+0+1" : "ref: Template/"');
+    expect(document.renderNodes[0].physics).toMatchObject({ mass: 4, friction: .3, ccd: true });
+    expect(document.renderNodes[0].material).not.toHaveProperty('mass');
+  });
   it('reads a completed frame without mutating or accumulating it', () => {
     const baseline = createSpatialDocument('"Ball/+0+1/+0+1/+0+1" : ""');
     const id = baseline.renderNodes[0].id;

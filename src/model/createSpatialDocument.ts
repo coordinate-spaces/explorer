@@ -1,5 +1,5 @@
 import { parseXyzDslDocument } from '../xyzdsl/parser';
-import { mergeXyzDslContentSpecs, mergeXyzDslGeometrySpecs, mergeXyzDslMaterialSpecs, resolveXyzDslDocument } from '../xyzdsl/resolveDocument';
+import { mergeXyzDslContentSpecs, mergeXyzDslGeometrySpecs, mergeXyzDslMaterialSpecs, mergeXyzDslPhysicsSpecs, resolveXyzDslDocument } from '../xyzdsl/resolveDocument';
 import type { ResolvedConditionalVariant } from '../xyzdsl/resolveDocument';
 import type { XyzDslBoxSpec, XyzDslDeclarationOrigin } from '../xyzdsl/types';
 import { canonicalNamespacePath } from '../xyzdsl/pathParser';
@@ -237,6 +237,7 @@ function applyConditionalVariants(
   return nodes.map((node) => {
     let box = { ...node.box };
     let material = node.material;
+    let physics = node.physics ?? { diagnostics: [] };
     let geometry = node.geometry;
     let content = node.content ?? { diagnostics: [] };
     let rotation = node.localTransform?.rotation ?? node.transform.rotation;
@@ -274,6 +275,7 @@ function applyConditionalVariants(
         positionChanged = true;
       }
       material = mergeXyzDslMaterialSpecs(material, variant.properties.material);
+      physics = mergeXyzDslPhysicsSpecs(physics, variant.properties.physics);
       content = mergeXyzDslContentSpecs(content, variant.properties.content);
       if (variant.properties.geometry.declared) {
         geometry = geometryFromBox(box, mergeXyzDslGeometrySpecs({
@@ -310,6 +312,7 @@ function applyConditionalVariants(
       baseBox: node.baseBox ?? node.box,
       box,
       material,
+      physics,
       content,
       geometry,
       localTransform,
@@ -362,6 +365,7 @@ export function createSpatialDocument(source: string, options: CreateSpatialDocu
         source: object.source,
         box: object.box,
         material: object.material,
+        physics: object.physics,
         content: object.content,
         geometry: geometryFromBox(object.box, object.geometry),
         localTransform,

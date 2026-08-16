@@ -65,6 +65,44 @@ Spatial transaction validation may limit each memo/properties field to 100 bytes
 "Table/LegD/+7+1/+0+5/+7+1" : "geometry: cylinder"
 ```
 
+## Physics properties
+
+Physics properties are authored alongside geometry but resolve separately from
+visual material. For example:
+
+```txt
+"Crate/" : "physics-mode: dynamic; mass: 12; friction: 0.6; ccd: true"
+"Crate/+0+4/+0+4/+0+4" : "restitution: 0.15; lock-rotations: x,z"
+```
+
+`physics-mode` accepts `dynamic`, `static`, or `kinematic`. The sole supported
+mass model is `mass`, measured in kilograms; values must be finite and
+non-negative. `density` is reserved and rejected (if introduced later, explicit
+mass will take precedence). `friction` and `restitution` range from zero to one,
+`linear-damping` is a non-negative inverse-second coefficient, and
+`gravity-scale` is a finite dimensionless multiplier. `ccd`, `can-sleep`,
+`sensor`, and `physical-body` use exactly `true` or `false`. Translation and
+rotation locks use `lock-translations` / `lock-rotations` with `none`, `all`, or
+a comma-separated subset of `x,y,z`. `collision-groups` and `solver-groups`
+accept unsigned 32-bit masks.
+
+Physics fields inherit independently through namespace declarations and ordered
+references. Concrete declarations and conditional declarations override only
+the fields they state, preserving all other inherited values. Collider material
+fields (friction, restitution, sensor, and group masks) apply per primitive;
+body mode, mass, damping, gravity, CCD, sleeping, and locks apply to the compound
+body. A compound mode conflict uses its first declared mode and reports a
+diagnostic. Secondary projections are sensors outside the physical world by
+default; `physical-body: true` opts one into Rapier, while `sensor: false` can
+then request contact-producing collider behavior. Transaction amounts are not
+mass and only participate in the explicit weighted-interaction conversion.
+Cones compile to Rapier cone colliders. Subtraction/intersection CSG tools emit
+diagnostics and are omitted because compound colliders can only union positive
+volumes and the document does not retain a collision-ready boolean mesh; treating
+a tool as a positive primitive would invert the authored operation. See
+[the accumulative physics contract](docs/accumulative-physics.md) for defaults
+and compilation details.
+
 ## Interaction directives
 
 Secondary projections can act as remote cursors. A baseline object can declare conditional variants with the Base64-compatible `+touch` and `+breach` directives. `touch` means faces meet within a small tolerance without overlapping, while `breach` means positive-volume intersection. Directive segments are removed from object identity, and their position selects the namespace scope that must be interacting.

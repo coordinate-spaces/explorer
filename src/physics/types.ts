@@ -3,7 +3,7 @@ import type { SpatialBounds } from '../model/SpatialNode';
 export type Vector3Tuple = [number, number, number];
 export type QuaternionTuple = [number, number, number, number];
 export type RigidBodyMode = 'dynamic' | 'kinematic' | 'static';
-export type ColliderShape = 'cuboid' | 'ball' | 'cylinder' | 'capsule';
+export type ColliderShape = 'cuboid' | 'ball' | 'cylinder' | 'cone' | 'capsule';
 
 export interface ColliderDefinition {
   id: string;

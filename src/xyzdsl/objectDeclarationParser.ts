@@ -4,16 +4,19 @@ import { parseMaterialDeclaration, SUPPORTED_MATERIAL_KEYS } from './materialPar
 import { parsePropertyDeclarations } from './propertyParser';
 import { parseReferenceDeclaration } from './referenceParser';
 import { parseTransformDeclaration } from './transformParser';
+import { parsePhysicsDeclaration, SUPPORTED_PHYSICS_KEYS } from './physicsParser';
 import type {
   XyzDslContentSpec,
   XyzDslGeometrySpec,
   XyzDslMaterialSpec,
   XyzDslReferenceSpec,
   XyzDslTransformSpec,
+  XyzDslPhysicsSpec,
 } from './types';
 
 const SUPPORTED_OBJECT_PROPERTIES = new Set([
   ...SUPPORTED_MATERIAL_KEYS,
+  ...SUPPORTED_PHYSICS_KEYS,
   'geometry',
   'box-radius',
   'puff',
@@ -31,6 +34,7 @@ const SUPPORTED_OBJECT_PROPERTIES = new Set([
 
 export interface XyzDslObjectPropertiesSpec {
   material: XyzDslMaterialSpec;
+  physics: XyzDslPhysicsSpec;
   geometry: XyzDslGeometrySpec;
   transform: XyzDslTransformSpec;
   reference: XyzDslReferenceSpec;
@@ -41,6 +45,7 @@ export interface XyzDslObjectPropertiesSpec {
 export function parseObjectProperties(source: string): XyzDslObjectPropertiesSpec {
   const { declarations, diagnostics } = parsePropertyDeclarations(source);
   const material = parseMaterialDeclaration(declarations);
+  const physics = parsePhysicsDeclaration(declarations);
   const geometry = parseGeometryDeclaration(declarations);
   const transform = parseTransformDeclaration(declarations);
   const reference = parseReferenceDeclaration(declarations);
@@ -53,6 +58,7 @@ export function parseObjectProperties(source: string): XyzDslObjectPropertiesSpe
 
   return {
     material,
+    physics,
     geometry,
     transform,
     reference,
@@ -60,6 +66,7 @@ export function parseObjectProperties(source: string): XyzDslObjectPropertiesSpe
     diagnostics: [
       ...diagnostics,
       ...material.diagnostics,
+      ...physics.diagnostics,
       ...geometry.diagnostics,
       ...transform.diagnostics,
       ...reference.diagnostics,

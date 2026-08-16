@@ -36,6 +36,7 @@ function node(
     box: nodeBox,
     bounds: boundsFromTransformedBox(nodeBox, transform),
     material: { diagnostics: [] },
+    physics: { diagnostics: [] },
     geometry: { kind: 'box', dimensions: [nodeBox.width, nodeBox.height, nodeBox.depth] },
     transform,
     worldTransform: transform,

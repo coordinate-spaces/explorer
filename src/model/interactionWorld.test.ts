@@ -7,7 +7,7 @@ function node(id: string, minX: number, sourceKind: 'baseline' | 'secondary' = '
     id, source: id, namespacePath: id, renderable: true,
     box: { source: id, x: minX, y: 0, z: 0, width: 1, height: 1, depth: 1 },
     bounds: { minX, maxX: minX + 1, minY: 0, maxY: 1, minZ: 0, maxZ: 1 },
-    material: { diagnostics: [] }, content: { diagnostics: [] },
+    material: { diagnostics: [] }, physics: { diagnostics: [] }, content: { diagnostics: [] },
     geometry: { kind: 'box', dimensions: [1, 1, 1] },
     transform: { position: [minX + 0.5, 0.5, 0.5], rotation: [0, 0, 0], scale: [1, 1, 1], pivot: [0, 0, 0] },
     origin: { sourceKind },

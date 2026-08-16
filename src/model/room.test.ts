@@ -25,6 +25,7 @@ function nodeWithBounds(bounds: Partial<SpatialNode['bounds']>): SpatialNode {
       ...bounds,
     },
     material: { diagnostics: [] },
+    physics: { diagnostics: [] },
     geometry: { kind: 'box', dimensions: [1, 1, 1] },
     transform: { position: [0.5, 0.5, 0.5], rotation: [0, 0, 0], scale: [1, 1, 1], pivot: [0, 0, 0] },
   };
