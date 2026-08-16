@@ -112,7 +112,7 @@ amounts.
 
 Rapier is the sole runtime authority for gravity, contacts, restitution,
 friction, sleeping, and rigid-body pose. Compilation deliberately performs no
-implicit settling step. A playback owner should drive the world with
+implicit settling step. The application session owner drives the world with
 `FixedStepSimulationRunner`; its interpolation alpha is presentation-only and
 must never be fed back into physics or interaction evaluation.
 
@@ -122,11 +122,21 @@ shape queries, and deterministic logical-pair aggregation are implemented behind
 the physics adapter. The AABB narrow phase is retained only for explicit
 compatibility/reference calls.
 
+The Rapier sensing migration and application runtime migration are separate
+completion milestones. Collider-backed sensing is complete, and the runtime
+migration is now complete as well: `SpatialSimulationSession` owns the retained
+timeline, continuously evaluates facts and bindings at fixed ticks while
+running, bounds catch-up, discards paused wall time, and publishes completed
+immutable documents to React. Transaction frames remain authored input changes,
+not clocks.
+
 Interaction directives remain declarative sensors when compiled directly with
 `createSpatialDocument`. The application transaction pipeline now gives the spatial
 relative and weighted overrides on `+touch` and `+breach` accumulative semantics:
-every new transaction/playback frame that still reports the selected interaction translates the retained
-body pose again. Completed frames remain immutable, so rendering cannot advance time.
+each fixed physics tick that still reports the selected interaction translates
+the retained body pose again. A transaction can change the declarations used by
+later ticks, but does not itself advance time. Completed frames remain immutable,
+so rendering cannot advance time.
 
 Accumulation is owned by the transaction layer instead:
 
