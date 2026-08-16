@@ -39,6 +39,10 @@ export class SpatialSimulationSession {
   frame(): AccumulativeSpatialFrame { return this.published; }
 
   setInput(source: string, originsByLine?: ReadonlyMap<number, XyzDslDeclarationOrigin>): AccumulativeSpatialFrame {
+    // React may render for reasons unrelated to the authored projection. Avoid a
+    // reconcile in that case: the fixed-step runner owns clock advancement and
+    // will evaluate this retained input when a complete tick is available.
+    if (source === this.input.source && originsByLine === this.input.originsByLine) return this.published;
     this.input = { source, originsByLine };
     this.published = this.timeline.compile(source, originsByLine);
     return this.published;

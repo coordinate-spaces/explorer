@@ -640,7 +640,11 @@ export default function App() {
     let previous = performance.now();
     let request = 0;
     const animate = (now: number) => {
-      const frame = session.advance((now - previous) / 1000);
+      // Read the retained session on every browser frame so an authored
+      // reconstruction cannot leave the clock driving a stale physics world.
+      const activeSession = simulationSessionRef.current;
+      if (!activeSession) return;
+      const frame = activeSession.advance((now - previous) / 1000);
       previous = now;
       if (frame) setDocument(frame.document);
       request = requestAnimationFrame(animate);
