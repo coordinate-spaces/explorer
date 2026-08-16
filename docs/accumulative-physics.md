@@ -5,8 +5,9 @@
 Runtime simulations use Rapier through the engine-neutral `RigidBodyWorld`
 contract. Spatial nodes are compiled into stable compound-body/collider
 definitions before reconciliation; renderer code receives only immutable poses
-and never sees Rapier handles. The former AABB solver remains temporarily as a
-compatibility/test backend while remaining interaction queries are migrated.
+and never sees Rapier handles. Production interaction sensing is also Rapier-backed.
+The AABB interaction implementation remains an explicit compatibility/reference
+library path, not an application fallback.
 
 Project coordinates are treated as metres, physics ticks as seconds divided by
 the configured tick rate, `mass` as kilograms, force as newtons, and impulse as
@@ -16,31 +17,64 @@ Transaction amounts are never kilograms and are no longer copied to rigid-body
 mass. They remain inputs only to the explicitly weighted `+++` interaction
 conversion at the transaction boundary.
 
-## XYZDSL physics properties
+## XYZDSL physics-property grammar
 
-Physics is an independent property group, not part of visual material. The
-initial vocabulary is: `physics-mode: dynamic | static | kinematic`; `mass` in
-kg (finite and strictly positive); `friction` and `restitution` in `[0,1]`;
-`linear-damping` in inverse seconds (non-negative); dimensionless
-`gravity-scale`; strict booleans `ccd`, `can-sleep`, `sensor`, and
-`physical-body`; `lock-translations` and `lock-rotations` as `none`, `all`, or a
-comma-separated subset of `x,y,z`; and unsigned 32-bit `collision-groups` and
-`solver-groups`. Defaults preserve the previous runtime: dynamic, friction
-`0.7`, restitution/damping `0`, gravity scale `1`, CCD off, sleeping on, and no
-axis locks.
+Physics is an independent property group, not part of visual material. Physics
+properties use the ordinary declaration value grammar: semicolon-separated
+`name: value` entries inside the declaration's quoted property string. Property
+names are lowercase and values below are case-sensitive except that axis names
+are normalized to lowercase.
+
+```xyzdsl
+"Body/+0+2/+0+2/+0+2" : "physics-mode: dynamic; mass: 2.5; friction: 0.4; ccd: true; lock-rotations: x,z"
+```
+
+| Property | Accepted grammar | Default | Unit / meaning |
+| --- | --- | --- | --- |
+| `physics-mode` | `dynamic \| static \| kinematic` | `dynamic` | Rigid-body mode. |
+| `mass` | finite number `> 0` | `1` in the backend when omitted | kilograms (kg), total authored mass rather than density or volume-derived mass. |
+| `density` | reserved; any authored value is diagnosed and ignored | none | Reserved for a future mass model; it is not currently a synonym for `mass`. |
+| `friction` | finite number in `[0, 1]` | `0.7` | dimensionless collider coefficient. |
+| `restitution` | finite number in `[0, 1]` | `0` | dimensionless collider coefficient. |
+| `linear-damping` | finite number `>= 0` | `0` | inverse seconds (s^-1). |
+| `gravity-scale` | any finite number | `1` | dimensionless multiplier; negative values reverse gravity. |
+| `ccd` | exactly `true` or `false` | `false` | continuous collision detection. |
+| `can-sleep` | exactly `true` or `false` | `true` | whether Rapier may sleep the body. |
+| `sensor` | exactly `true` or `false` | `false` for baseline/physical colliders; `true` for ordinary secondary cursors | Collider intersection-only mode. |
+| `physical-body` | exactly `true` or `false` | `false` for secondary declarations | Opts a secondary declaration into persistent physical-body behavior. It has no special effect on baseline declarations. |
+| `lock-translations` | `none`, `all`, or a unique comma/space-separated subset of `x,y,z` | `none` | Locked world translation axes. |
+| `lock-rotations` | `none`, `all`, or a unique comma/space-separated subset of `x,y,z` | `none` | Locked world rotation axes. |
+| `collision-groups` | integer `0..4294967295` | baseline `0x0001_0003`; secondary `0x0002_0001` | Rapier unsigned 32-bit membership/filter mask. |
+| `solver-groups` | integer `0..4294967295` | Rapier default; `0` for ordinary secondary sensors | Rapier unsigned 32-bit solver membership/filter mask. |
+
+Invalid values produce line diagnostics and do not replace the inherited/default
+value. There is no permissive boolean spelling (`yes`, `1`, and mixed-case values
+are invalid), no repeated axis, and no implicit clamping. The last occurrence of
+the same property within one declaration is the parsed occurrence.
+
+### Defaults and inheritance
 
 Every field inherits independently through ancestor namespace declarations and
-ordered references. A concrete declaration and an active conditional variant
-override only fields they declare; an omitted field never clears the inherited
-physics object. Material-like collider coefficients (`friction`,
+ordered references. References are resolved in authored order, after which the
+concrete declaration wins. A concrete declaration and an active conditional
+variant override only fields they declare; an omitted field never clears the
+inherited physics object or resets siblings to defaults. Thus, for example, a
+variant that declares only `restitution` retains inherited `mass`, mode, locks,
+and damping. The defaults in the table are installed only where the resolved
+chain supplies no value.
+
+Material-like collider fields (`friction`,
 `restitution`, groups, and `sensor`) are resolved per primitive and applied to
 that primitive's collider. Body fields apply to the compound entity. When
 compound primitives conflict on `physics-mode`, the first declaration's mode
 wins deterministically and compilation emits a line diagnostic.
 
-Secondary declarations default to sensors for interaction queries and do not
-enter the Rapier scene. They may explicitly set `physical-body: true`; their
-collider still defaults to `sensor: true`, unless `sensor: false` is authored.
+### Secondary cursors and supported shapes
+
+Secondary declarations enter the Rapier scene as kinematic, non-state-retaining
+sensor proxies for interaction queries. They may explicitly set
+`physical-body: true`; an opted-in collider still defaults to `sensor: true`,
+unless `sensor: false` is authored.
 Box, sphere, cylinder, and cone primitives compile to their matching Rapier
 shapes, and union compounds retain one positive collider per primitive.
 Subtraction/intersection CSG tools are omitted with a diagnostic: a Rapier
@@ -50,16 +84,40 @@ intersection mesh. Treating either tool as an ordinary positive collider would
 materially change the authored solid. A future mesh/decomposition compilation
 stage may provide exact or explicitly documented approximations.
 
+Unsupported or unknown visual geometry otherwise uses the existing box/cuboid
+physics approximation. This fallback must not be used for subtraction or
+intersection tools: those colliders are omitted rather than silently adding
+positive volume. Unsupported CSG tools remain renderable, and their omission diagnostic is
+carried into the compiled spatial document.
+
+### Transaction-amount migration
+
+Transaction `amount` metadata is not physics syntax, has no mass unit, and is
+never copied into `mass`, density, collider mass, force, or impulse. Existing
+documents that relied on an amount-shaped value must author `mass: <kg>`
+explicitly. When `mass` is absent, the rigid-body backend uses `1 kg`, regardless
+of transaction amount.
+
+The only retained amount conversion is the explicit weighted `+++` interaction
+at the transaction boundary. Its translation distance is
+`cursor amount / target amount / 100` project metres. This is legacy interaction
+weighting, not a physical force or mass conversion. Missing or unusable weights
+therefore follow the interaction directive's existing behavior rather than
+altering body mass. Future force/impulse syntax must state newtons or
+newton-seconds explicitly and must not infer those values from transaction
+amounts.
+
 Rapier is the sole runtime authority for gravity, contacts, restitution,
 friction, sleeping, and rigid-body pose. Compilation deliberately performs no
 implicit settling step. A playback owner should drive the world with
 `FixedStepSimulationRunner`; its interpolation alpha is presentation-only and
 must never be fed back into physics or interaction evaluation.
 
-The next migration boundary is collider-backed interaction sensing. Secondary
-cursors still use the existing deterministic AABB query contract, so sensor and
-contact-manifold facts must be moved behind the physics adapter before the AABB
-narrow phase can be retired completely.
+Collider-backed interaction sensing is complete in the application. Secondary
+cursor proxies, sensor intersections, ordinary contact manifolds, periodic
+shape queries, and deterministic logical-pair aggregation are implemented behind
+the physics adapter. The AABB narrow phase is retained only for explicit
+compatibility/reference calls.
 
 Interaction directives remain declarative sensors when compiled directly with
 `createSpatialDocument`. The application transaction pipeline now gives the spatial

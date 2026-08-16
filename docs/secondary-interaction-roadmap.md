@@ -71,21 +71,40 @@ Task 6 is complete only when tests and application integration demonstrate:
 
 ## Task 7: scalable spatial candidate index
 
-**Status: partially implemented; the current index is per-compilation, not incremental across frames.**
+**Status: library foundation implemented; application retention and performance validation remain.**
 
 ### Implemented
 
 - `SpatialInteractionIndex` defines `query`, `update`, and `remove` operations.
 - `AabbInteractionIndex` partitions baseline AABBs into deterministic uniform-grid cells.
 - Queries expand cursor bounds by touch tolerance, deduplicate cell candidates, apply an AABB broad-phase filter, and return stable ID ordering.
-- `evaluateInteractions` uses the index before its touch/breach predicate checks.
+- `InteractionNarrowPhase` is a replaceable narrow-phase boundary, and
+  `AabbInteractionNarrowPhase` implements the legacy AABB `touch`/`breach`
+  contract through that boundary.
+- `InteractionWorld` is a retained library abstraction. It owns one index,
+  applies target updates and removals, and evaluates cursor-only frames without
+  rebuilding the index.
+- `AabbInteractionIndex` sends a node spanning more than 4,096 cells to a
+  bounded oversized-object set. A query whose own bounds exceed the cap safely
+  scans the retained nodes instead of enumerating an uncontrolled number of
+  cells.
+- `evaluateInteractions` can use a supplied index and narrow phase before its
+  final predicate checks.
+
+These are **library capabilities**, not a description of application wiring.
+The application does not retain an `InteractionWorld`. Its
+`AccumulativeSpatialTimeline` recompiles authored and conditional documents
+through `createSpatialDocument`, reconciles the resulting collider definitions,
+and obtains production interaction facts from the retained Rapier world. Direct
+`createSpatialDocument` calls do not evaluate interactions unless facts are
+supplied or the explicit `aabbInteractionCompatibility` test/reference option is
+enabled.
 
 ### Not implemented
 
-- `evaluateInteractions` constructs a new index for every `createSpatialDocument` call.
-- The application does not retain one baseline index across secondary-only movement frames.
+- The application does not retain an `InteractionWorld` or incrementally apply
+  baseline node diffs to `AabbInteractionIndex` across secondary-only frames.
 - Although `update` and `remove` exist, no document-diff or playback integration invokes them incrementally.
-- There is no explicit narrow-phase interface for geometry-specific sphere, cylinder, oriented-box, mesh, or CSG tests.
 - There are no brute-force parity/property tests over generated scenes.
 - There are no performance benchmarks for sparse scenes, dense scenes, large objects, or many moving cursors.
 - Uniform-grid cell size is fixed by a constructor default and is not selected from scene scale or profiling data.
@@ -105,7 +124,7 @@ interface InteractionWorld {
 
 Baseline edits and active conditional variants should produce explicit insert/update/remove changes. Secondary-only frames should query the retained index without rebuilding it. If a conditional variant changes a target's effective bounds, that target must be updated before the next interaction evaluation according to the documented pre-variant/next-frame feedback semantics.
 
-The broad phase should feed a replaceable narrow phase:
+The implemented broad phase feeds a replaceable narrow phase:
 
 ```ts
 interface InteractionNarrowPhase {
@@ -113,7 +132,10 @@ interface InteractionNarrowPhase {
 }
 ```
 
-The initial narrow phase may preserve current AABB behavior. Later geometry-specific implementations can be selected by collision-shape or geometry kind without changing XYZDSL directives or `InteractionFact` consumers.
+The initial AABB implementation preserves the compatibility behavior. Production
+application sensing now uses Rapier geometry rather than selecting a
+geometry-specific implementation of this library interface; either approach can
+continue to produce the same `InteractionFact` contract.
 
 ### Acceptance criteria
 
@@ -123,9 +145,45 @@ Task 7 is complete only when tests and profiling demonstrate:
 2. Baseline insertion, movement, resizing, and deletion call incremental index operations correctly.
 3. Indexed candidates and final facts match a brute-force reference across generated scenes.
 4. Candidate and fact ordering remains deterministic.
-5. Very large bounds cannot cause an uncontrolled cell-enumeration failure; a fallback or alternate structure is defined.
-6. A narrow-phase interface exists and current AABB behavior is implemented through it.
+5. **Implemented and unit-tested:** very large bounds use the 4,096-cell bounded fallback.
+6. **Implemented and unit-tested:** a narrow-phase interface exists and current AABB behavior is implemented through it.
 7. Benchmarks cover sparse, dense, large-bound, and multi-cursor workloads and establish a regression baseline.
+
+Criteria 1 and 2 are demonstrated at the library boundary, but not by the
+application integration, so Task 7 remains open. Criteria 3 and 7 also remain
+open; criterion 4 has deterministic unit coverage but still needs the generated
+parity suite from criterion 3.
+
+## Rapier sensing migration checklist
+
+The implementation and application integration tests for this migration are
+complete:
+
+- [x] **Secondary sensor compilation:** compile every secondary primitive into a
+  kinematic, non-state-retaining sensor proxy by default, while preserving the
+  explicit `physical-body: true` path.
+- [x] **Stable collider-ID mapping:** derive collider and body IDs from stable
+  spatial node/entity identities and retain authored cursor/target provenance
+  without exposing Rapier handles.
+- [x] **Periodic wrapping:** query the central cursor plus the eight neighboring
+  X/Z images, select the closest representative contact, and deduplicate logical
+  cursor-target facts.
+- [x] **Sensor intersections:** use Rapier's sensor intersection graph for the
+  central image and exact shape intersection for periodic images, without
+  generating solver impulses.
+- [x] **Manifold/shape-contact conversion:** use manifolds for ordinary collider
+  penetration and exact shape contacts for sensor or tolerance queries, then
+  normalize them to `touch`/`breach`, normal, separation, penetration, and
+  resolution-distance fields.
+- [x] **Deterministic aggregation:** collapse compound collider pairs to one
+  deterministic representative and sort logical facts by stable stream, cursor,
+  and target identity.
+- [x] **Snapshot/seek behavior:** serialize stable definitions and identities,
+  restore the Rapier world and preceding interaction facts, and reproduce the
+  same query results after restore/replay.
+- [x] **Remove the production AABB fallback:** the application supplies Rapier
+  facts to `createSpatialDocument`; AABB evaluation is available only through
+  the explicit compatibility option used by focused model tests.
 
 ## Delivery order
 
@@ -138,8 +196,18 @@ The renderer-independent foundation is now available in `src/physics` and
 body state, deterministic input ordering, snapshots, replay-safe interaction
 transitions, force/impulse separation, and an immutable document overlay.
 
-`InteractionWorld` also permits a retained broad-phase index, an injected narrow
-phase, and bounded uniform-grid membership. Application playback integration,
-portable force/mass syntax, angular integration, and a physical collision-manifold
-solver remain intentionally separate follow-up work. The remaining directive syntax
-retains its documented semantics. See [Accumulative physics](accumulative-physics.md).
+`InteractionWorld` also provides a retained broad-phase index, an injected narrow
+phase, and bounded uniform-grid membership as library abstractions. The application
+instead retains a Rapier world while rebuilding documents through
+`createSpatialDocument`; it does not retain `InteractionWorld`.
+
+## Remaining migration work
+
+With the Rapier sensing checklist and its integration tests complete, production
+AABB sensing is no longer migration work. What remains is incremental application
+document compilation/index reconciliation (if `InteractionWorld` is adopted), the
+generated broad-phase parity suite and performance regression benchmarks, Task 6's
+application-visible transition/effect API and seek integration, standardized
+force/impulse XYZDSL syntax, and angular force/impulse bindings. The existing
+directive syntax retains its documented semantics. See
+[Accumulative physics](accumulative-physics.md).
