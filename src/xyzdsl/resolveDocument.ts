@@ -533,6 +533,7 @@ export function resolveXyzDslDocument(objects: SpatialObject[]): {
   );
 
   resolvedObjects.forEach((object, objectIndex) => {
+    const authoredInstance = instances[objectIndex];
     if (
       !object.reference.targetPath ||
       !hasConcreteAncestorInstance(object, concreteNamespaces)
@@ -616,7 +617,9 @@ export function resolveXyzDslDocument(objects: SpatialObject[]): {
         namespacePath: canonicalNamespacePath(namespace),
         parentNamespacePath: canonicalNamespacePath(namespace.slice(0, -1)),
         material: properties.material,
-        physics: properties.physics,
+        // Resolved template descendants carry defaults. Reapply only fields
+        // authored on the ref instance so those defaults cannot erase them.
+        physics: mergeXyzDslPhysicsSpecs(properties.physics, authoredInstance.physics),
         geometry: properties.geometry,
         transform: properties.transform,
         content: properties.content,

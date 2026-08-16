@@ -34,6 +34,25 @@ function scopedOrigins() {
 }
 
 describe('AccumulativeSpatialTimeline', () => {
+  it('reconciles active conditional physics and returns compiler diagnostics', () => {
+    const source = [
+      '"Target/+0+1/+0+1/+0+1":""',
+      '"Target/+touch":"physics-mode: static; restitution: .8"',
+      '"Shape/+3+1/+0+1/+0+1":""',
+      '"Shape/Cut/+3+1/+0+1/+0+1":"operation: subtraction"',
+      '"Cursor/+1+1/+0+1/+0+1":""',
+    ].join('\n');
+    const declarationOrigins = new Map([
+      [1, { sourceKind: 'baseline' as const }], [2, { sourceKind: 'baseline' as const }],
+      [3, { sourceKind: 'baseline' as const }], [4, { sourceKind: 'baseline' as const }],
+      [5, { sourceKind: 'secondary' as const, streamId: 'cursor' }],
+    ]);
+    const timeline = new AccumulativeSpatialTimeline();
+    const frame = timeline.compile(source, declarationOrigins);
+    const definition = timeline.simulation.world.snapshot().definitions.find(({ id }) => id.includes('Target'));
+    expect(definition).toMatchObject({ mode: 'static', restitution: .8 });
+    expect(frame.document.diagnostics.some(({ message }) => message.includes('positive primitive colliders'))).toBe(true);
+  });
   it('preserves authored poses until the rigid-body world advances', () => {
     const declaration = '"First/+0+1/+0+1/+0+1":""\n"Second/+0+1/+0+1/+0+1":""';
     const authored = createSpatialDocument(declaration);

@@ -10,7 +10,10 @@ function flatten(nodes: readonly SpatialNode[]): SpatialNode[] {
 
 function entityId(node: SpatialNode): string {
   const component = node.namespacePath?.split('/').filter(Boolean)[0];
-  return component ? `component:${component}` : `node:${node.id}`;
+  const localId = component ? `component:${component}` : `node:${node.id}`;
+  return node.origin?.sourceKind === 'secondary'
+    ? `secondary:${node.origin.streamId ?? node.origin.publicKey ?? 'unknown'}:${localId}`
+    : localId;
 }
 
 function colliderShape(node: SpatialNode): ColliderShape {
@@ -24,6 +27,11 @@ function colliderShape(node: SpatialNode): ColliderShape {
 
 /** Converts renderer-neutral nodes into stable compound rigid-body definitions. */
 export function compilePhysicsScene(document: SpatialDocument, revision = 'baseline'): RigidBodyDefinition[] {
+  const diagnose = (diagnostic: SpatialDocument['diagnostics'][number]) => {
+    if (!document.diagnostics.some(({ line, source, message }) => line === diagnostic.line && source === diagnostic.source && message === diagnostic.message)) {
+      document.diagnostics.push(diagnostic);
+    }
+  };
   const csgEntityByNodeId = new Map<string, string>();
   document.csgExpressions.forEach((expression) => {
     const id = entityId(expression.base);
@@ -39,7 +47,7 @@ export function compilePhysicsScene(document: SpatialDocument, revision = 'basel
     const mode = node.physics?.['physics-mode'] ?? 'dynamic';
     const established = modeByEntity.get(id);
     if (!established) modeByEntity.set(id, mode);
-    else if (established !== mode) document.diagnostics.push({
+    else if (established !== mode) diagnose({
       line: Number(node.metadata?.lineNumber ?? 0), source: node.source,
       message: `Conflicting physics-mode "${mode}" in compound "${id}"; using first mode "${established}".`,
     });
@@ -66,7 +74,7 @@ export function compilePhysicsScene(document: SpatialDocument, revision = 'basel
         solverGroups: physics['solver-groups'],
       };
       const unsupportedCollider = node.geometry.operation === 'subtraction' || node.geometry.operation === 'intersection';
-      if (unsupportedCollider) document.diagnostics.push({
+      if (unsupportedCollider) diagnose({
         line: Number(node.metadata?.lineNumber ?? 0), source: node.source,
         message: `Physics collider omitted: ${node.geometry.operation} CSG tools cannot be represented faithfully by positive primitive colliders.`,
       });
@@ -89,7 +97,7 @@ export function compilePhysicsScene(document: SpatialDocument, revision = 'basel
         friction: physics.friction,
         restitution: physics.restitution,
         revision,
-        colliders: !unsupportedCollider && node.geometry.operation === undefined ? [collider] : [],
+        colliders: !unsupportedCollider && (node.geometry.operation === undefined || node.geometry.operation === 'union') ? [collider] : [],
       };
     });
 }

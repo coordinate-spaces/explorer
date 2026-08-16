@@ -20,7 +20,7 @@ conversion at the transaction boundary.
 
 Physics is an independent property group, not part of visual material. The
 initial vocabulary is: `physics-mode: dynamic | static | kinematic`; `mass` in
-kg (finite and non-negative); `friction` and `restitution` in `[0,1]`;
+kg (finite and strictly positive); `friction` and `restitution` in `[0,1]`;
 `linear-damping` in inverse seconds (non-negative); dimensionless
 `gravity-scale`; strict booleans `ccd`, `can-sleep`, `sensor`, and
 `physical-body`; `lock-translations` and `lock-rotations` as `none`, `all`, or a

@@ -9,7 +9,7 @@ describe('XYZDSL physics properties', () => {
     expect(parsed.value?.[0].physics).toMatchObject({ 'physics-mode': 'kinematic', mass: 2.5, ccd: true, 'lock-translations': [true, false, true] });
   });
 
-  it.each(['mass: -1', 'friction: 2', 'ccd: yes', 'physics-mode: flying', 'lock-rotations: x,q', 'mass: Infinity', 'density: -1', 'collision-groups: 1.5'])(
+  it.each(['mass: -1', 'mass: 0', 'friction: 2', 'ccd: yes', 'physics-mode: flying', 'lock-rotations: x,q', 'mass: Infinity', 'density: -1', 'collision-groups: 1.5'])(
     'diagnoses malformed %s', (property) => {
       const parsed = parseXyzDslDocument(`"+0+1/+0+1/+0+1" : "${property}"`);
       expect(parsed.ok).toBe(false);
@@ -22,5 +22,11 @@ describe('XYZDSL physics properties', () => {
     const resolved = resolveXyzDslDocument(parsed.value!);
     expect(resolved.objects[0].physics).toMatchObject({ mass: 8, friction: .5, ccd: true });
     expect(resolved.variants[0].properties.physics.restitution).toBe(.9);
+  });
+
+  it('preserves physics authored on a compound ref instance', () => {
+    const parsed = parseXyzDslDocument('"Template/" : ""\n"Template/Part/+0+1/+0+1/+0+1" : "mass: 2"\n"Copy/+2+1/+0+1/+0+1" : "ref: Template/; physics-mode: static"');
+    const clone = resolveXyzDslDocument(parsed.value!).objects.find(({ materializedFrom }) => materializedFrom);
+    expect(clone?.physics).toMatchObject({ 'physics-mode': 'static', mass: 2 });
   });
 });

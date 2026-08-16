@@ -25,6 +25,21 @@ describe('compilePhysicsScene', () => {
     expect(definitions.find(({ id }) => id.includes('Cut'))?.colliders).toEqual([]);
     expect(document.diagnostics.at(-1)?.message).toContain('positive primitive colliders');
   });
+  it('includes union tools as positive compound colliders', () => {
+    const document = createSpatialDocument('"Shape/+0+2/+0+2/+0+2" : ""\n"Shape/Added/+2+1/+0+1/+0+1" : "operation: union"');
+    const added = compilePhysicsScene(document).find(({ id }) => id.includes('Added'));
+    expect(added?.colliders).toHaveLength(1);
+  });
+
+  it('stream-scopes opted-in secondary rigid bodies', () => {
+    const origins = new Map([
+      [1, { sourceKind: 'baseline' as const }],
+      [2, { sourceKind: 'secondary' as const, streamId: 'remote-a' }],
+    ]);
+    const definitions = compilePhysicsScene(createSpatialDocument('"Shared/+0+1/+0+1/+0+1" : ""\n"Shared/+2+1/+0+1/+0+1" : "physical-body: true"', { originsByLine: origins }));
+    expect(new Set(definitions.map(({ entityId }) => entityId)).size).toBe(2);
+    expect(definitions[1].entityId).toContain('secondary:remote-a:');
+  });
   it('maps authored primitives to stable collider definitions', () => {
     const definitions = compilePhysicsScene(createSpatialDocument(`"Box/+0+2/+0+4/+0+6" : "geometry: box"
 "Ball/+5+2/+0+2/+0+2" : "geometry: sphere"`));

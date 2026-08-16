@@ -48,6 +48,10 @@ export function parsePhysicsDeclaration(declarations: XyzDslPropertyDeclaration[
     else result.diagnostics.push(`Invalid physics-mode "${mode}"; expected dynamic, static, or kinematic.`);
   }
   number('mass', { min: 0 });
+  if (result.mass === 0) {
+    result.diagnostics.push('Invalid mass "0"; expected a finite number > 0.');
+    delete result.mass;
+  }
   const density = latest.get('density');
   if (density !== undefined) {
     const value = Number(density);

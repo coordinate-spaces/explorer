@@ -51,6 +51,24 @@ function renderable(nodes: readonly SpatialNode[]): SpatialNode[] {
     .filter(Boolean) as SpatialNode[];
 }
 
+function withCompilerDiagnostics(document: SpatialDocument, compiled: SpatialDocument): SpatialDocument {
+  const diagnostics = [...document.diagnostics];
+  compiled.diagnostics.forEach((diagnostic) => {
+    if (!diagnostics.some((candidate) => candidate.line === diagnostic.line && candidate.message === diagnostic.message && candidate.source === diagnostic.source)) {
+      diagnostics.push(diagnostic);
+    }
+  });
+  return { ...document, diagnostics };
+}
+
+function withPhysicsById(nodes: readonly SpatialNode[], physicsById: ReadonlyMap<string, SpatialNode['physics']>): SpatialNode[] {
+  return nodes.map((node) => ({
+    ...node,
+    physics: physicsById.get(node.id) ?? node.physics,
+    children: withPhysicsById(node.children ?? [], physicsById),
+  }));
+}
+
 /** Transaction/playback-owned bridge from XYZDSL interaction declarations to persistent physics. */
 export class AccumulativeSpatialTimeline {
   readonly simulation: SimulationTimeline;
@@ -63,21 +81,31 @@ export class AccumulativeSpatialTimeline {
 
   private reconcile(source: string, originsByLine?: ReadonlyMap<number, XyzDslDeclarationOrigin>): SpatialDocument {
     const authored = createSpatialDocument(source, { originsByLine, applyConditionalVariants: false });
-    const definitions = compilePhysicsScene(authored, this.baselineRevision);
+    // Translation variants remain simulation inputs, but active declarative
+    // physics variants must be present before body reconciliation.
+    const conditional = createSpatialDocument(source, {
+      originsByLine,
+      accumulativePhysics: true,
+      interactionFacts: authored.interactions,
+    });
+    const physicsById = new Map(renderable(conditional.nodes).map((node) => [node.id, node.physics]));
+    const effective = { ...authored, nodes: withPhysicsById(authored.nodes, physicsById) };
+    const definitions = compilePhysicsScene(effective, this.baselineRevision);
     this.simulation.reconcileDefinitions(definitions);
-    return authored;
+    return effective;
   }
 
   /** Recompile against retained state without advancing simulation time. */
   compile(source: string, originsByLine?: ReadonlyMap<number, XyzDslDeclarationOrigin>): AccumulativeSpatialFrame {
-    this.reconcile(source, originsByLine);
+    const compiled = this.reconcile(source, originsByLine);
+    const document = createSpatialDocument(source, {
+      originsByLine,
+      physicsFrame: this.simulation.world.frame(),
+      accumulativePhysics: true,
+    });
     return {
       tick: this.simulation.world.tick,
-      document: createSpatialDocument(source, {
-        originsByLine,
-        physicsFrame: this.simulation.world.frame(),
-        accumulativePhysics: true,
-      }),
+      document: withCompilerDiagnostics(document, compiled),
     };
   }
 
@@ -111,12 +139,12 @@ export class AccumulativeSpatialTimeline {
     const frame = this.simulation.evaluate(tick, tick, 0, current.interactions ?? [], bindings);
     return {
       tick,
-      document: createSpatialDocument(source, {
+      document: withCompilerDiagnostics(createSpatialDocument(source, {
         originsByLine,
         physicsFrame: frame.physics,
         accumulativePhysics: true,
         interactionFacts: frame.facts,
-      }),
+      }), authored),
     };
   }
 }

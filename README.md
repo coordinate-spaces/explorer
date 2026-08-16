@@ -77,7 +77,7 @@ visual material. For example:
 
 `physics-mode` accepts `dynamic`, `static`, or `kinematic`. The sole supported
 mass model is `mass`, measured in kilograms; values must be finite and
-non-negative. `density` is reserved and rejected (if introduced later, explicit
+strictly positive. `density` is reserved and rejected (if introduced later, explicit
 mass will take precedence). `friction` and `restitution` range from zero to one,
 `linear-damping` is a non-negative inverse-second coefficient, and
 `gravity-scale` is a finite dimensionless multiplier. `ccd`, `can-sleep`,
