@@ -81,6 +81,27 @@ describe('AccumulativeSpatialTimeline', () => {
     const definition = timeline.simulation.world.snapshot().definitions.find(({ id }) => id.includes('Target'));
     expect(definition?.colliders?.[0].shape).toBe('ball');
     expect(definition?.orientation).not.toEqual([0, 0, 0, 1]);
+    const simulatedOrientation = timeline.simulation.world.frame().states.get(definition!.id)?.orientation;
+    definition?.orientation?.forEach((component, index) => expect(simulatedOrientation?.[index]).toBeCloseTo(component));
+  });
+
+  it('installs a first-frame conditional absolute pose after querying the authored pose', () => {
+    const source = [
+      '"Target/+0+2/+0+2/+0+2":""',
+      '"Target/+touch/+9+2/+0+2/+0+2":""',
+      '"Cursor/+2+1/+0+2/+0+2":""',
+    ].join('\n');
+    const declarationOrigins = new Map<number, XyzDslDeclarationOrigin>([
+      [1, { sourceKind: 'baseline' }], [2, { sourceKind: 'baseline' }],
+      [3, { sourceKind: 'secondary', streamId: 'cursor' }],
+    ]);
+    const timeline = new AccumulativeSpatialTimeline();
+
+    timeline.compile(source, declarationOrigins);
+    const definition = timeline.simulation.world.snapshot().definitions.find(({ id }) => id.includes('Target'))!;
+
+    expect(definition.position).toEqual([10, 1, 1]);
+    expect(timeline.simulation.world.frame().states.get(definition.id)?.position).toEqual(definition.position);
   });
   it('preserves authored poses until the rigid-body world advances', () => {
     const declaration = '"First/+0+1/+0+1/+0+1":""\n"Second/+0+1/+0+1/+0+1":""';
@@ -151,7 +172,7 @@ describe('AccumulativeSpatialTimeline', () => {
 
     expect(frame.document.interactions).toHaveLength(1);
     expect(target?.activeInteractions).toHaveLength(1);
-    expect(target?.transform.position[0]).toBe(9.5);
+    expect(target?.transform.position[0]).toBeCloseTo(9.5);
     expect(target?.transform.rotation[2]).toBeCloseTo(Math.PI / 4);
     expect(target?.material.color).toBe('red');
     expect(target?.geometry.kind).toBe('box');
@@ -260,5 +281,43 @@ describe('AccumulativeSpatialTimeline', () => {
     const lever = frame.document.renderNodes.find((node) => node.namespacePath === 'Machine/Lever/');
 
     expect(lever?.transform.position[0]).toBeCloseTo(3.5);
+  });
+
+  it('uses Rapier geometry rather than overlapping sphere AABBs to select a breach variant', () => {
+    const declaration = [
+      '"Target/+0+4/+0+4/+0+4":"geometry: sphere; color: blue"',
+      '"Target/+breach":"color: red"',
+      '"Cursor/+3+4/+0+4/+3+4":"geometry: sphere"',
+    ].join('\n');
+    const declarationOrigins = new Map<number, XyzDslDeclarationOrigin>([
+      [1, { sourceKind: 'baseline' }], [2, { sourceKind: 'baseline' }],
+      [3, { sourceKind: 'secondary', streamId: 'controller' }],
+    ]);
+
+    const frame = new AccumulativeSpatialTimeline().evaluate(declaration, declarationOrigins);
+
+    expect(frame.document.interactions).toEqual([]);
+    expect(frame.document.renderNodes.find(({ namespacePath }) => namespacePath === 'Target/')?.material.color).toBe('blue');
+  });
+
+  it('selects a breach variant on real curved-shape contact and preserves cursor provenance', () => {
+    const declaration = [
+      '"Target/+0+4/+0+4/+0+4":"geometry: sphere; color: blue"',
+      '"Target/+breach":"color: red"',
+      '"Cursor/+2+4/+0+4/+2+4":"geometry: sphere"',
+    ].join('\n');
+    const declarationOrigins = new Map<number, XyzDslDeclarationOrigin>([
+      [1, { sourceKind: 'baseline' }], [2, { sourceKind: 'baseline' }],
+      [3, { sourceKind: 'secondary', streamId: 'controller', transactionId: 'tx-7', transactionTime: 42, transactionAmount: 9 }],
+    ]);
+
+    const frame = new AccumulativeSpatialTimeline().evaluate(declaration, declarationOrigins);
+    const fact = frame.document.interactions![0];
+
+    expect(frame.document.renderNodes.find(({ namespacePath }) => namespacePath === 'Target/')?.material.color).toBe('red');
+    expect(fact).toMatchObject({
+      state: 'breach', streamId: 'controller', cursorNamespace: 'Cursor/',
+      transactionId: 'tx-7', transactionTime: 42, cursorWeight: 9, targetNamespace: 'Target/',
+    });
   });
 });

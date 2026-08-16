@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  createSpatialDocument,
+  createSpatialDocument as createSpatialDocumentModel,
   MAX_WEIGHTED_TRANSLATION,
   MIN_TRANSACTION_AMOUNT,
   weightedTranslationDistance,
@@ -8,6 +8,9 @@ import {
 import { interactionTransitions } from '../transactions/interactionTimeline';
 import type { XyzDslDeclarationOrigin } from '../xyzdsl/types';
 import { composeTransforms } from './transform';
+
+const createSpatialDocument = (source: string, options: Parameters<typeof createSpatialDocumentModel>[1] = {}) =>
+  createSpatialDocumentModel(source, { ...options, aabbInteractionCompatibility: true });
 
 function origins(secondaryLine: number): Map<number, XyzDslDeclarationOrigin> {
   return new Map([
