@@ -16,7 +16,7 @@ export interface InteractionFact {
   /** Per-axis direction away from the cursor, used when an interaction normal is zero. */
   inferredDirection: [number, number, number];
   penetration?: number;
-  /** Minimum target translation required to separate a breached AABB. */
+  /** Target translation distance along the interaction normal needed to separate the representative geometry contact. */
   resolutionDistance?: number;
   separation?: number;
   cursorWeight?: number;

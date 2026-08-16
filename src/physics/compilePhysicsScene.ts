@@ -50,12 +50,21 @@ export function compilePhysicsScene(document: SpatialDocument, revision = 'basel
     });
   });
 
-  const candidates = flatten(document.nodes)
-    .filter((node) => node.origin?.sourceKind !== 'secondary' || node.physics?.['physical-body'] === true);
+  // All secondary primitives are compiled: ordinary cursors are zero-mass sensors,
+  // while the explicit physical-body opt-in retains ordinary rigid-body semantics.
+  const candidates = flatten(document.nodes);
+  const physicsEntityId = (node: SpatialNode): string => {
+    const baseId = csgEntityByNodeId.get(node.id) ?? entityId(node);
+    if (node.origin?.sourceKind !== 'secondary') return baseId;
+    // Sensor proxies and opted-in physical members cannot share one Rapier body:
+    // their body modes, mass, solver participation, and state lifetimes differ.
+    return `${baseId}:${node.physics?.['physical-body'] === true ? 'physical' : 'cursor-sensor'}`;
+  };
   const modeByEntity = new Map<string, NonNullable<RigidBodyDefinition['mode']>>();
   candidates.forEach((node) => {
-    const id = csgEntityByNodeId.get(node.id) ?? entityId(node);
-    const mode = node.physics?.['physics-mode'] ?? 'dynamic';
+    const id = physicsEntityId(node);
+    const mode = node.origin?.sourceKind === 'secondary' && node.physics?.['physical-body'] !== true
+      ? 'kinematic' : (node.physics?.['physics-mode'] ?? 'dynamic');
     const established = modeByEntity.get(id);
     if (!established) modeByEntity.set(id, mode);
     else if (established !== mode) diagnose({
@@ -67,7 +76,9 @@ export function compilePhysicsScene(document: SpatialDocument, revision = 'basel
   return candidates.map((node, entityOrder): RigidBodyDefinition => {
       const transform = node.worldTransform ?? node.transform;
       const physics = node.physics ?? { diagnostics: [] };
-      const compiledEntityId = csgEntityByNodeId.get(node.id) ?? entityId(node);
+      const cursor = node.origin?.sourceKind === 'secondary';
+      const physicalCursor = cursor && physics['physical-body'] === true;
+      const compiledEntityId = physicsEntityId(node);
       const q = new Quaternion().setFromEuler(new Euler(...transform.rotation, 'XYZ'));
       // The resolved world transform contains reference/materialization scaling;
       // geometry dimensions still describe the unscaled template primitive.
@@ -80,9 +91,12 @@ export function compilePhysicsScene(document: SpatialDocument, revision = 'basel
         offset: [0, 0, 0],
         friction: physics.friction ?? 0.7,
         restitution: physics.restitution ?? 0,
-        sensor: physics.sensor ?? node.origin?.sourceKind === 'secondary',
-        collisionGroups: physics['collision-groups'],
-        solverGroups: physics['solver-groups'],
+        sensor: physics.sensor ?? (cursor && !physicalCursor),
+        // Default cursors see baseline (group 1) but not group 2 cursors. Baseline
+        // sees both. Explicit authored groups always win.
+        collisionGroups: physics['collision-groups'] ?? (cursor ? (2 << 16) | 1 : (1 << 16) | 3),
+        solverGroups: physics['solver-groups'] ?? (cursor && !physicalCursor ? 0 : undefined),
+        interactionRole: cursor ? 'cursor' : 'target',
       };
       const unsupportedCollider = node.geometry.operation === 'subtraction' || node.geometry.operation === 'intersection';
       if (unsupportedCollider) diagnose({
@@ -93,7 +107,7 @@ export function compilePhysicsScene(document: SpatialDocument, revision = 'basel
         id: node.id,
         entityId: compiledEntityId,
         entityOrder,
-        contributesToBounds: node.geometry.operation === undefined,
+        contributesToBounds: (!cursor || physicalCursor) && node.geometry.operation === undefined,
         bounds: node.bounds,
         position: [...transform.position],
         orientation: [q.x, q.y, q.z, q.w],
@@ -109,6 +123,15 @@ export function compilePhysicsScene(document: SpatialDocument, revision = 'basel
         restitution: physics.restitution,
         revision,
         colliders: !unsupportedCollider && (node.geometry.operation === undefined || node.geometry.operation === 'union') ? [collider] : [],
+        interactionIdentity: {
+          id: node.id,
+          namespace: node.namespacePath ?? (cursor ? node.id : ''),
+          streamId: cursor ? (node.origin?.streamId ?? node.origin?.publicKey ?? 'secondary') : undefined,
+          transactionId: node.origin?.transactionId,
+          transactionTime: node.origin?.transactionTime,
+          weight: node.origin?.transactionAmount,
+        },
+        retainsPhysicsState: !cursor || physicalCursor,
       };
     });
 }

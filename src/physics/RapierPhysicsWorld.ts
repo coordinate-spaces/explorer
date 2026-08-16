@@ -1,6 +1,6 @@
 import RAPIER from '@dimforge/rapier3d-compat';
 import type { RigidBodyWorld } from './RigidBodyWorld';
-import type { ColliderDefinition, PhysicsFrame, PhysicsInput, PhysicsSnapshot, RigidBodyDefinition, RigidBodyState, Vector3Tuple } from './types';
+import type { ColliderDefinition, InteractionQueryOptions, InteractionQueryResult, PhysicsFrame, PhysicsInput, PhysicsSnapshot, RigidBodyDefinition, RigidBodyState, Vector3Tuple } from './types';
 import { Quaternion, Vector3 } from 'three';
 
 await RAPIER.init();
@@ -15,6 +15,10 @@ export class RapierPhysicsWorld implements RigidBodyWorld {
   private world = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
   private definitions = new Map<string, RigidBodyDefinition>();
   private bodyByEntity = new Map<string, RAPIER.RigidBody>();
+  private entityByBodyHandle = new Map<number, string>();
+  private colliderById = new Map<string, RAPIER.Collider>();
+  private colliderIdByHandle = new Map<number, string>();
+  private memberByColliderId = new Map<string, string>();
   private memberLocalPoses = new Map<string, MemberLocalPose>();
   private queuedInputs = new Map<number, PhysicsInput[]>();
   private currentTick = 0;
@@ -68,7 +72,8 @@ export class RapierPhysicsWorld implements RigidBodyWorld {
     this.world.timestep = 1 / this.ticksPerSecond;
     this.addGround();
     this.definitions = new Map(next.map((definition) => [definition.id, { ...definition }]));
-    this.bodyByEntity.clear(); this.memberLocalPoses.clear();
+    this.bodyByEntity.clear(); this.entityByBodyHandle.clear(); this.colliderById.clear();
+    this.colliderIdByHandle.clear(); this.memberByColliderId.clear(); this.memberLocalPoses.clear();
 
     const groups = new Map<string, RigidBodyDefinition[]>();
     next.forEach((definition) => {
@@ -79,9 +84,12 @@ export class RapierPhysicsWorld implements RigidBodyWorld {
       const anchor = members[0];
       const preserved = previous.get(anchor.id);
       const unchanged = previousDefinitions.get(anchor.id)?.revision === anchor.revision;
-      const position = preserved && unchanged ? preserved.position : anchor.position;
-      const orientation = preserved && unchanged ? preserved.orientation : (anchor.orientation ?? [0, 0, 0, 1]);
       const mode = anchor.mode ?? 'dynamic';
+      // Authored kinematic cursor poses are resolved pre-variant input for every
+      // reconciliation; only simulated dynamic/static state is preserved.
+      const preservePose = preserved && unchanged && mode !== 'kinematic';
+      const position = preservePose ? preserved.position : anchor.position;
+      const orientation = preservePose ? preserved.orientation : (anchor.orientation ?? [0, 0, 0, 1]);
       const desc = mode === 'static' ? RAPIER.RigidBodyDesc.fixed() : mode === 'kinematic'
         ? RAPIER.RigidBodyDesc.kinematicPositionBased() : RAPIER.RigidBodyDesc.dynamic();
       desc.setTranslation(...position).setRotation({ x: orientation[0], y: orientation[1], z: orientation[2], w: orientation[3] })
@@ -95,6 +103,7 @@ export class RapierPhysicsWorld implements RigidBodyWorld {
       if (anchor.enabledTranslations) body.setEnabledTranslations(...anchor.enabledTranslations, false);
       if (anchor.enabledRotations) body.setEnabledRotations(...anchor.enabledRotations, false);
       this.bodyByEntity.set(entityId, body);
+      this.entityByBodyHandle.set(body.handle, entityId);
       const mass = members.reduce((sum, member) => sum + (member.mass && member.mass > 0 ? member.mass : 1), 0);
       const massColliderCount = members.flatMap((member) => member.colliders ?? []).filter((collider) => !collider.sensor).length;
       const colliderMass = massColliderCount ? mass / massColliderCount : 0;
@@ -109,11 +118,14 @@ export class RapierPhysicsWorld implements RigidBodyWorld {
         (member.colliders ?? []).forEach((collider) => {
           const colliderOffset = new Vector3(...collider.offset).applyQuaternion(localOrientation).add(localPosition);
           const colliderOrientation = localOrientation.clone().multiply(quaternion(collider.orientation));
-          this.world.createCollider(this.colliderDesc({
+          const compiled = this.world.createCollider(this.colliderDesc({
             ...collider,
             offset: [colliderOffset.x, colliderOffset.y, colliderOffset.z],
             orientation: quaternionTuple(colliderOrientation),
           }, colliderMass), body);
+          this.colliderById.set(collider.id, compiled);
+          this.colliderIdByHandle.set(compiled.handle, collider.id);
+          this.memberByColliderId.set(collider.id, member.id);
         });
       });
       if (mode === 'dynamic' && massColliderCount === 0) body.setAdditionalMass(mass, false);
@@ -157,6 +169,9 @@ export class RapierPhysicsWorld implements RigidBodyWorld {
   frame(): PhysicsFrame {
     const states = new Map<string, RigidBodyState>();
     this.definitions.forEach((definition, id) => {
+      // Cursor sensors are authored per transaction frame. Publishing them as
+      // retained simulation state would overwrite the next authored cursor pose.
+      if (definition.retainsPhysicsState === false) return;
       const body = this.bodyFor(id); if (!body) return;
       const p = tuple(body.translation()); const localPose = this.memberLocalPoses.get(id) ?? { position: [0, 0, 0] as Vector3Tuple, orientation: [0, 0, 0, 1] as [number, number, number, number] };
       const bodyOrientation = quaternionTupleToThree(body.rotation());
@@ -166,6 +181,100 @@ export class RapierPhysicsWorld implements RigidBodyWorld {
         orientation: quaternionTuple(orientation), linearVelocity: tuple(body.linvel()), angularVelocity: tuple(body.angvel()), sleeping: body.isSleeping(), tick: this.currentTick });
     });
     return { tick: this.currentTick, states };
+  }
+
+  /**
+   * Geometry query for post-step poses at `tick`. It only reads Rapier and is safe
+   * to call repeatedly. Shape distance is authoritative: negative distance is a
+   * breach, while [0, tolerance] is a geometry-aware face/edge/corner touch.
+   */
+  queryInteractions(options: InteractionQueryOptions = {}): readonly InteractionQueryResult[] {
+    const tolerance = Math.max(0, options.tolerance ?? 0.001);
+    const definitions = [...this.definitions.values()];
+    const cursorColliders = definitions.flatMap((definition) => (definition.colliders ?? [])
+      .filter(({ interactionRole }) => interactionRole === 'cursor').map((collider) => ({ definition, collider })));
+    const targetColliders = definitions.flatMap((definition) => (definition.colliders ?? [])
+      .filter(({ interactionRole }) => interactionRole === 'target').map((collider) => ({ definition, collider })));
+    const offsets: Vector3Tuple[] = options.periodicSpace
+      ? [-options.periodicSpace.width, 0, options.periodicSpace.width].flatMap((x) =>
+          [-options.periodicSpace!.depth, 0, options.periodicSpace!.depth].map((z): Vector3Tuple => [x, 0, z]))
+      : [[0, 0, 0]];
+    const candidates: InteractionQueryResult[] = [];
+
+    cursorColliders.forEach((cursorEntry) => targetColliders.forEach((targetEntry) => {
+      if (cursorEntry.definition.id === targetEntry.definition.id) return;
+      if (!groupsCompatible(cursorEntry.collider.collisionGroups, targetEntry.collider.collisionGroups)) return;
+      const cursor = this.colliderById.get(cursorEntry.collider.id);
+      const target = this.colliderById.get(targetEntry.collider.id);
+      if (!cursor || !target) return;
+      let best: InteractionQueryResult | undefined;
+      offsets.forEach(([x, y, z]) => {
+        const cursorPosition = cursor.translation();
+        const shifted = { x: cursorPosition.x + x, y: cursorPosition.y + y, z: cursorPosition.z + z };
+        const numericalSlop = 1e-5;
+        const centralImage = x === 0 && y === 0 && z === 0;
+        const contact = centralImage
+          ? target.contactCollider(cursor, tolerance + numericalSlop)
+          : target.contactShape(cursor.shape, shifted, cursor.rotation(), tolerance + numericalSlop);
+        if (!contact) return;
+        if (contact.distance > tolerance + numericalSlop) return;
+        let geometricDistance = contact.distance;
+        let geometricNormal = tuple(contact.normal2);
+        // Solver colliders expose all contact manifolds. Prefer their deepest
+        // contact and world normal; shape-contact remains the proximity query for
+        // separated pairs and for sensors, which intentionally have no manifold.
+        if (centralImage && !cursor.isSensor() && !target.isSensor()) {
+          this.world.contactPair(target, cursor, (manifold, flipped) => {
+            for (let i = 0; i < manifold.numContacts(); i += 1) {
+              const distance = manifold.contactDist(i);
+              if (distance > geometricDistance) continue;
+              const n = manifold.normal();
+              const sign = flipped ? 1 : -1;
+              geometricDistance = distance;
+              geometricNormal = [n.x * sign, n.y * sign, n.z * sign];
+            }
+          });
+        }
+        // Rapier's sensor intersection graph establishes positive overlap for the
+        // ordinary image. Periodic images use the same exact-shape intersection.
+        let intersects = cursor.isSensor() && centralImage
+          ? false : target.shape.intersectsShape(target.translation(), target.rotation(), cursor.shape, shifted, cursor.rotation());
+        if (cursor.isSensor() && centralImage) {
+          this.world.intersectionPairsWith(cursor, (other) => { if (other.handle === target.handle) intersects = true; });
+        }
+        const penetration = geometricDistance < -1e-7 ? -geometricDistance : intersects && geometricDistance < 0 ? -geometricDistance : 0;
+        const state = penetration > 0 ? 'breach' as const : 'touch' as const;
+        const normal = geometricNormal;
+        const targetPosition = target.translation();
+        const inferredDirection: Vector3Tuple = [
+          targetPosition.x < shifted.x ? -1 : 1,
+          targetPosition.y < shifted.y ? -1 : 1,
+          targetPosition.z < shifted.z ? -1 : 1,
+        ];
+        const targetIdentity = targetEntry.definition.interactionIdentity ?? { id: targetEntry.definition.id, namespace: '' };
+        const rawCursorIdentity = cursorEntry.definition.interactionIdentity ?? { id: cursorEntry.definition.id, namespace: cursorEntry.definition.id };
+        const cursorIdentity = { ...rawCursorIdentity, streamId: rawCursorIdentity.streamId ?? 'secondary' };
+        const result: InteractionQueryResult = {
+          tick: this.currentTick, state, target: { ...targetIdentity }, cursor: cursorIdentity,
+          targetColliderId: targetEntry.collider.id, cursorColliderId: cursorEntry.collider.id,
+          normal, inferredDirection,
+          ...(state === 'breach' ? { penetration, resolutionDistance: penetration } : { separation: Math.max(0, geometricDistance) }),
+        };
+        if (!best || compareRepresentative(result, best) < 0) best = result;
+      });
+      if (best) candidates.push(best);
+    }));
+
+    const logical = new Map<string, InteractionQueryResult>();
+    candidates.forEach((candidate) => {
+      const key = `${candidate.cursor.streamId}\0${candidate.cursor.namespace}\0${candidate.cursor.id}\0${candidate.target.namespace}\0${candidate.target.id}`;
+      const current = logical.get(key);
+      if (!current || compareRepresentative(candidate, current) < 0) logical.set(key, candidate);
+    });
+    return Object.freeze([...logical.values()].sort((a, b) =>
+      a.cursor.streamId.localeCompare(b.cursor.streamId) || a.cursor.namespace.localeCompare(b.cursor.namespace) ||
+      a.cursor.id.localeCompare(b.cursor.id) || a.target.namespace.localeCompare(b.target.namespace) || a.target.id.localeCompare(b.target.id))
+      .map((result) => Object.freeze(result)));
   }
 
   snapshot(): PhysicsSnapshot { return { schemaVersion: 1, backend: 'rapier-0.20', tick: this.currentTick, states: [...this.frame().states.values()], definitions: [...this.definitions.values()] }; }
@@ -192,7 +301,26 @@ export class RapierPhysicsWorld implements RigidBodyWorld {
     this.currentTick = snapshot.tick;
     this.queuedInputs.clear();
   }
-  dispose(): void { this.world.free(); this.definitions.clear(); this.bodyByEntity.clear(); this.memberLocalPoses.clear(); this.queuedInputs.clear(); }
+  dispose(): void { this.world.free(); this.definitions.clear(); this.bodyByEntity.clear(); this.entityByBodyHandle.clear();
+    this.colliderById.clear(); this.colliderIdByHandle.clear(); this.memberByColliderId.clear(); this.memberLocalPoses.clear(); this.queuedInputs.clear(); }
+}
+
+function groupsCompatible(a = 0xffffffff, b = 0xffffffff): boolean {
+  const aMembership = a >>> 16; const aFilter = a & 0xffff;
+  const bMembership = b >>> 16; const bFilter = b & 0xffff;
+  return (aMembership & bFilter) !== 0 && (bMembership & aFilter) !== 0;
+}
+
+function compareRepresentative(a: InteractionQueryResult, b: InteractionQueryResult): number {
+  if (a.state !== b.state) return a.state === 'breach' ? -1 : 1;
+  if (a.state === 'breach') {
+    const depth = (b.penetration ?? 0) - (a.penetration ?? 0);
+    if (depth) return depth;
+  } else {
+    const distance = (a.separation ?? Infinity) - (b.separation ?? Infinity);
+    if (distance) return distance;
+  }
+  return a.targetColliderId.localeCompare(b.targetColliderId) || a.cursorColliderId.localeCompare(b.cursorColliderId);
 }
 
 function quaternionTupleToThree(value: { x: number; y: number; z: number; w: number }): Quaternion {

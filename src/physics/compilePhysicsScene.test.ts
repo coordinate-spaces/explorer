@@ -40,6 +40,30 @@ describe('compilePhysicsScene', () => {
     expect(new Set(definitions.map(({ entityId }) => entityId)).size).toBe(2);
     expect(definitions[1].entityId).toContain('secondary:remote-a:');
   });
+  it('separates default sensor and physical members in one secondary component', () => {
+    const sensorOrigins = new Map([
+      [1, { sourceKind: 'baseline' as const }],
+      [2, { sourceKind: 'secondary' as const, streamId: 'remote-a' }],
+    ]);
+    const physicalOrigins = new Map([
+      [1, { sourceKind: 'baseline' as const }],
+      [2, { sourceKind: 'secondary' as const, streamId: 'remote-a' }],
+    ]);
+    const sensor = compilePhysicsScene(createSpatialDocument(
+      '"Ground/+0+1/+0+1/+0+1" : ""\n"Cursor/+0+1/+2+1/+0+1" : ""',
+      { originsByLine: sensorOrigins },
+    )).find(({ interactionIdentity }) => interactionIdentity?.namespace === 'Cursor/')!;
+    const physical = compilePhysicsScene(createSpatialDocument(
+      '"Ground/+0+1/+0+1/+0+1" : ""\n"Cursor/+2+1/+2+1/+0+1" : "physical-body: true"',
+      { originsByLine: physicalOrigins },
+    )).find(({ interactionIdentity }) => interactionIdentity?.namespace === 'Cursor/')!;
+    expect(sensor).toMatchObject({ mode: 'kinematic', contributesToBounds: false, retainsPhysicsState: false,
+      colliders: [{ sensor: true, solverGroups: 0 }] });
+    expect(physical).toMatchObject({ mode: 'dynamic', contributesToBounds: true, retainsPhysicsState: true,
+      colliders: [{ sensor: false }] });
+    expect(physical.colliders![0].solverGroups).toBeUndefined();
+    expect(sensor.entityId).not.toBe(physical.entityId);
+  });
   it('does not attach cross-stream union tools to a baseline CSG body', () => {
     const origins = new Map([
       [1, { sourceKind: 'baseline' as const }],
