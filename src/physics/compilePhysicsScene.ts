@@ -16,6 +16,12 @@ function entityId(node: SpatialNode): string {
     : localId;
 }
 
+function originScope(node: SpatialNode): string {
+  return node.origin?.sourceKind === 'secondary'
+    ? `secondary:${node.origin.streamId ?? node.origin.publicKey ?? 'unknown'}`
+    : 'baseline';
+}
+
 function colliderShape(node: SpatialNode): ColliderShape {
   switch (node.geometry.kind) {
     case 'sphere': return 'ball';
@@ -36,7 +42,12 @@ export function compilePhysicsScene(document: SpatialDocument, revision = 'basel
   document.csgExpressions.forEach((expression) => {
     const id = entityId(expression.base);
     csgEntityByNodeId.set(expression.base.id, id);
-    expression.operations.forEach(({ tool }) => csgEntityByNodeId.set(tool.id, id));
+    expression.operations.forEach(({ tool }) => {
+      // Visual CSG may cross projection streams, but physics bodies may not.
+      if (originScope(tool) === originScope(expression.base)) {
+        csgEntityByNodeId.set(tool.id, id);
+      }
+    });
   });
 
   const candidates = flatten(document.nodes)

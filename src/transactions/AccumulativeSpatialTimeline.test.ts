@@ -53,6 +53,35 @@ describe('AccumulativeSpatialTimeline', () => {
     expect(definition).toMatchObject({ mode: 'static', restitution: .8 });
     expect(frame.document.diagnostics.some(({ message }) => message.includes('positive primitive colliders'))).toBe(true);
   });
+  it('selects conditional physics from retained poses', () => {
+    const baseline = '"Target/+0+1/+0+1/+0+1":""\n"Cursor/+1+1/+0+1/+0+1":""';
+    const declarationOrigins = new Map([
+      [1, { sourceKind: 'baseline' as const }],
+      [2, { sourceKind: 'secondary' as const, streamId: 'cursor' }],
+      [3, { sourceKind: 'baseline' as const }],
+    ]);
+    const timeline = new AccumulativeSpatialTimeline();
+    const initial = timeline.compile(baseline, declarationOrigins);
+    const targetId = initial.document.renderNodes.find(({ origin }) => origin?.sourceKind !== 'secondary')!.id;
+    timeline.simulation.world.enqueueInputs([{ kind: 'teleport', bodyId: targetId, tick: 1, position: [10, .5, .5] }]);
+    timeline.simulation.world.step(1);
+    timeline.compile(`${baseline}\n"Target/+touch":"physics-mode: static"`, declarationOrigins);
+    const definition = timeline.simulation.world.snapshot().definitions.find(({ id }) => id === targetId);
+    expect(definition?.mode).toBe('dynamic');
+  });
+
+  it('reconciles collider-relevant conditional geometry without simulation-owned translation', () => {
+    const source = '"Target/+0+2/+0+2/+0+2":""\n"Target/+touch":"geometry: sphere; rotation: 0,45,0"\n"Cursor/+2+1/+0+2/+0+2":""';
+    const declarationOrigins = new Map([
+      [1, { sourceKind: 'baseline' as const }], [2, { sourceKind: 'baseline' as const }],
+      [3, { sourceKind: 'secondary' as const, streamId: 'cursor' }],
+    ]);
+    const timeline = new AccumulativeSpatialTimeline();
+    timeline.compile(source, declarationOrigins);
+    const definition = timeline.simulation.world.snapshot().definitions.find(({ id }) => id.includes('Target'));
+    expect(definition?.colliders?.[0].shape).toBe('ball');
+    expect(definition?.orientation).not.toEqual([0, 0, 0, 1]);
+  });
   it('preserves authored poses until the rigid-body world advances', () => {
     const declaration = '"First/+0+1/+0+1/+0+1":""\n"Second/+0+1/+0+1/+0+1":""';
     const authored = createSpatialDocument(declaration);

@@ -40,6 +40,17 @@ describe('compilePhysicsScene', () => {
     expect(new Set(definitions.map(({ entityId }) => entityId)).size).toBe(2);
     expect(definitions[1].entityId).toContain('secondary:remote-a:');
   });
+  it('does not attach cross-stream union tools to a baseline CSG body', () => {
+    const origins = new Map([
+      [1, { sourceKind: 'baseline' as const }],
+      [2, { sourceKind: 'secondary' as const, streamId: 'remote-a' }],
+    ]);
+    const document = createSpatialDocument('"+0+2/+0+2/+0+2" : ""\n"+0+2/+0+2/+0+2" : "operation: union; physical-body: true"', { originsByLine: origins });
+    expect(document.csgExpressions).toHaveLength(1);
+    const definitions = compilePhysicsScene(document);
+    expect(new Set(definitions.map(({ entityId }) => entityId)).size).toBe(2);
+    expect(definitions.find(({ entityId }) => entityId?.includes('secondary:remote-a:'))?.entityId).toContain('secondary:remote-a:');
+  });
   it('maps authored primitives to stable collider definitions', () => {
     const definitions = compilePhysicsScene(createSpatialDocument(`"Box/+0+2/+0+4/+0+6" : "geometry: box"
 "Ball/+5+2/+0+2/+0+2" : "geometry: sphere"`));

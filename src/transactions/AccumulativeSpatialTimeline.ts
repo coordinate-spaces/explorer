@@ -61,12 +61,29 @@ function withCompilerDiagnostics(document: SpatialDocument, compiled: SpatialDoc
   return { ...document, diagnostics };
 }
 
-function withPhysicsById(nodes: readonly SpatialNode[], physicsById: ReadonlyMap<string, SpatialNode['physics']>): SpatialNode[] {
-  return nodes.map((node) => ({
-    ...node,
-    physics: physicsById.get(node.id) ?? node.physics,
-    children: withPhysicsById(node.children ?? [], physicsById),
-  }));
+function withColliderStateById(nodes: readonly SpatialNode[], conditionalById: ReadonlyMap<string, SpatialNode>): SpatialNode[] {
+  return nodes.map((node) => {
+    const conditional = conditionalById.get(node.id);
+    const copyTransform = (base: SpatialNode['transform'], override: SpatialNode['transform']) => ({
+      ...base,
+      rotation: override.rotation,
+      scale: override.scale,
+    });
+    return {
+      ...node,
+      ...(conditional ? {
+        box: conditional.box,
+        physics: conditional.physics,
+        geometry: conditional.geometry,
+        transform: copyTransform(node.transform, conditional.transform),
+        localTransform: node.localTransform && conditional.localTransform
+          ? copyTransform(node.localTransform, conditional.localTransform) : node.localTransform,
+        worldTransform: node.worldTransform && conditional.worldTransform
+          ? copyTransform(node.worldTransform, conditional.worldTransform) : node.worldTransform,
+      } : {}),
+      children: withColliderStateById(node.children ?? [], conditionalById),
+    };
+  });
 }
 
 /** Transaction/playback-owned bridge from XYZDSL interaction declarations to persistent physics. */
@@ -80,16 +97,24 @@ export class AccumulativeSpatialTimeline {
   dispose(): void { this.simulation.dispose(); }
 
   private reconcile(source: string, originsByLine?: ReadonlyMap<number, XyzDslDeclarationOrigin>): SpatialDocument {
-    const authored = createSpatialDocument(source, { originsByLine, applyConditionalVariants: false });
+    const retainedFrame = this.simulation.world.frame();
+    const authored = createSpatialDocument(source, {
+      originsByLine,
+      physicsFrame: retainedFrame,
+      applyConditionalVariants: false,
+    });
     // Translation variants remain simulation inputs, but active declarative
-    // physics variants must be present before body reconciliation.
+    // collider and physics variants must be present before body reconciliation.
     const conditional = createSpatialDocument(source, {
       originsByLine,
+      physicsFrame: retainedFrame,
       accumulativePhysics: true,
       interactionFacts: authored.interactions,
     });
-    const physicsById = new Map(renderable(conditional.nodes).map((node) => [node.id, node.physics]));
-    const effective = { ...authored, nodes: withPhysicsById(authored.nodes, physicsById) };
+    // Relative/weighted translations are suppressed by accumulativePhysics.
+    // Copy collider state without replacing retained positions in the authored tree.
+    const conditionalById = new Map(renderable(conditional.nodes).map((node) => [node.id, node]));
+    const effective = { ...authored, nodes: withColliderStateById(authored.nodes, conditionalById) };
     const definitions = compilePhysicsScene(effective, this.baselineRevision);
     this.simulation.reconcileDefinitions(definitions);
     return effective;
@@ -112,11 +137,6 @@ export class AccumulativeSpatialTimeline {
   evaluate(source: string, originsByLine?: ReadonlyMap<number, XyzDslDeclarationOrigin>): AccumulativeSpatialFrame {
     const authored = this.reconcile(source, originsByLine);
 
-    const current = createSpatialDocument(source, {
-      originsByLine,
-      physicsFrame: this.simulation.world.frame(),
-      accumulativePhysics: true,
-    });
     const parsed = parseXyzDslDocument(source, originsByLine);
     const resolved = resolveXyzDslDocument(parsed.value ?? []);
     const idsByNamespace = new Map(renderable(authored.nodes).map((node) => [node.namespacePath, node.id]));
@@ -136,7 +156,9 @@ export class AccumulativeSpatialTimeline {
       return [];
     });
     const tick = this.simulation.world.tick + 1;
-    const frame = this.simulation.evaluate(tick, tick, 0, current.interactions ?? [], bindings);
+    // Reuse the retained-pose facts that selected the reconciled conditional
+    // state; collider changes must not retroactively change that selection.
+    const frame = this.simulation.evaluate(tick, tick, 0, authored.interactions ?? [], bindings);
     return {
       tick,
       document: withCompilerDiagnostics(createSpatialDocument(source, {
