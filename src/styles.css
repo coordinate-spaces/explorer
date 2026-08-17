@@ -122,6 +122,34 @@ button {
   color: #f8fafc;
 }
 
+.coordinate-intent-console {
+  pointer-events: auto;
+  position: fixed;
+  left: 1rem;
+  bottom: 1rem;
+  z-index: 20;
+  width: min(32rem, calc(100vw - 2rem));
+  border: 1px solid rgb(34 211 238 / 35%);
+  border-radius: 0.8rem;
+  padding: 0.75rem;
+  background: rgb(8 19 29 / 90%);
+  box-shadow: 0 16px 50px rgb(0 0 0 / 35%);
+  backdrop-filter: blur(14px);
+  color: #cffafe;
+  font-size: 0.8rem;
+}
+
+.coordinate-intent-console summary { cursor: pointer; font-weight: 700; }
+.coordinate-intent-console dl { display: grid; gap: 0.25rem; margin: 0.65rem 0; }
+.coordinate-intent-console dl div { display: grid; grid-template-columns: 5rem 1fr; }
+.coordinate-intent-console dt { color: #67e8f9; }
+.coordinate-intent-console dd { margin: 0; overflow-wrap: anywhere; }
+.coordinate-intent-instruction { display: grid; grid-template-columns: 1fr auto; gap: 0.4rem; align-items: center; }
+.coordinate-intent-instruction code { grid-column: 1 / -1; padding: 0.6rem; border-radius: 0.4rem; background: #020617; overflow-wrap: anywhere; color: #a5f3fc; }
+.coordinate-intent-instruction button { border: 1px solid rgb(34 211 238 / 40%); border-radius: 999px; background: #164e63; color: white; padding: 0.25rem 0.6rem; }
+.coordinate-intent-diagnostics { margin-bottom: 0; color: #fca5a5; }
+.coordinate-intent-ok { margin-bottom: 0; color: #86efac; }
+
 .runtime-playback-controls {
   pointer-events: auto;
   position: fixed;

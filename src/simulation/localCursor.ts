@@ -1,4 +1,6 @@
 import type { CoordinateSpaceDimensions } from '../model/coordinateSpace';
+import { parseXyzDslDocument } from '../xyzdsl/parser';
+import { canonicalNamespacePath } from '../xyzdsl/pathParser';
 
 export const LOCAL_CURSOR_STREAM_ID = 'local-simulation';
 export const LOCAL_CURSOR_NAMESPACE = 'LocalCursor/';
@@ -14,6 +16,17 @@ export interface LocalCoordinateIntent {
 export const DEFAULT_LOCAL_COORDINATE_INTENT: LocalCoordinateIntent = {
   namespace: 'Character/', pointer: [6, 0, 4], heading: 0, mode: 'absolute', sequence: 0,
 };
+
+/** Primary declaration-only namespaces that own at least one concrete descendant. */
+export function localIntentDefinitions(source: string): string[] {
+  const objects = parseXyzDslDocument(source).value ?? [];
+  return objects.filter((object) => object.declarationOnly && object.namespace.length > 0)
+    .filter((definition) => objects.some((candidate) => candidate.box && candidate.namespace.length > definition.namespace.length
+      && definition.namespace.every((segment, index) => candidate.namespace[index] === segment)))
+    .map((object) => canonicalNamespacePath(object.namespace))
+    .filter((namespace, index, all) => all.indexOf(namespace) === index)
+    .sort();
+}
 
 export interface LocalCursorPose {
   position: [number, number, number];
@@ -91,11 +104,14 @@ export function advanceLocalCoordinateIntent(intent: LocalCoordinateIntent, inpu
   const length = Math.hypot(input.forward, input.right);
   const scale = length > 1 ? 1 / length : 1;
   const distance = Math.max(0, pointerSpeed) * clamp(input.deltaSeconds, 0, 0.1);
-  return { ...intent, heading, pointer: [
-    intent.pointer[0] + (Math.sin(radians) * input.forward + Math.cos(radians) * input.right) * scale * distance,
-    intent.pointer[1] + input.up * distance,
-    intent.pointer[2] + (-Math.cos(radians) * input.forward + Math.sin(radians) * input.right) * scale * distance,
-  ], sequence: intent.sequence + 1 };
+  const delta: [number, number, number] = [
+    (Math.sin(radians) * input.forward + Math.cos(radians) * input.right) * scale * distance,
+    input.up * distance,
+    (-Math.cos(radians) * input.forward + Math.sin(radians) * input.right) * scale * distance,
+  ];
+  return { ...intent, heading, pointer: intent.mode === 'relative'
+    ? delta
+    : delta.map((value, axis) => value + intent.pointer[axis]) as [number, number, number], sequence: intent.sequence + 1 };
 }
 
 export function localCoordinateIntentXyzDsl(intent: LocalCoordinateIntent): string {

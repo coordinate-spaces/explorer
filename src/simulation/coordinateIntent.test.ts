@@ -13,6 +13,18 @@ describe('coordinate intent simulation', () => {
     expect(reducer.apply({ id: 'p', mode: 'relative', coordinate: [2, 0, -1], frameId: '2' }).pointer).toEqual([12, 0, 4]);
   });
 
+  it('turns toward the pointer at the configured bounded rate', () => {
+    const result = coordinateIntentInputs('body', state, [10, 0, 0], { diagnostics: [], 'max-turn-rate': 60 }, 1, true);
+    const orientation = result.inputs.find((input) => input.kind === 'orientation');
+    expect(orientation).toMatchObject({ kind: 'orientation' });
+    if (orientation?.kind === 'orientation') expect(orientation.orientation[1]).toBeCloseTo(Math.sin(Math.PI / 360));
+  });
+
+  it('does not snap facing after arriving', () => {
+    const result = coordinateIntentInputs('body', state, [0, 0, 0], { diagnostics: [] }, 1, true);
+    expect(result.inputs.some((input) => input.kind === 'orientation')).toBe(false);
+  });
+
   it('uses the authored deceleration limit while slowing before arrival', () => {
     const moving = { ...state, linearVelocity: [5, 0, 0] as [number, number, number] };
     const result = coordinateIntentInputs('body', moving, [1, 0, 0], {

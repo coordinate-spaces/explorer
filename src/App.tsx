@@ -26,7 +26,8 @@ import { useRealtimePublicKeyTransactions } from './transactions/useRealtimePubl
 import { XyzDslDrawer } from './ui/XyzDslDrawer';
 import { SelectedNodeInspector } from './ui/SelectedNodeInspector';
 import { usePersistentState } from './ui/usePersistentState';
-import { advanceLocalCursor, DEFAULT_LOCAL_CURSOR_POSE, LOCAL_CURSOR_STREAM_ID, localCursorXyzDsl, type LocalCursorInput } from './simulation/localCursor';
+import { CoordinateIntentConsole } from './ui/CoordinateIntentConsole';
+import { advanceLocalCoordinateIntent, DEFAULT_LOCAL_COORDINATE_INTENT, LOCAL_CURSOR_STREAM_ID, localCoordinateIntentXyzDsl, localIntentDefinitions, type LocalCursorInput } from './simulation/localCursor';
 
 const INITIAL_XYZDSL = `"+2+4/+0+6/+1+3" : "geometry: cylinder; color: 0x333333; metalness: 0.8; roughness: 0.2"
 "+2+4/+7+6/+0+10c" : "geometry: cone; color: yellow; metalness: 0.2; roughness: 0.5"
@@ -38,7 +39,10 @@ const INITIAL_XYZDSL = `"+2+4/+0+6/+1+3" : "geometry: cylinder; color: 0x333333;
 "Table/Leg/+0+1/+0+5/+0+1" : ""
 "Table/Leg/+7+1/+0+5/+0+1" : ""
 "Table/Leg/+0+1/+0+5/+7+1" : ""
-"Table/Leg/+7+1/+0+5/+7+1" : ""`;
+"Table/Leg/+7+1/+0+5/+7+1" : ""
+
+"Character/" : "physics-mode: dynamic; max-speed: 4; max-acceleration: 12; max-deceleration: 16; max-turn-rate: 360; arrival-radius: 10c"
+"Character/Body/+0+6c/+0+18c/+0+6c" : "geometry: cylinder; mass: 1; lock-rotations: x,z"`;
 
 const DEFAULT_TRANSACTION_ENDPOINT = 'wss://sure-formerly-filly.ngrok-free.app/00000000e29a7850088d660489b7b9ae2da763bc3bd83324ecc54eee04840adb';
 
@@ -184,7 +188,7 @@ export default function App() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [simulationMode, setSimulationMode] = useState<'stopped' | 'running' | 'paused'>('stopped');
   const [simulationSource, setSimulationSource] = useState<'remote' | 'local'>('remote');
-  const [localCursorPose, setLocalCursorPose] = useState(DEFAULT_LOCAL_CURSOR_POSE);
+  const [localCoordinateIntent, setLocalCoordinateIntent] = useState(DEFAULT_LOCAL_COORDINATE_INTENT);
   const [localCursorCaptured, setLocalCursorCaptured] = useState(false);
   const [secondaryCameraTarget, setSecondaryCameraTarget] = useState<SecondaryCameraTarget | undefined>();
   const [selectedNodeId, setSelectedNodeId] = useState<string | undefined>();
@@ -566,13 +570,16 @@ export default function App() {
     () => originsForEditedSource(authoringSource, primaryRemoteBaselineSource, transactionXyzDsl.originsByLine),
     [authoringSource, primaryRemoteBaselineSource, transactionXyzDsl.originsByLine],
   );
+  const localDefinitionChoices = useMemo(() => localIntentDefinitions(authoringSource), [authoringSource]);
+  const selectedLocalDefinition = localDefinitionChoices.includes(localCoordinateIntent.namespace)
+    ? localCoordinateIntent.namespace : (localDefinitionChoices[0] ?? '');
   const localCursorStream = useMemo(() => ({
     id: LOCAL_CURSOR_STREAM_ID,
-    transactionId: `local-frame-${localCursorPose.sequence}`,
-    transactionTime: localCursorPose.sequence,
-    declarations: localCursorXyzDsl(localCursorPose),
+    transactionId: `local-frame-${localCoordinateIntent.sequence}`,
+    transactionTime: localCoordinateIntent.sequence,
+    declarations: localCoordinateIntentXyzDsl({ ...localCoordinateIntent, namespace: selectedLocalDefinition }),
     bypassNamespacePolicy: true,
-  }), [localCursorPose]);
+  }), [localCoordinateIntent, selectedLocalDefinition]);
   const renderedBundle = useMemo(
     () => composeSpatialEditorSourceBundle(
       authoringSource,
@@ -658,11 +665,11 @@ export default function App() {
     simulationSessionRef.current = new SpatialSimulationSession(renderedBundle.source, renderedBundle.originsByLine, baselineRevision);
     simulationSessionRef.current.start();
     simulationBaselineRevisionRef.current = baselineRevision;
-    if (simulationSource === 'local') setLocalCursorPose({ ...DEFAULT_LOCAL_CURSOR_POSE, position: [...DEFAULT_LOCAL_CURSOR_POSE.position], rotation: [...DEFAULT_LOCAL_CURSOR_POSE.rotation], size: [...DEFAULT_LOCAL_CURSOR_POSE.size] });
+    if (simulationSource === 'local') setLocalCoordinateIntent({ ...DEFAULT_LOCAL_COORDINATE_INTENT, namespace: selectedLocalDefinition, pointer: [...DEFAULT_LOCAL_COORDINATE_INTENT.pointer] });
     setAppMode('viewer');
     setDrawerOpen(false);
     setSimulationMode('running');
-  }, [baselineRevision, renderedBundle, simulationSource]);
+  }, [baselineRevision, renderedBundle, selectedLocalDefinition, simulationSource]);
 
   const stopSimulation = useCallback(() => {
     simulationSessionRef.current?.dispose();
@@ -673,8 +680,8 @@ export default function App() {
   }, []);
   const handleLocalCursorInput = useCallback((input: LocalCursorInput) => {
     if (simulationMode !== 'running' || simulationSource !== 'local') return;
-    setLocalCursorPose((pose) => advanceLocalCursor(pose, input, document.coordinateSpace));
-  }, [document.coordinateSpace, simulationMode, simulationSource]);
+    setLocalCoordinateIntent((intent) => advanceLocalCoordinateIntent(intent, input));
+  }, [simulationMode, simulationSource]);
   const selectedNode = useMemo(
     () => findNodeById(document.nodes, selectedNodeId) ?? findNodeByLineNumber(document.nodes, selectedLineNumber),
     [document.nodes, selectedLineNumber, selectedNodeId],
@@ -1010,7 +1017,17 @@ export default function App() {
                 <option value="local">Local cursor</option>
               </select>
             </label>
-            <button type="button" onClick={startSimulation}>Start simulation</button>
+            {simulationSource === 'local' ? <label className="simulation-camera-control">Definition
+              <select aria-label="Local controller definition" value={selectedLocalDefinition} onChange={(event) => setLocalCoordinateIntent((intent) => ({ ...intent, namespace: event.target.value }))}>
+                {localDefinitionChoices.length ? localDefinitionChoices.map((namespace) => <option key={namespace}>{namespace}</option>) : <option value="">No controller definitions</option>}
+              </select>
+            </label> : null}
+            {simulationSource === 'local' ? <label className="simulation-camera-control">Intent
+              <select aria-label="Local intent mode" value={localCoordinateIntent.mode} onChange={(event) => setLocalCoordinateIntent((intent) => ({ ...intent, mode: event.target.value as 'absolute' | 'relative', pointer: event.target.value === 'relative' ? [0, 0, 0] : [...DEFAULT_LOCAL_COORDINATE_INTENT.pointer], sequence: intent.sequence + 1 }))}>
+                <option value="absolute">Absolute</option><option value="relative">Relative</option>
+              </select>
+            </label> : null}
+            <button type="button" onClick={startSimulation} disabled={simulationSource === 'local' && !selectedLocalDefinition}>Start simulation</button>
           </>
         ) : (
           <>
@@ -1020,8 +1037,8 @@ export default function App() {
             <button type="button" onClick={stopSimulation}>Stop and reset</button>
             {simulationSource === 'local' ? (
               <span className="local-cursor-status" title="Click the scene to capture the mouse; press Escape to release.">
-                {localCursorCaptured ? 'Mouse captured' : 'Click scene · WASD · Space/Shift · mouse'} · frame {localCursorPose.sequence}
-                {' · '}XYZ {localCursorPose.position.map((value) => value.toFixed(2)).join(', ')}
+                {localCursorCaptured ? 'Mouse captured' : 'Click scene · WASD · Space/Shift · mouse'} · frame {localCoordinateIntent.sequence}
+                {' · '}XYZ {localCoordinateIntent.pointer.map((value) => value.toFixed(2)).join(', ')}
                 {' · '}{document.interactions?.length ?? 0} interaction{document.interactions?.length === 1 ? '' : 's'}
               </span>
             ) : null}
@@ -1045,6 +1062,11 @@ export default function App() {
           </>
         )}
       </div>
+      {simulationSource === 'local' ? <CoordinateIntentConsole
+        declaration={localCoordinateIntentXyzDsl({ ...localCoordinateIntent, namespace: selectedLocalDefinition })}
+        intent={{ ...localCoordinateIntent, namespace: selectedLocalDefinition }}
+        diagnostics={document.diagnostics}
+      /> : null}
       <XyzDslDrawer
         appMode={appMode}
         authoringAvailable={simulationMode === 'stopped'}
