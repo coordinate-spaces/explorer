@@ -45,6 +45,9 @@ export interface CharacterControllerResult {
 }
 
 const clamp = (value: number, limit: number) => Math.max(-limit, Math.min(limit, value));
+const radiansToDegrees = (value: number) => value * 180 / Math.PI;
+const degreesToRadians = (value: number) => value * Math.PI / 180;
+const shortestAngle = (value: number) => ((value + 540) % 360) - 180;
 
 /** Converts a pointer into bounded forces; it never sets or teleports a pose. */
 export function coordinateIntentInputs(
@@ -78,5 +81,22 @@ export function coordinateIntentInputs(
   const jump = grounded && pointer[1] - state.position[1] > stepHeight && (physics['jump-speed'] ?? 0) > 0;
   if (jump) inputs.push({ kind: 'impulse', bodyId, tick, vector: [0, (physics['jump-speed'] ?? 0) * mass, 0] });
   const desiredYaw = distance > arrival ? Math.atan2(dx, -dz) * 180 / Math.PI : 0;
+  if (distance > arrival) {
+    const [x, y, z, w] = state.orientation;
+    const currentYaw = radiansToDegrees(Math.atan2(2 * (w * y + x * z), 1 - 2 * (y * y + z * z)));
+    const turnLimit = (physics['max-turn-rate'] ?? 360) / 60;
+    const yawDelta = clamp(shortestAngle(desiredYaw - currentYaw), turnLimit);
+    const halfDelta = degreesToRadians(yawDelta) / 2;
+    const sin = Math.sin(halfDelta);
+    const cos = Math.cos(halfDelta);
+    // Apply only the bounded world-y delta. Multiplying it into the retained
+    // quaternion preserves pitch and roll from authored state or physics.
+    inputs.push({ kind: 'orientation', bodyId, tick, orientation: [
+      cos * x + sin * z,
+      cos * y + sin * w,
+      cos * z - sin * x,
+      cos * w - sin * y,
+    ] });
+  }
   return { inputs, desiredYaw: clamp(desiredYaw, 180), arrived: distance <= arrival, jump };
 }

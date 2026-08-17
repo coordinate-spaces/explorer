@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { advanceLocalCoordinateIntent, advanceLocalCursor, DEFAULT_LOCAL_COORDINATE_INTENT, DEFAULT_LOCAL_CURSOR_POSE, localCoordinateIntentXyzDsl, localCursorXyzDsl } from './localCursor';
+import { advanceLocalCoordinateIntent, advanceLocalCursor, DEFAULT_LOCAL_COORDINATE_INTENT, DEFAULT_LOCAL_CURSOR_POSE, localCoordinateIntentXyzDsl, localCursorXyzDsl, localIntentDefinitions, resetLocalCoordinateIntent } from './localCursor';
 import { parseXyzDslDeclaration } from '../xyzdsl/parser';
 import { composeSpatialEditorSourceBundle } from '../transactions/composeTransactionSources';
 import { createSpatialDocument } from '../model/createSpatialDocument';
@@ -7,10 +7,24 @@ import { createSpatialDocument } from '../model/createSpatialDocument';
 const room = { width: 40, height: 20, depth: 40 };
 
 describe('local cursor simulation', () => {
+  it('lists only definition namespaces with concrete descendants', () => {
+    expect(localIntentDefinitions('"Character/" : ""\n"Character/Body/+0+1/+0+2/+0+1" : ""\n"Empty/" : ""')).toEqual(['Character/']);
+  });
   it('authors an intent pointer without emitting character pose or size', () => {
     const intent = advanceLocalCoordinateIntent(DEFAULT_LOCAL_COORDINATE_INTENT, { forward: 1, right: 0, up: 0, yawDelta: 0, pitchDelta: 0, deltaSeconds: 0.1 });
     expect(intent.pointer).toEqual([6, 0, 3.6]);
     expect(localCoordinateIntentXyzDsl(intent)).toBe('"Character/+600c/+0c/+360c" : "intent: absolute"');
+  });
+
+  it('emits only the current displacement in relative mode', () => {
+    const intent = advanceLocalCoordinateIntent({ ...DEFAULT_LOCAL_COORDINATE_INTENT, mode: 'relative', pointer: [0, 0, 0] }, { forward: 1, right: 0, up: 0, yawDelta: 0, pitchDelta: 0, deltaSeconds: 0.1 });
+    expect(intent.pointer).toEqual([0, 0, -0.4]);
+  });
+
+  it('preserves relative mode when resetting for simulation start', () => {
+    expect(resetLocalCoordinateIntent({ ...DEFAULT_LOCAL_COORDINATE_INTENT, mode: 'relative', pointer: [2, 0, 1], sequence: 8 }, 'Avatar/')).toMatchObject({
+      namespace: 'Avatar/', mode: 'relative', pointer: [0, 0, 0], heading: 0, sequence: 0,
+    });
   });
   it('normalizes diagonal movement and moves relative to yaw', () => {
     const straight = advanceLocalCursor(DEFAULT_LOCAL_CURSOR_POSE, { forward: 1, right: 0, up: 0, yawDelta: 0, pitchDelta: 0, deltaSeconds: 0.1 }, room, 10);

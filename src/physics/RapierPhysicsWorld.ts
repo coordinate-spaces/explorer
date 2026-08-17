@@ -153,6 +153,7 @@ export class RapierPhysicsWorld implements RigidBodyWorld {
         if (input.kind === 'force') body.addForce({ x: input.vector[0], y: input.vector[1], z: input.vector[2] }, true);
         else if (input.kind === 'impulse') body.applyImpulse({ x: input.vector[0], y: input.vector[1], z: input.vector[2] }, true);
         else if (input.kind === 'translation') { const p = body.translation(); body.setTranslation({ x: p.x + input.vector[0], y: p.y + input.vector[1], z: p.z + input.vector[2] }, true); }
+        else if (input.kind === 'orientation') body.setRotation({ x: input.orientation[0], y: input.orientation[1], z: input.orientation[2], w: input.orientation[3] }, true);
         else if ('position' in input) {
           const localPose = this.memberLocalPoses.get(input.bodyId) ?? { position: [0, 0, 0] as Vector3Tuple, orientation: [0, 0, 0, 1] as [number, number, number, number] };
           const offset = new Vector3(...localPose.position).applyQuaternion(quaternionTupleToThree(body.rotation()));

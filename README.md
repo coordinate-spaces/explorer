@@ -249,12 +249,12 @@ See [docs/implementation-plan.md](docs/implementation-plan.md) for architecture 
 
 The viewer can exercise secondary-cursor interactions without a remote public key or WebSocket overlay:
 
-1. In **Simulation**, choose **Local cursor** as the source and select **Start simulation**.
-2. Click the 3D scene to capture the pointer. Use **W/A/S/D** to move relative to cursor heading, **Space/Shift** (or **E/Q**) to move vertically, and the mouse to change yaw and pitch.
-3. Press **Escape** to release the pointer. Pause freezes local emissions; **Stop and reset** removes the synthetic cursor and restores the authored baseline.
-4. Use the camera selector to remain in orbit view or choose `LocalCursor/ · local-simulation` for the existing cursor camera.
+1. Add a declaration-only controller definition with at least one concrete geometry descendant. The bundled scene includes `Character/` as an example.
+2. In **Simulation**, choose **Local cursor**, select the definition and absolute or relative intent mode, then select **Start simulation**.
+3. Click the 3D scene to capture the pointer. Use **W/A/S/D** to move relative to cursor heading, **Space/Shift** (or **E/Q**) to move vertically, and the mouse to change heading.
+4. Press **Escape** to release the pointer. Pause freezes local emissions; **Stop and reset** removes the runtime controller and restores the authored baseline.
 
-At a fixed 30 Hz input cadence, controls are integrated into a complete, valid XYZDSL declaration containing absolute X/Y/Z bounds and a `rotation: x,y,z` property. The declaration is composed locally with `secondary` provenance and a synthetic frame ID, so it uses the same parser, renderer-side wrapping, touch/breach evaluation, and accumulative simulation path as a remote cursor while bypassing transaction transport entirely. Emitted X/Z positions remain unwrapped across positive coordinate-space spans, Y is clamped, and path coordinates are emitted in centiunits. Because XYZDSL path offsets are unsigned, movement stops at zero on an X or Z axis; the spatial-document projection—not the local input adapter—maps emitted coordinates into the rendered periodic cell.
+The coordinate-intent console exposes the complete signed XYZDSL instruction, stream frame, selected baseline definition, and controller diagnostics while simulation is running. The declaration is composed locally with `secondary` provenance and a synthetic frame ID, then resolved into a dynamic runtime body. The instruction itself is never rendered and never acts as a sensor; movement, turning, and collision response belong to the retained Rapier body.
 
 ## Coordinate intent controllers
 
