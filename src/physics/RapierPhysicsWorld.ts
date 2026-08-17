@@ -1,6 +1,6 @@
 import RAPIER from '@dimforge/rapier3d-compat';
 import type { RigidBodyWorld } from './RigidBodyWorld';
-import type { ColliderDefinition, InteractionQueryOptions, InteractionQueryResult, PhysicsFrame, PhysicsInput, PhysicsSnapshot, RigidBodyDefinition, RigidBodyState, Vector3Tuple } from './types';
+import type { ColliderDefinition, InteractionQueryOptions, InteractionQueryResult, JointDefinition, PhysicsFrame, PhysicsInput, PhysicsSnapshot, RigidBodyDefinition, RigidBodyState, Vector3Tuple } from './types';
 import { Quaternion, Vector3 } from 'three';
 
 await RAPIER.init();
@@ -20,6 +20,8 @@ export class RapierPhysicsWorld implements RigidBodyWorld {
   private colliderIdByHandle = new Map<number, string>();
   private memberByColliderId = new Map<string, string>();
   private memberLocalPoses = new Map<string, MemberLocalPose>();
+  private jointDefinitions = new Map<string, JointDefinition>();
+  private jointById = new Map<string, RAPIER.ImpulseJoint>();
   private queuedInputs = new Map<number, PhysicsInput[]>();
   private currentTick = 0;
 
@@ -56,7 +58,7 @@ export class RapierPhysicsWorld implements RigidBodyWorld {
     return desc;
   }
 
-  reconcileDefinitions(next: readonly RigidBodyDefinition[]): void {
+  reconcileDefinitions(next: readonly RigidBodyDefinition[], joints: readonly JointDefinition[] = []): void {
     const previous = this.frame().states;
     const previousDefinitions = this.definitions;
     const modes = new Map<string, Set<string>>();
@@ -74,6 +76,8 @@ export class RapierPhysicsWorld implements RigidBodyWorld {
     this.definitions = new Map(next.map((definition) => [definition.id, { ...definition }]));
     this.bodyByEntity.clear(); this.entityByBodyHandle.clear(); this.colliderById.clear();
     this.colliderIdByHandle.clear(); this.memberByColliderId.clear(); this.memberLocalPoses.clear();
+    this.jointDefinitions = new Map(joints.map((joint) => [joint.id, { ...joint }]));
+    this.jointById.clear();
 
     const groups = new Map<string, RigidBodyDefinition[]>();
     next.forEach((definition) => {
@@ -129,6 +133,22 @@ export class RapierPhysicsWorld implements RigidBodyWorld {
         });
       });
       if (mode === 'dynamic' && massColliderCount === 0) body.setAdditionalMass(mass, false);
+    });
+    joints.forEach((definition) => {
+      const parent = this.bodyByEntity.get(definition.parentEntityId);
+      const child = this.bodyByEntity.get(definition.childEntityId);
+      if (!parent || !child) throw new Error(`Joint ${definition.id} references a missing rigid body.`);
+      const data = RAPIER.JointData.revoluteWithAxes(
+        { x: definition.parentAnchor[0], y: definition.parentAnchor[1], z: definition.parentAnchor[2] },
+        { x: definition.childAnchor[0], y: definition.childAnchor[1], z: definition.childAnchor[2] },
+        { x: definition.parentAxis[0], y: definition.parentAxis[1], z: definition.parentAxis[2] },
+        { x: definition.childAxis[0], y: definition.childAxis[1], z: definition.childAxis[2] },
+      );
+      const joint = this.world.createImpulseJoint(data, parent, child, true) as RAPIER.RevoluteImpulseJoint;
+      joint.setContactsEnabled(definition.collideConnected ?? false);
+      if (definition.limits) joint.setLimits(...definition.limits);
+      if (definition.damping && definition.damping > 0) joint.configureMotorVelocity(0, definition.damping);
+      this.jointById.set(definition.id, joint);
     });
   }
 
@@ -278,10 +298,10 @@ export class RapierPhysicsWorld implements RigidBodyWorld {
       .map((result) => Object.freeze(result)));
   }
 
-  snapshot(): PhysicsSnapshot { return { schemaVersion: 1, backend: 'rapier-0.20', tick: this.currentTick, states: [...this.frame().states.values()], definitions: [...this.definitions.values()] }; }
+  snapshot(): PhysicsSnapshot { return { schemaVersion: 1, backend: 'rapier-0.20', tick: this.currentTick, states: [...this.frame().states.values()], definitions: [...this.definitions.values()], joints: [...this.jointDefinitions.values()] }; }
   restore(snapshot: PhysicsSnapshot): void {
     this.definitions.clear();
-    this.reconcileDefinitions(snapshot.definitions);
+    this.reconcileDefinitions(snapshot.definitions, snapshot.joints ?? []);
     const states = new Map(snapshot.states.map((state) => [state.id, state]));
     const restoredEntities = new Set<string>();
     snapshot.definitions.forEach((definition) => {
@@ -303,7 +323,7 @@ export class RapierPhysicsWorld implements RigidBodyWorld {
     this.queuedInputs.clear();
   }
   dispose(): void { this.world.free(); this.definitions.clear(); this.bodyByEntity.clear(); this.entityByBodyHandle.clear();
-    this.colliderById.clear(); this.colliderIdByHandle.clear(); this.memberByColliderId.clear(); this.memberLocalPoses.clear(); this.queuedInputs.clear(); }
+    this.colliderById.clear(); this.colliderIdByHandle.clear(); this.memberByColliderId.clear(); this.memberLocalPoses.clear(); this.jointDefinitions.clear(); this.jointById.clear(); this.queuedInputs.clear(); }
 }
 
 function groupsCompatible(a = 0xffffffff, b = 0xffffffff): boolean {

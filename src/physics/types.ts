@@ -5,6 +5,20 @@ export type QuaternionTuple = [number, number, number, number];
 export type RigidBodyMode = 'dynamic' | 'kinematic' | 'static';
 export type ColliderShape = 'cuboid' | 'ball' | 'cylinder' | 'cone' | 'capsule';
 
+export interface JointDefinition {
+  id: string;
+  kind: 'revolute';
+  parentEntityId: string;
+  childEntityId: string;
+  parentAnchor: Vector3Tuple;
+  childAnchor: Vector3Tuple;
+  parentAxis: Vector3Tuple;
+  childAxis: Vector3Tuple;
+  limits?: [number, number];
+  damping?: number;
+  collideConnected?: boolean;
+}
+
 export interface ColliderDefinition {
   id: string;
   bodyId: string;
@@ -119,4 +133,5 @@ export interface PhysicsSnapshot {
   tick: number;
   states: RigidBodyState[];
   definitions: RigidBodyDefinition[];
+  joints?: JointDefinition[];
 }

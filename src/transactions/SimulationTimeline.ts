@@ -1,7 +1,7 @@
 import type { InteractionFact } from '../model/interactions';
 import { PhysicsWorld } from '../physics/PhysicsWorld';
 import type { RigidBodyWorld } from '../physics/RigidBodyWorld';
-import type { PhysicsFrame, PhysicsInput, PhysicsSnapshot, RigidBodyDefinition, Vector3Tuple } from '../physics/types';
+import type { JointDefinition, PhysicsFrame, PhysicsInput, PhysicsSnapshot, RigidBodyDefinition, Vector3Tuple } from '../physics/types';
 import { interactionTransitions } from './interactionTimeline';
 import type { InteractionTransition } from './interactionTimeline';
 
@@ -71,8 +71,8 @@ export class SimulationTimeline {
       .forEach((snapshotTick) => this.snapshots.delete(snapshotTick));
   }
 
-  reconcileDefinitions(definitions: readonly RigidBodyDefinition[]): void {
-    this.world.reconcileDefinitions(definitions);
+  reconcileDefinitions(definitions: readonly RigidBodyDefinition[], joints: readonly JointDefinition[] = []): void {
+    this.world.reconcileDefinitions(definitions, joints);
     this.invalidateSnapshotsAfter(this.world.tick);
     this.snapshots.set(this.world.tick, {
       physics: this.world.snapshot(),

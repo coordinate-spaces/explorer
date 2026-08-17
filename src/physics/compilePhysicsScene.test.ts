@@ -1,8 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import { createSpatialDocument } from '../model/createSpatialDocument';
-import { compilePhysicsScene } from './compilePhysicsScene';
+import { compileArticulatedPhysicsScene, compilePhysicsScene } from './compilePhysicsScene';
 
 describe('compilePhysicsScene', () => {
+  it('splits explicit bodies and resolves a revolute pivot into local frames', () => {
+    const document = createSpatialDocument(`"Pendulum/+0+1/+0+1/+0+1" : ""
+"Pendulum/Anchor/+45c+10c/+8+1/+45c+10c" : "body: Anchor; physics-mode: static"
+"Pendulum/Rod/+45c+10c/+3+5/+45c+10c" : "body: Rod; joint: revolute; joint-parent: Pendulum/Anchor/; joint-anchor: 0.5 8 0.5; joint-axis: 0 0 1"`);
+    const scene = compileArticulatedPhysicsScene(document);
+    expect(new Set(scene.bodies.map(({ entityId }) => entityId))).toEqual(new Set(['component:Pendulum/body:Anchor', 'component:Pendulum/body:Rod']));
+    expect(scene.joints).toEqual([expect.objectContaining({ parentAnchor: [0, -0.5, 0], childAnchor: [0, 2.5, 0], parentAxis: [0, 0, 1], childAxis: [0, 0, 1] })]);
+  });
   it('compiles body, collider, locks, groups, and no transaction-derived mass', () => {
     const origins = new Map([[1, { sourceKind: 'baseline' as const, transactionAmount: 999 }]]);
     const document = createSpatialDocument('"Body/+0+2/+0+2/+0+2" : "physics-mode: static; mass: 3; friction: .2; restitution: .4; linear-damping: 2; gravity-scale: .5; ccd: true; can-sleep: false; lock-translations: x; lock-rotations: y,z; sensor: true; collision-groups: 12; solver-groups: 34"', { originsByLine: origins });
