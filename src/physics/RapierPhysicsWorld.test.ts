@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { RapierPhysicsWorld } from './RapierPhysicsWorld';
-import type { RigidBodyDefinition } from './types';
+import type { JointDefinition, RigidBodyDefinition } from './types';
 
 const body: RigidBodyDefinition = {
   id: 'box', bounds: { minX: -0.5, maxX: 0.5, minY: 2, maxY: 3, minZ: -0.5, maxZ: 0.5 }, position: [0, 2.5, 0],
@@ -8,6 +8,23 @@ const body: RigidBodyDefinition = {
 };
 
 describe('RapierPhysicsWorld', () => {
+  it('swings a revolute pendulum while retaining its pivot distance', () => {
+    const anchor: RigidBodyDefinition = { ...body, id: 'anchor', entityId: 'anchor-body', mode: 'static', position: [0, 8.5, 0] };
+    const rod: RigidBodyDefinition = { ...body, id: 'rod', entityId: 'rod-body', mass: 1, position: [0, 5.5, 0],
+      colliders: [{ id: 'rod-collider', bodyId: 'rod', shape: 'cuboid', dimensions: [0.2, 5, 0.2], offset: [0, 0, 0] }] };
+    const joint: JointDefinition = { id: 'hinge', kind: 'revolute', parentEntityId: 'anchor-body', childEntityId: 'rod-body',
+      parentAnchor: [0, -0.5, 0], childAnchor: [0, 2.5, 0], parentAxis: [0, 0, 1], childAxis: [0, 0, 1] };
+    const world = new RapierPhysicsWorld(60); world.reconcileDefinitions([anchor, rod], [joint]);
+    world.enqueueInputs([{ kind: 'impulse', bodyId: 'rod', tick: 1, vector: [2, 0, 0] }]);
+    const state = world.step(120).states.get('rod')!;
+    expect(Math.abs(state.position[0])).toBeGreaterThan(0.1);
+    expect(Math.hypot(state.position[0], state.position[1] - 8)).toBeCloseTo(2.5, 2);
+    const snapshot = world.snapshot();
+    expect(snapshot.joints).toEqual([joint]);
+    world.restore(snapshot);
+    expect(world.frame().states.get('rod')!.position).toEqual(state.position);
+    world.dispose();
+  });
   it('integrates gravity and resolves a rigid-body contact with the ground', () => {
     const world = new RapierPhysicsWorld(); world.reconcileDefinitions([body]);
     expect(world.step().states.get('box')!.position[1]).toBeLessThan(2.5);

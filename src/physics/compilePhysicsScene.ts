@@ -1,25 +1,14 @@
 import type { SpatialDocument } from '../model/SpatialDocument';
 import type { SpatialNode } from '../model/SpatialNode';
-import type { ColliderDefinition, ColliderShape, RigidBodyDefinition, Vector3Tuple } from './types';
-import { Euler, Quaternion } from 'three';
+import type { ColliderDefinition, ColliderShape, JointDefinition, RigidBodyDefinition, Vector3Tuple } from './types';
+import { Euler, Quaternion, Vector3 } from 'three';
+import { authoredPhysicsEntityId, physicsOriginScope, scopedPhysicsNamespace } from './physicsIdentity';
+
+export interface CompiledPhysicsScene { bodies: RigidBodyDefinition[]; joints: JointDefinition[] }
 
 function flatten(nodes: readonly SpatialNode[]): SpatialNode[] {
   return nodes.flatMap((node) => [node.renderable ? node : undefined, ...flatten(node.children ?? [])])
     .filter(Boolean) as SpatialNode[];
-}
-
-function entityId(node: SpatialNode): string {
-  const component = node.namespacePath?.split('/').filter(Boolean)[0];
-  const localId = component ? `component:${component}` : `node:${node.id}`;
-  return node.origin?.sourceKind === 'secondary'
-    ? `secondary:${node.origin.streamId ?? node.origin.publicKey ?? 'unknown'}:${localId}`
-    : localId;
-}
-
-function originScope(node: SpatialNode): string {
-  return node.origin?.sourceKind === 'secondary'
-    ? `secondary:${node.origin.streamId ?? node.origin.publicKey ?? 'unknown'}`
-    : 'baseline';
 }
 
 function colliderShape(node: SpatialNode): ColliderShape {
@@ -33,6 +22,10 @@ function colliderShape(node: SpatialNode): ColliderShape {
 
 /** Converts renderer-neutral nodes into stable compound rigid-body definitions. */
 export function compilePhysicsScene(document: SpatialDocument, revision = 'baseline'): RigidBodyDefinition[] {
+  return compileArticulatedPhysicsScene(document, revision).bodies;
+}
+
+export function compileArticulatedPhysicsScene(document: SpatialDocument, revision = 'baseline'): CompiledPhysicsScene {
   const diagnose = (diagnostic: SpatialDocument['diagnostics'][number]) => {
     if (!document.diagnostics.some(({ line, source, message }) => line === diagnostic.line && source === diagnostic.source && message === diagnostic.message)) {
       document.diagnostics.push(diagnostic);
@@ -40,11 +33,11 @@ export function compilePhysicsScene(document: SpatialDocument, revision = 'basel
   };
   const csgEntityByNodeId = new Map<string, string>();
   document.csgExpressions.forEach((expression) => {
-    const id = entityId(expression.base);
+    const id = authoredPhysicsEntityId(expression.base);
     csgEntityByNodeId.set(expression.base.id, id);
     expression.operations.forEach(({ tool }) => {
       // Visual CSG may cross projection streams, but physics bodies may not.
-      if (originScope(tool) === originScope(expression.base)) {
+      if (physicsOriginScope(tool) === physicsOriginScope(expression.base)) {
         csgEntityByNodeId.set(tool.id, id);
       }
     });
@@ -54,7 +47,7 @@ export function compilePhysicsScene(document: SpatialDocument, revision = 'basel
   // while the explicit physical-body opt-in retains ordinary rigid-body semantics.
   const candidates = flatten(document.nodes);
   const physicsEntityId = (node: SpatialNode): string => {
-    const baseId = csgEntityByNodeId.get(node.id) ?? entityId(node);
+    const baseId = csgEntityByNodeId.get(node.id) ?? authoredPhysicsEntityId(node);
     if (node.origin?.sourceKind !== 'secondary') return baseId;
     // Sensor proxies and opted-in physical members cannot share one Rapier body:
     // their body modes, mass, solver participation, and state lifetimes differ.
@@ -73,7 +66,7 @@ export function compilePhysicsScene(document: SpatialDocument, revision = 'basel
     });
   });
 
-  return candidates.map((node, entityOrder): RigidBodyDefinition => {
+  const bodies = candidates.map((node, entityOrder): RigidBodyDefinition => {
       const transform = node.worldTransform ?? node.transform;
       const physics = node.physics ?? { diagnostics: [] };
       const cursor = node.origin?.sourceKind === 'secondary';
@@ -134,4 +127,75 @@ export function compilePhysicsScene(document: SpatialDocument, revision = 'basel
         retainsPhysicsState: !cursor || physicalCursor,
       };
     });
+
+  const representativeByEntity = new Map<string, RigidBodyDefinition>();
+  bodies.forEach((body) => { if (!representativeByEntity.has(body.entityId ?? body.id)) representativeByEntity.set(body.entityId ?? body.id, body); });
+  const entityByNamespace = new Map(candidates.map((node, index) => [scopedPhysicsNamespace(node), bodies[index].entityId ?? bodies[index].id]));
+  const joints: JointDefinition[] = [];
+  const seenChildEntities = new Set<string>();
+  candidates.forEach((node, index) => {
+    const spec = node.physics;
+    if (!spec?.joint) return;
+    const childEntityId = bodies[index].entityId ?? bodies[index].id;
+    if (seenChildEntities.has(childEntityId)) return;
+    seenChildEntities.add(childEntityId);
+    const parentPath = spec['joint-parent'];
+    const parentEntityId = parentPath && entityByNamespace.get(scopedPhysicsNamespace(node, parentPath));
+    const anchor = spec['joint-anchor'];
+    const axis = spec['joint-axis'];
+    if (!parentPath || !parentEntityId) {
+      diagnose({ line: Number(node.metadata?.lineNumber ?? 0), source: node.source, message: `Joint parent "${parentPath ?? ''}" was not found.` });
+      return;
+    }
+    if (parentEntityId === childEntityId) {
+      diagnose({ line: Number(node.metadata?.lineNumber ?? 0), source: node.source, message: 'Joint endpoints must resolve to different rigid bodies.' });
+      return;
+    }
+    if (!anchor || !axis || Math.hypot(...axis) === 0) {
+      diagnose({ line: Number(node.metadata?.lineNumber ?? 0), source: node.source, message: 'Revolute joints require a finite joint-anchor and a non-zero joint-axis.' });
+      return;
+    }
+    const parent = representativeByEntity.get(parentEntityId)!;
+    const child = representativeByEntity.get(childEntityId)!;
+    const localPoint = (body: RigidBodyDefinition): Vector3Tuple => {
+      const q = new Quaternion(...(body.orientation ?? [0, 0, 0, 1])).invert();
+      const point = new Vector3(...anchor).sub(new Vector3(...body.position)).applyQuaternion(q);
+      return [point.x, point.y, point.z];
+    };
+    const worldAxis = new Vector3(...axis).normalize();
+    const axisIn = (body: RigidBodyDefinition): Vector3Tuple => {
+      const local = worldAxis.clone().applyQuaternion(new Quaternion(...(body.orientation ?? [0, 0, 0, 1])).invert());
+      return [local.x, local.y, local.z];
+    };
+    joints.push({
+      id: `joint:${childEntityId}`,
+      kind: 'revolute', parentEntityId, childEntityId,
+      parentAnchor: localPoint(parent), childAnchor: localPoint(child),
+      parentAxis: axisIn(parent), childAxis: axisIn(child),
+      limits: spec['joint-limits']?.map((degrees) => degrees * Math.PI / 180) as [number, number] | undefined,
+      damping: spec['joint-damping'], collideConnected: spec['collide-connected'] ?? false,
+    });
+  });
+  const jointByChild = new Map(joints.map((joint) => [joint.childEntityId, joint]));
+  const cyclicJointIds = new Set<string>();
+  joints.forEach((joint) => {
+    const path: JointDefinition[] = [];
+    const visited = new Map<string, number>();
+    let current: JointDefinition | undefined = joint;
+    while (current) {
+      const repeatedAt = visited.get(current.childEntityId);
+      if (repeatedAt !== undefined) {
+        path.slice(repeatedAt).forEach((entry) => cyclicJointIds.add(entry.id));
+        break;
+      }
+      visited.set(current.childEntityId, path.length);
+      path.push(current);
+      current = jointByChild.get(current.parentEntityId);
+    }
+  });
+  if (cyclicJointIds.size > 0) diagnose({
+    line: 0, source: '',
+    message: `Cyclic articulation is not supported in Release A: ${[...cyclicJointIds].sort().join(', ')}.`,
+  });
+  return { bodies, joints: joints.filter(({ id }) => !cyclicJointIds.has(id)) };
 }

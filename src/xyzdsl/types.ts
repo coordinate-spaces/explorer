@@ -110,9 +110,22 @@ export interface XyzDslMaterialSpec {
 }
 
 export type XyzDslPhysicsMode = 'dynamic' | 'static' | 'kinematic';
+export type XyzDslJointKind = 'revolute';
 
 /** Authored/resolved physics, deliberately separate from visual material. */
 export interface XyzDslPhysicsSpec {
+  /** Explicit rigid-component boundary. Descendants inherit this body name. */
+  body?: string;
+  joint?: XyzDslJointKind;
+  'joint-parent'?: string;
+  /** Authored world-space pivot in project units. */
+  'joint-anchor'?: [number, number, number];
+  /** Authored world-space revolute axis. */
+  'joint-axis'?: [number, number, number];
+  /** Revolute limits in degrees. */
+  'joint-limits'?: [number, number];
+  'joint-damping'?: number;
+  'collide-connected'?: boolean;
   'physics-mode'?: XyzDslPhysicsMode;
   /** Explicit rigid-body mass in kilograms. */
   mass?: number;

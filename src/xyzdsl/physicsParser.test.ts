@@ -3,6 +3,10 @@ import { parseXyzDslDocument } from './parser';
 import { resolveXyzDslDocument } from './resolveDocument';
 
 describe('XYZDSL physics properties', () => {
+  it('parses experimental revolute articulation properties', () => {
+    const parsed = parseXyzDslDocument('"Pendulum/Rod/+45c+10c/+3+5/+45c+10c" : "body: Rod; joint: revolute; joint-parent: Pendulum/Anchor/; joint-anchor: 0.5 8 0.5; joint-axis: 0 0 1; joint-limits: -170 170; joint-damping: 0.05"');
+    expect(parsed.value?.[0].physics).toMatchObject({ body: 'Rod', joint: 'revolute', 'joint-parent': 'Pendulum/Anchor/', 'joint-anchor': [0.5, 8, 0.5], 'joint-axis': [0, 0, 1], 'joint-limits': [-170, 170], 'joint-damping': 0.05 });
+  });
   it('parses the complete vocabulary', () => {
     const parsed = parseXyzDslDocument('"Body/+0+1/+0+1/+0+1" : "physics-mode: kinematic; mass: 2.5; friction: .4; restitution: .2; linear-damping: 1; gravity-scale: -1; ccd: true; can-sleep: false; lock-translations: x,z; lock-rotations: all; sensor: true; collision-groups: 15"');
     expect(parsed.ok).toBe(true);

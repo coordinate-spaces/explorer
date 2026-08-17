@@ -2,6 +2,8 @@ import type { XyzDslPropertyDeclaration } from './propertyParser';
 import type { XyzDslPhysicsMode, XyzDslPhysicsSpec } from './types';
 
 export const SUPPORTED_PHYSICS_KEYS = [
+  'body', 'joint', 'joint-parent', 'joint-anchor', 'joint-axis', 'joint-limits',
+  'joint-damping', 'collide-connected',
   'physics-mode', 'mass', 'density', 'friction', 'restitution', 'linear-damping',
   'gravity-scale', 'ccd', 'can-sleep', 'lock-translations', 'lock-rotations',
   'sensor', 'physical-body', 'collision-groups', 'solver-groups',
@@ -43,6 +45,37 @@ export function parsePhysicsDeclaration(declarations: XyzDslPropertyDeclaration[
       result[key] = ['x', 'y', 'z'].map((axis) => tokens.includes(axis)) as [boolean, boolean, boolean];
     } else result.diagnostics.push(`Invalid ${key} "${raw}"; expected none, all, or a comma-separated subset of x,y,z.`);
   };
+  const tuple = (key: 'joint-anchor' | 'joint-axis', length = 3) => {
+    const raw = latest.get(key);
+    if (raw === undefined) return;
+    const values = raw.split(/[\s,]+/).filter(Boolean).map(Number);
+    if (values.length !== length || values.some((value) => !Number.isFinite(value))) {
+      result.diagnostics.push(`Invalid ${key} "${raw}"; expected ${length} finite numbers.`);
+      return;
+    }
+    (result as unknown as Record<string, unknown>)[key] = values;
+  };
+
+  const body = latest.get('body');
+  if (body !== undefined) {
+    if (/^[A-Za-z0-9][A-Za-z0-9_-]*$/.test(body)) result.body = body;
+    else result.diagnostics.push(`Invalid body "${body}"; expected an identifier.`);
+  }
+  const joint = latest.get('joint');
+  if (joint !== undefined) {
+    if (joint === 'revolute') result.joint = joint;
+    else result.diagnostics.push(`Invalid joint "${joint}"; Release A supports revolute only.`);
+  }
+  const jointParent = latest.get('joint-parent');
+  if (jointParent !== undefined) result['joint-parent'] = jointParent.endsWith('/') ? jointParent : `${jointParent}/`;
+  tuple('joint-anchor'); tuple('joint-axis');
+  const limits = latest.get('joint-limits');
+  if (limits !== undefined) {
+    const values = limits.split(/[\s,]+/).filter(Boolean).map(Number);
+    if (values.length !== 2 || values.some((value) => !Number.isFinite(value)) || values[0] > values[1]) result.diagnostics.push(`Invalid joint-limits "${limits}"; expected ordered minimum and maximum degrees.`);
+    else result['joint-limits'] = values as [number, number];
+  }
+  number('joint-damping', { min: 0 });
 
   const mode = latest.get('physics-mode');
   if (mode !== undefined) {
@@ -76,7 +109,7 @@ export function parsePhysicsDeclaration(declarations: XyzDslPropertyDeclaration[
       delete result[key];
     }
   }
-  for (const key of ['ccd', 'can-sleep', 'sensor', 'physical-body'] as const) boolean(key);
+  for (const key of ['ccd', 'can-sleep', 'sensor', 'physical-body', 'collide-connected'] as const) boolean(key);
   axes('lock-translations'); axes('lock-rotations');
   return result;
 }

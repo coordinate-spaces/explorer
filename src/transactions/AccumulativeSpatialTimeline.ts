@@ -2,7 +2,7 @@ import { createSpatialDocument } from '../model/createSpatialDocument';
 import type { SpatialDocument } from '../model/SpatialDocument';
 import type { SpatialNode } from '../model/SpatialNode';
 import type { InteractionFact } from '../model/interactions';
-import { compilePhysicsScene } from '../physics/compilePhysicsScene';
+import { compileArticulatedPhysicsScene } from '../physics/compilePhysicsScene';
 import { RapierPhysicsWorld } from '../physics/RapierPhysicsWorld';
 import { parseXyzDslDocument } from '../xyzdsl/parser';
 import { canonicalNamespacePath } from '../xyzdsl/pathParser';
@@ -137,7 +137,8 @@ export class AccumulativeSpatialTimeline {
     });
     // Reconcile and query the authored pre-variant scene. A variant selected by
     // these facts can alter only the scene used by the next transaction tick.
-    this.simulation.reconcileDefinitions(compilePhysicsScene(authored, this.baselineRevision));
+    const authoredScene = compileArticulatedPhysicsScene(authored, this.baselineRevision);
+    this.simulation.reconcileDefinitions(authoredScene.bodies, authoredScene.joints);
     const facts = this.interactionFacts(authored);
     const conditional = createSpatialDocument(source, {
       originsByLine,
@@ -153,8 +154,8 @@ export class AccumulativeSpatialTimeline {
     // not let its temporary poses become the "previous" state preserved while
     // installing effective conditional definitions.
     this.simulation.world.restore(retainedSnapshot);
-    const definitions = compilePhysicsScene(effective, this.baselineRevision);
-    this.simulation.reconcileDefinitions(definitions);
+    const definitions = compileArticulatedPhysicsScene(effective, this.baselineRevision);
+    this.simulation.reconcileDefinitions(definitions.bodies, definitions.joints);
     return { authored, effective, facts };
   }
 

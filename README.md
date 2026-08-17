@@ -103,6 +103,23 @@ a tool as a positive primitive would invert the authored operation. See
 [the accumulative physics contract](docs/accumulative-physics.md) for defaults
 and compilation details.
 
+### Experimental passive articulation
+
+Release A supports explicit rigid-body boundaries connected by passive revolute
+joints. A joint is authored on its child body with a world-space pivot and axis:
+
+```txt
+"Pendulum/+0+1/+0+1/+0+1" : ""
+"Pendulum/Anchor/+45c+10c/+8+1/+45c+10c" : "body: Anchor; physics-mode: static"
+"Pendulum/Rod/+45c+10c/+3+5/+45c+10c" : "body: Rod; mass: 1; joint: revolute; joint-parent: Pendulum/Anchor/; joint-anchor: 0.5 8 0.5; joint-axis: 0 0 1; joint-damping: 0.05"
+```
+
+Unjointed components retain their existing top-level compound-body behavior.
+The experimental release supports passive revolute motion, optional degree-based
+`joint-limits`, damping, and connected-body collision control. Motors, cursor
+joint targeting, other joint kinds, and closed loops are intentionally deferred.
+See [the experimental articulation contract](docs/experimental-articulation.md).
+
 ## Interaction directives
 
 Secondary projections can act as remote cursors. A baseline object can declare conditional variants with the Base64-compatible `+touch` and `+breach` directives. `touch` means faces meet within a small tolerance without overlapping, while `breach` means positive-volume intersection. Directive segments are removed from object identity, and their position selects the namespace scope that must be interacting.
