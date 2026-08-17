@@ -24,12 +24,24 @@ export interface ResolvedSpatialObject extends SpatialObject {
   materializedFrom?: string;
   collisionOrder?: number;
   anchorScale?: [number, number, number];
+  runtimeIntentId?: string;
 }
 
 export interface ResolvedConditionalVariant extends Omit<SpatialObject, 'box'> {
   conditional: NonNullable<SpatialObject['conditional']>;
   properties: ResolvedProperties;
   targetNamespacePath: string;
+}
+
+export interface ResolvedIntent {
+  id: string;
+  mode: 'absolute' | 'relative';
+  coordinate: [number, number, number];
+  definitionNamespacePath: string;
+  streamId: string;
+  lineNumber: number;
+  origin: NonNullable<SpatialObject['origin']>;
+  definition: ResolvedProperties;
 }
 
 interface ResolvedProperties {
@@ -464,15 +476,44 @@ function scaleToFit(
 export function resolveXyzDslDocument(objects: SpatialObject[]): {
   objects: ResolvedSpatialObject[];
   variants: ResolvedConditionalVariant[];
+  intents: ResolvedIntent[];
   diagnostics: ParseDiagnostic[];
 } {
   const diagnostics: ParseDiagnostic[] = [];
-  const ordinaryObjects = objects.filter((object) => !object.conditional);
+  const intentObjects = objects.filter((object) => object.intent);
+  const ordinaryObjects = objects.filter((object) => !object.conditional && !object.intent);
   const conditionalObjects = objects.filter((object) => object.conditional);
   const effectiveObjects = latestNamedEntries(ordinaryObjects);
   const instances = effectiveObjects.filter(
     (object) => !object.declarationOnly && object.box,
   );
+
+  const intents = intentObjects.flatMap((object): ResolvedIntent[] => {
+    const namespacePath = canonicalNamespacePath(object.namespace);
+    if (object.origin?.sourceKind !== 'secondary') {
+      diagnostics.push({ line: object.lineNumber, source: object.source, message: 'Intent declarations must originate from a secondary controller stream.' });
+      return [];
+    }
+    const definition = [...ordinaryObjects].reverse().find((candidate) =>
+      candidate.origin?.sourceKind !== 'secondary' && candidate.declarationOnly && canonicalNamespacePath(candidate.namespace) === namespacePath);
+    if (!definition) {
+      diagnostics.push({ line: object.lineNumber, source: object.source, message: `Intent definition "${namespacePath}" was not found in the primary baseline.` });
+      return [];
+    }
+    const resolvedDefinition = resolvePropertiesFor(definition, ordinaryObjects);
+    diagnostics.push(...resolvedDefinition.diagnostics);
+    const streamId = object.origin.streamId ?? object.origin.publicKey ?? 'secondary';
+    return [{
+      id: `${streamId}::${namespacePath}`,
+      mode: object.intent!.mode,
+      coordinate: object.intent!.coordinate,
+      definitionNamespacePath: namespacePath,
+      streamId,
+      lineNumber: object.lineNumber,
+      origin: object.origin,
+      definition: resolvedDefinition.properties,
+    }];
+  });
   const concreteNamespaces = concreteNamespaceSet(effectiveObjects);
 
   const resolveObject = (
@@ -702,6 +743,7 @@ export function resolveXyzDslDocument(objects: SpatialObject[]): {
         !hasMaterializedChildInstance(object, renderEligibleObjects),
     })),
     variants,
+    intents,
     diagnostics,
   };
 }

@@ -58,6 +58,14 @@ export interface XyzDslPathSpec {
   conditional?: XyzDslConditionalSpec;
 }
 
+export type XyzDslIntentMode = 'absolute' | 'relative';
+
+/** A controller instruction. Coordinates describe a target, never renderable geometry. */
+export interface XyzDslIntentSpec {
+  mode: XyzDslIntentMode;
+  coordinate: [number, number, number];
+}
+
 export type XyzDslGeometryKind = 'box' | 'cylinder' | 'cone' | 'sphere';
 export type XyzDslCsgOperation = 'union' | 'subtraction' | 'intersection';
 
@@ -121,6 +129,16 @@ export interface XyzDslPhysicsSpec {
   'physical-body'?: boolean;
   'collision-groups'?: number;
   'solver-groups'?: number;
+  'max-speed'?: number;
+  'max-acceleration'?: number;
+  'max-deceleration'?: number;
+  'max-turn-rate'?: number;
+  'arrival-radius'?: number;
+  'jump-speed'?: number;
+  'max-step-height'?: number;
+  'max-slope'?: number;
+  'air-control'?: number;
+  'max-fall-speed'?: number;
   diagnostics: string[];
 }
 
@@ -157,6 +175,7 @@ export interface SpatialObject {
   lineNumber: number;
   origin?: XyzDslDeclarationOrigin;
   conditional?: XyzDslConditionalSpec;
+  intent?: XyzDslIntentSpec;
   unionGroupId?: string;
 }
 

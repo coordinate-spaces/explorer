@@ -10,6 +10,7 @@ import { resolveXyzDslDocument } from '../xyzdsl/resolveDocument';
 import type { XyzDslDeclarationOrigin } from '../xyzdsl/types';
 import { SimulationTimeline } from './SimulationTimeline';
 import type { PhysicsDirectiveBinding } from './SimulationTimeline';
+import { CoordinateIntentReducer, coordinateIntentInputs } from '../simulation/coordinateIntent';
 
 export interface AccumulativeSpatialFrame {
   document: SpatialDocument;
@@ -94,6 +95,7 @@ function withColliderStateById(nodes: readonly SpatialNode[], conditionalById: R
 /** Transaction/playback-owned bridge from XYZDSL interaction declarations to persistent physics. */
 export class AccumulativeSpatialTimeline {
   readonly simulation: SimulationTimeline;
+  private readonly intents = new CoordinateIntentReducer();
 
   constructor(readonly baselineRevision = 'baseline') {
     this.simulation = new SimulationTimeline(new RapierPhysicsWorld());
@@ -193,9 +195,19 @@ export class AccumulativeSpatialTimeline {
       return [];
     });
     const tick = this.simulation.world.tick + 1;
+    const states = this.simulation.world.frame().states;
+    const controllerInputs = resolved.intents.flatMap((intent) => {
+      const frameId = intent.origin.transactionId ?? `${intent.origin.transactionTime ?? tick}:${intent.origin.sourceOrder ?? intent.lineNumber}`;
+      const pointer = this.intents.apply({ id: intent.id, mode: intent.mode, coordinate: intent.coordinate, frameId }).pointer;
+      const node = renderable(authored.nodes).find((candidate) => candidate.metadata?.intentId === intent.id);
+      const state = node ? states.get(node.id) : undefined;
+      if (!node || !state) return [];
+      const grounded = Math.abs(state.linearVelocity[1]) < 1e-3;
+      return coordinateIntentInputs(node.id, state, pointer, intent.definition.physics, tick, grounded).inputs;
+    });
     // Reuse the retained-pose facts that selected the reconciled conditional
     // state; collider changes must not retroactively change that selection.
-    const frame = this.simulation.evaluate(tick, tick, 0, facts, bindings);
+    const frame = this.simulation.evaluate(tick, tick, 0, facts, bindings, controllerInputs);
     return {
       tick,
       document: withCompilerDiagnostics(createSpatialDocument(source, {

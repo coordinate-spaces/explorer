@@ -178,6 +178,32 @@ Two streams that both declare `Cursor/` MUST remain distinct. When one cursor le
 
 One stream MAY control several cursor namespaces, such as `LeftHand/`, `RightHand/`, and `GazePointer/`.
 
+### 8.2 Definition-backed coordinate intents
+
+A secondary declaration with `intent: absolute` or `intent: relative` is a
+controller instruction rather than a cursor collider. Its namespace MUST resolve
+to a declaration-only definition in the primary baseline. The runtime identity is
+`(streamId, canonical definition namespace)`; consequently, independent streams
+may instantiate the same definition without sharing state.
+
+An intent path ends in three signed translation components. `absolute` replaces
+the retained, unwrapped world-space pointer. `relative` adds its displacement to
+that pointer once when the transaction frame becomes active. Re-evaluating a
+render or physics frame MUST NOT apply the displacement again. A relative first
+frame uses the definition spawn anchor, defaulting to the world origin.
+
+The pointer is neither a sampled path nor a requested body pose. The character
+controller compares it with retained physics state on fixed ticks. Maximum speed,
+acceleration, deceleration, turn rate, arrival radius, step height, slope, jump
+speed, air control, and fall speed inherit from the primary definition. Absolute
+intent does not teleport. A jump is inferred only for an elevated target beyond
+step height while grounded; a persistent pointer cannot retrigger a jump in air.
+
+The raw intent MUST NOT render, pack, participate in CSG, produce a collider, or
+act as a `touch`/`breach` sensor. Transaction time and stable source order decide
+successive expressions. Replay reconstructs pointer updates before advancing the
+same fixed physics ticks.
+
 ## 9. Transaction time and movement
 
 Secondary declarations are ordered by transaction time with a stable source-order tie-break. Repeated concrete declarations with the same `(streamId, namespace)` represent discrete movement; the selected frame uses the latest applicable declaration for that stream and namespace.

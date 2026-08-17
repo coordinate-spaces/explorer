@@ -1,6 +1,6 @@
 import { parseXyzDslDocument } from '../xyzdsl/parser';
 import { mergeXyzDslContentSpecs, mergeXyzDslGeometrySpecs, mergeXyzDslMaterialSpecs, mergeXyzDslPhysicsSpecs, resolveXyzDslDocument } from '../xyzdsl/resolveDocument';
-import type { ResolvedConditionalVariant } from '../xyzdsl/resolveDocument';
+import type { ResolvedConditionalVariant, ResolvedSpatialObject } from '../xyzdsl/resolveDocument';
 import type { XyzDslBoxSpec, XyzDslDeclarationOrigin } from '../xyzdsl/types';
 import { canonicalNamespacePath } from '../xyzdsl/pathParser';
 import type { SpatialDocument } from './SpatialDocument';
@@ -335,7 +335,37 @@ export function createSpatialDocument(source: string, options: CreateSpatialDocu
   const nodesByNamespace = new Map<string, SpatialNode>();
   const topLevelNodes: SpatialNode[] = [];
 
-  resolved.objects
+  // Materialize controller-owned runtime bodies from definition descendants.
+  // The raw intent remains non-renderable; retained physics poses own movement.
+  const runtimeObjects = resolved.intents.flatMap((intent): ResolvedSpatialObject[] => {
+    const definitionSegments = intent.definitionNamespacePath.split('/').filter(Boolean);
+    const templates = resolved.objects.filter((object) =>
+      object.origin?.sourceKind !== 'secondary' &&
+      object.namespace.length > definitionSegments.length &&
+      definitionSegments.every((segment, index) => object.namespace[index] === segment));
+    if (templates.length === 0) {
+      diagnostics.push({ line: intent.lineNumber, source: '', message: `Intent definition "${intent.definitionNamespacePath}" has no concrete geometry descendants.` });
+      return [];
+    }
+    const controllerSegment = `Controller${intent.streamId.replace(/[^A-Za-z0-9+]/g, '') || 'Secondary'}`;
+    return templates.map((template) => {
+      const namespace = [...definitionSegments, controllerSegment, ...template.namespace.slice(definitionSegments.length)];
+      return {
+        ...template,
+        id: `intent:${intent.id}:${template.id}`,
+        namespace,
+        namespacePath: canonicalNamespacePath(namespace),
+        parentNamespacePath: canonicalNamespacePath(namespace.slice(0, -1)),
+        renderable: true,
+        physics: { ...template.physics, 'physical-body': true, diagnostics: [] },
+        origin: intent.origin,
+        source: `runtime instance of ${intent.definitionNamespacePath}`,
+        runtimeIntentId: intent.id,
+      };
+    });
+  });
+
+  [...resolved.objects, ...runtimeObjects]
     .sort(
       (a, b) =>
         a.namespace.length - b.namespace.length || a.lineNumber - b.lineNumber,
@@ -385,6 +415,7 @@ export function createSpatialDocument(source: string, options: CreateSpatialDocu
           reference: object.reference.targetPath,
           materializedFrom: object.materializedFrom,
           anchorScale: object.anchorScale,
+          intentId: object.runtimeIntentId,
         },
         origin: object.origin,
         baseBox: object.box,
@@ -455,5 +486,6 @@ export function createSpatialDocument(source: string, options: CreateSpatialDocu
     coordinateSpace,
     interactions,
     physicsTick: options.physicsFrame?.tick,
+    intents: resolved.intents,
   };
 }

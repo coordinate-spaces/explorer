@@ -5,6 +5,8 @@ export const SUPPORTED_PHYSICS_KEYS = [
   'physics-mode', 'mass', 'density', 'friction', 'restitution', 'linear-damping',
   'gravity-scale', 'ccd', 'can-sleep', 'lock-translations', 'lock-rotations',
   'sensor', 'physical-body', 'collision-groups', 'solver-groups',
+  'max-speed', 'max-acceleration', 'max-deceleration', 'max-turn-rate',
+  'arrival-radius', 'jump-speed', 'max-step-height', 'max-slope', 'air-control', 'max-fall-speed',
 ] as const;
 
 const MODES = new Set<XyzDslPhysicsMode>(['dynamic', 'static', 'kinematic']);
@@ -63,6 +65,9 @@ export function parsePhysicsDeclaration(declarations: XyzDslPropertyDeclaration[
   number('restitution', { min: 0, max: 1 });
   number('linear-damping', { min: 0 });
   number('gravity-scale');
+  for (const key of ['max-speed', 'max-acceleration', 'max-deceleration', 'max-turn-rate', 'arrival-radius', 'jump-speed', 'max-step-height', 'max-fall-speed'] as const) number(key, { min: 0 });
+  number('max-slope', { min: 0, max: 90 });
+  number('air-control', { min: 0, max: 1 });
   number('collision-groups', { min: 0, max: 0xffffffff });
   number('solver-groups', { min: 0, max: 0xffffffff });
   for (const key of ['collision-groups', 'solver-groups'] as const) {

@@ -12,6 +12,7 @@ import type {
   XyzDslReferenceSpec,
   XyzDslTransformSpec,
   XyzDslPhysicsSpec,
+  XyzDslIntentMode,
 } from './types';
 
 const SUPPORTED_OBJECT_PROPERTIES = new Set([
@@ -30,6 +31,7 @@ const SUPPORTED_OBJECT_PROPERTIES = new Set([
   'content-text-uri',
   'content-url',
   'content-url-uri',
+  'intent',
 ]);
 
 export interface XyzDslObjectPropertiesSpec {
@@ -40,6 +42,7 @@ export interface XyzDslObjectPropertiesSpec {
   reference: XyzDslReferenceSpec;
   content: XyzDslContentSpec;
   diagnostics: string[];
+  intent?: XyzDslIntentMode;
 }
 
 export function parseObjectProperties(source: string): XyzDslObjectPropertiesSpec {
@@ -55,6 +58,11 @@ export function parseObjectProperties(source: string): XyzDslObjectPropertiesSpe
     .map(
       ({ property }) => `Ignoring unsupported object property "${property}".`,
     );
+  const intentValue = declarations.filter(({ property }) => property === 'intent').at(-1)?.value;
+  const intent = intentValue === 'absolute' || intentValue === 'relative' ? intentValue : undefined;
+  const intentDiagnostics = intentValue !== undefined && !intent
+    ? [`Invalid intent "${intentValue}"; expected absolute or relative.`]
+    : [];
 
   return {
     material,
@@ -63,6 +71,7 @@ export function parseObjectProperties(source: string): XyzDslObjectPropertiesSpe
     transform,
     reference,
     content,
+    intent,
     diagnostics: [
       ...diagnostics,
       ...material.diagnostics,
@@ -72,6 +81,7 @@ export function parseObjectProperties(source: string): XyzDslObjectPropertiesSpe
       ...reference.diagnostics,
       ...content.diagnostics,
       ...unsupportedDiagnostics,
+      ...intentDiagnostics,
     ],
   };
 }

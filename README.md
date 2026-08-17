@@ -255,3 +255,21 @@ The viewer can exercise secondary-cursor interactions without a remote public ke
 4. Use the camera selector to remain in orbit view or choose `LocalCursor/ · local-simulation` for the existing cursor camera.
 
 At a fixed 30 Hz input cadence, controls are integrated into a complete, valid XYZDSL declaration containing absolute X/Y/Z bounds and a `rotation: x,y,z` property. The declaration is composed locally with `secondary` provenance and a synthetic frame ID, so it uses the same parser, renderer-side wrapping, touch/breach evaluation, and accumulative simulation path as a remote cursor while bypassing transaction transport entirely. Emitted X/Z positions remain unwrapped across positive coordinate-space spans, Y is clamped, and path coordinates are emitted in centiunits. Because XYZDSL path offsets are unsigned, movement stops at zero on an X or Z axis; the spatial-document projection—not the local input adapter—maps emitted coordinates into the rendered periodic cell.
+
+## Coordinate intent controllers
+
+A secondary controller can reference a declaration-only definition in the primary
+baseline and express where its runtime character intends to go. Intent coordinates
+are points, not boxes or immediate poses:
+
+```xyz
+"Character/" : "physics-mode: dynamic; max-speed: 4; max-acceleration: 12; max-deceleration: 16; max-turn-rate: 360; arrival-radius: 10c; jump-speed: 7; max-step-height: 50c"
+"Character/+10/+0/+5" : "intent: absolute"
+"Character/+2/+0/-1" : "intent: relative"
+```
+
+The secondary stream and canonical definition namespace identify the runtime
+controller. `absolute` replaces its pointer; `relative` adds a displacement to
+the previous pointer exactly once. The simulation—not the instruction—derives
+bounded speed, acceleration, braking, facing, and a grounded jump toward an
+elevated pointer. Intent records never become renderable geometry or colliders.

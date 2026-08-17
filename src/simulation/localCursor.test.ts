@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { advanceLocalCursor, DEFAULT_LOCAL_CURSOR_POSE, localCursorXyzDsl } from './localCursor';
+import { advanceLocalCoordinateIntent, advanceLocalCursor, DEFAULT_LOCAL_COORDINATE_INTENT, DEFAULT_LOCAL_CURSOR_POSE, localCoordinateIntentXyzDsl, localCursorXyzDsl } from './localCursor';
 import { parseXyzDslDeclaration } from '../xyzdsl/parser';
 import { composeSpatialEditorSourceBundle } from '../transactions/composeTransactionSources';
 import { createSpatialDocument } from '../model/createSpatialDocument';
@@ -7,6 +7,11 @@ import { createSpatialDocument } from '../model/createSpatialDocument';
 const room = { width: 40, height: 20, depth: 40 };
 
 describe('local cursor simulation', () => {
+  it('authors an intent pointer without emitting character pose or size', () => {
+    const intent = advanceLocalCoordinateIntent(DEFAULT_LOCAL_COORDINATE_INTENT, { forward: 1, right: 0, up: 0, yawDelta: 0, pitchDelta: 0, deltaSeconds: 0.1 });
+    expect(intent.pointer).toEqual([6, 0, 3.6]);
+    expect(localCoordinateIntentXyzDsl(intent)).toBe('"Character/+600c/+0c/+360c" : "intent: absolute"');
+  });
   it('normalizes diagonal movement and moves relative to yaw', () => {
     const straight = advanceLocalCursor(DEFAULT_LOCAL_CURSOR_POSE, { forward: 1, right: 0, up: 0, yawDelta: 0, pitchDelta: 0, deltaSeconds: 0.1 }, room, 10);
     const diagonal = advanceLocalCursor(DEFAULT_LOCAL_CURSOR_POSE, { forward: 1, right: 1, up: 0, yawDelta: 0, pitchDelta: 0, deltaSeconds: 0.1 }, room, 10);
