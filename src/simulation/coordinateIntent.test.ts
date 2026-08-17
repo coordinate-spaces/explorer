@@ -25,6 +25,12 @@ describe('coordinate intent simulation', () => {
     expect(result.inputs.some((input) => input.kind === 'orientation')).toBe(false);
   });
 
+  it('preserves pitch and roll when the turn rate is zero', () => {
+    const orientation: [number, number, number, number] = [0.2, 0.3, -0.1, Math.sqrt(0.86)];
+    const result = coordinateIntentInputs('body', { ...state, orientation }, [10, 0, 0], { diagnostics: [], 'max-turn-rate': 0 }, 1, true);
+    expect(result.inputs.find((input) => input.kind === 'orientation')).toMatchObject({ orientation });
+  });
+
   it('uses the authored deceleration limit while slowing before arrival', () => {
     const moving = { ...state, linearVelocity: [5, 0, 0] as [number, number, number] };
     const result = coordinateIntentInputs('body', moving, [1, 0, 0], {

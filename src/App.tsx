@@ -27,7 +27,7 @@ import { XyzDslDrawer } from './ui/XyzDslDrawer';
 import { SelectedNodeInspector } from './ui/SelectedNodeInspector';
 import { usePersistentState } from './ui/usePersistentState';
 import { CoordinateIntentConsole } from './ui/CoordinateIntentConsole';
-import { advanceLocalCoordinateIntent, DEFAULT_LOCAL_COORDINATE_INTENT, LOCAL_CURSOR_STREAM_ID, localCoordinateIntentXyzDsl, localIntentDefinitions, type LocalCursorInput } from './simulation/localCursor';
+import { advanceLocalCoordinateIntent, DEFAULT_LOCAL_COORDINATE_INTENT, LOCAL_CURSOR_STREAM_ID, localCoordinateIntentXyzDsl, localIntentDefinitions, resetLocalCoordinateIntent, type LocalCursorInput } from './simulation/localCursor';
 
 const INITIAL_XYZDSL = `"+2+4/+0+6/+1+3" : "geometry: cylinder; color: 0x333333; metalness: 0.8; roughness: 0.2"
 "+2+4/+7+6/+0+10c" : "geometry: cone; color: yellow; metalness: 0.2; roughness: 0.5"
@@ -665,7 +665,7 @@ export default function App() {
     simulationSessionRef.current = new SpatialSimulationSession(renderedBundle.source, renderedBundle.originsByLine, baselineRevision);
     simulationSessionRef.current.start();
     simulationBaselineRevisionRef.current = baselineRevision;
-    if (simulationSource === 'local') setLocalCoordinateIntent({ ...DEFAULT_LOCAL_COORDINATE_INTENT, namespace: selectedLocalDefinition, pointer: [...DEFAULT_LOCAL_COORDINATE_INTENT.pointer] });
+    if (simulationSource === 'local') setLocalCoordinateIntent((intent) => resetLocalCoordinateIntent(intent, selectedLocalDefinition));
     setAppMode('viewer');
     setDrawerOpen(false);
     setSimulationMode('running');

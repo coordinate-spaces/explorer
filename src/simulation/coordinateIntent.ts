@@ -85,9 +85,18 @@ export function coordinateIntentInputs(
     const [x, y, z, w] = state.orientation;
     const currentYaw = radiansToDegrees(Math.atan2(2 * (w * y + x * z), 1 - 2 * (y * y + z * z)));
     const turnLimit = (physics['max-turn-rate'] ?? 360) / 60;
-    const nextYaw = currentYaw + clamp(shortestAngle(desiredYaw - currentYaw), turnLimit);
-    const halfYaw = degreesToRadians(nextYaw) / 2;
-    inputs.push({ kind: 'orientation', bodyId, tick, orientation: [0, Math.sin(halfYaw), 0, Math.cos(halfYaw)] });
+    const yawDelta = clamp(shortestAngle(desiredYaw - currentYaw), turnLimit);
+    const halfDelta = degreesToRadians(yawDelta) / 2;
+    const sin = Math.sin(halfDelta);
+    const cos = Math.cos(halfDelta);
+    // Apply only the bounded world-y delta. Multiplying it into the retained
+    // quaternion preserves pitch and roll from authored state or physics.
+    inputs.push({ kind: 'orientation', bodyId, tick, orientation: [
+      cos * x + sin * z,
+      cos * y + sin * w,
+      cos * z - sin * x,
+      cos * w - sin * y,
+    ] });
   }
   return { inputs, desiredYaw: clamp(desiredYaw, 180), arrived: distance <= arrival, jump };
 }

@@ -17,6 +17,15 @@ export const DEFAULT_LOCAL_COORDINATE_INTENT: LocalCoordinateIntent = {
   namespace: 'Character/', pointer: [6, 0, 4], heading: 0, mode: 'absolute', sequence: 0,
 };
 
+export function resetLocalCoordinateIntent(intent: LocalCoordinateIntent, namespace: string): LocalCoordinateIntent {
+  return {
+    ...DEFAULT_LOCAL_COORDINATE_INTENT,
+    namespace,
+    mode: intent.mode,
+    pointer: intent.mode === 'relative' ? [0, 0, 0] : [...DEFAULT_LOCAL_COORDINATE_INTENT.pointer],
+  };
+}
+
 /** Primary declaration-only namespaces that own at least one concrete descendant. */
 export function localIntentDefinitions(source: string): string[] {
   const objects = parseXyzDslDocument(source).value ?? [];

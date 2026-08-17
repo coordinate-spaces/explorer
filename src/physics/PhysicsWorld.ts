@@ -158,6 +158,26 @@ export class PhysicsWorld implements RigidBodyWorld {
           states.forEach((state) => {
             state.position = state.position.map((component, axis) => component + input.vector[axis]) as Vector3Tuple;
           });
+        } else if (input.kind === 'orientation') {
+          const current = states[0].orientation;
+          const [tx, ty, tz, tw] = input.orientation;
+          const [cx, cy, cz, cw] = current;
+          // target * inverse(current) is the entity-wide rotation delta.
+          const delta: QuaternionTuple = [
+            -tw * cx + tx * cw - ty * cz + tz * cy,
+            -tw * cy + tx * cz + ty * cw - tz * cx,
+            -tw * cz - tx * cy + ty * cx + tz * cw,
+            tw * cw + tx * cx + ty * cy + tz * cz,
+          ];
+          states.forEach((state) => {
+            const [x, y, z, w] = state.orientation;
+            state.orientation = [
+              delta[3] * x + delta[0] * w + delta[1] * z - delta[2] * y,
+              delta[3] * y - delta[0] * z + delta[1] * w + delta[2] * x,
+              delta[3] * z + delta[0] * y - delta[1] * x + delta[2] * w,
+              delta[3] * w - delta[0] * x - delta[1] * y - delta[2] * z,
+            ];
+          });
         }
       });
       const dynamic = (definitions[0].mode ?? 'dynamic') === 'dynamic';

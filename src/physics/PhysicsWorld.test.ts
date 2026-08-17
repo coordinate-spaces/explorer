@@ -74,6 +74,14 @@ describe('PhysicsWorld', () => {
     expect(frame.states.get('PartA/')?.linearVelocity[0]).toBeCloseTo(0.5);
   });
 
+  it('applies orientation inputs to the fallback world', () => {
+    const world = new PhysicsWorld();
+    world.reconcileDefinitions([{ ...body, mode: 'kinematic' }]);
+    const orientation: [number, number, number, number] = [0, Math.SQRT1_2, 0, Math.SQRT1_2];
+    world.enqueueInputs([{ kind: 'orientation', bodyId: body.id, tick: 1, orientation }]);
+    expect(world.step().states.get(body.id)?.orientation).toEqual(orientation);
+  });
+
   it('allows upward inputs to become airborne before gravity returns the body to support', () => {
     const world = new PhysicsWorld(10);
     world.reconcileDefinitions([body]);
