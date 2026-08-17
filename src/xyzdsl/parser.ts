@@ -1,6 +1,6 @@
 import type { AxisName, XyzDslAxisSpec, XyzDslBoxSpec, ParseDiagnostic, ParseResult, SpatialObject, XyzDslDeclarationOrigin } from './types';
 import { parseObjectProperties } from './objectDeclarationParser';
-import { parseXyzDslPath, parsePathAxisSpec, parsePathBoxSpec, parsePathNumber } from './pathParser';
+import { parseIntentPath, parseXyzDslPath, parsePathAxisSpec, parsePathBoxSpec, parsePathNumber, canonicalNamespacePath } from './pathParser';
 
 const DECLARATION_PATTERN = /^\s*"(?<box>[^"]+)"\s*:\s*"(?<properties>[^"]*)"\s*$/;
 
@@ -34,8 +34,14 @@ export function parseXyzDslDeclaration(line: string, lineNumber = 1, origin?: Xy
   }
 
   try {
-    const path = parseXyzDslPath(match.groups.box);
     const properties = parseObjectProperties(match.groups.properties);
+    const intentPath = properties.intent ? parseIntentPath(match.groups.box) : undefined;
+    const path = intentPath ? {
+      source: match.groups.box,
+      namespace: intentPath.namespace,
+      canonicalPath: `${canonicalNamespacePath(intentPath.namespace)}${intentPath.coordinate.map((value) => `${value < 0 ? '-' : '+'}${Math.abs(value)}`).join('/')}`,
+      isDeclarationOnly: false,
+    } : parseXyzDslPath(match.groups.box);
 
     return {
       ok: true,
@@ -54,6 +60,7 @@ export function parseXyzDslDeclaration(line: string, lineNumber = 1, origin?: Xy
         declarationOnly: path.isDeclarationOnly,
         lineNumber,
         conditional: path.conditional,
+        intent: properties.intent && intentPath ? { mode: properties.intent, coordinate: intentPath.coordinate } : undefined,
         origin,
       },
       diagnostics: properties.diagnostics.map((message) => ({ line: lineNumber, source: line, message })),

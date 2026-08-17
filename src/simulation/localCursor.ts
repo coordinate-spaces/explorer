@@ -3,6 +3,18 @@ import type { CoordinateSpaceDimensions } from '../model/coordinateSpace';
 export const LOCAL_CURSOR_STREAM_ID = 'local-simulation';
 export const LOCAL_CURSOR_NAMESPACE = 'LocalCursor/';
 
+export interface LocalCoordinateIntent {
+  namespace: string;
+  pointer: [number, number, number];
+  heading: number;
+  mode: 'absolute' | 'relative';
+  sequence: number;
+}
+
+export const DEFAULT_LOCAL_COORDINATE_INTENT: LocalCoordinateIntent = {
+  namespace: 'Character/', pointer: [6, 0, 4], heading: 0, mode: 'absolute', sequence: 0,
+};
+
 export interface LocalCursorPose {
   position: [number, number, number];
   rotation: [number, number, number];
@@ -70,4 +82,27 @@ export function localCursorXyzDsl(pose: LocalCursorPose): string {
   const axes = pose.position.map((position, axis) => `+${centiunit(position)}+${centiunit(pose.size[axis], 1)}`);
   const rotation = pose.rotation.map((value) => Number.isFinite(value) ? Number(value.toFixed(3)) : 0);
   return `"${LOCAL_CURSOR_NAMESPACE}${axes.join('/')}" : "rotation: ${rotation.join(',')} ; color: 0x22d3ee; opacity: 0.7"`;
+}
+
+/** Moves only the authoring pointer; character motion remains physics-owned. */
+export function advanceLocalCoordinateIntent(intent: LocalCoordinateIntent, input: LocalCursorInput, pointerSpeed = 4): LocalCoordinateIntent {
+  const heading = intent.heading + input.yawDelta;
+  const radians = heading * Math.PI / 180;
+  const length = Math.hypot(input.forward, input.right);
+  const scale = length > 1 ? 1 / length : 1;
+  const distance = Math.max(0, pointerSpeed) * clamp(input.deltaSeconds, 0, 0.1);
+  return { ...intent, heading, pointer: [
+    intent.pointer[0] + (Math.sin(radians) * input.forward + Math.cos(radians) * input.right) * scale * distance,
+    intent.pointer[1] + input.up * distance,
+    intent.pointer[2] + (-Math.cos(radians) * input.forward + Math.sin(radians) * input.right) * scale * distance,
+  ], sequence: intent.sequence + 1 };
+}
+
+export function localCoordinateIntentXyzDsl(intent: LocalCoordinateIntent): string {
+  const namespace = `${intent.namespace.replace(/\/+$/, '')}/`;
+  const coordinate = intent.pointer.map((value) => {
+    const centiunits = Math.round(value * 100);
+    return `${centiunits < 0 ? '-' : '+'}${Math.abs(centiunits)}c`;
+  });
+  return `"${namespace}${coordinate.join('/')}" : "intent: ${intent.mode}"`;
 }

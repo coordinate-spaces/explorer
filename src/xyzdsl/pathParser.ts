@@ -10,6 +10,7 @@ const AXIS_NUMBER_CANDIDATE_PATTERN = /^(?:\d+(?:c)?|\d+p\d+)$/;
 const NAMESPACE_PATTERN = /^[A-Za-z0-9][A-Za-z0-9+]*$/;
 const DIRECTIVE_PATTERN = /^\+(?<name>[A-Za-z][A-Za-z0-9]*)$/;
 const DELTA_PATTERN = /^\+(?<magnitude>(?:0|[1-9]\d*)(?:c)?)$/;
+const SIGNED_DELTA_PATTERN = /^(?<sign>[+-])(?<magnitude>(?:0|[1-9]\d*)(?:c)?)$/;
 const WEIGHTED_TRANSLATION_SEGMENT = '+++';
 const SUPPORTED_INTERACTION_DIRECTIVES = new Set(['touch', 'breach']);
 
@@ -113,6 +114,24 @@ export function parsePathBoxSpec(source: string): XyzDslBoxSpec {
   }
 
   return parseBoxSegments(segments, source);
+}
+
+/** Parses Namespace/+X/+Y/+Z (or -components) without treating it as geometry. */
+export function parseIntentPath(source: string): { namespace: string[]; coordinate: [number, number, number] } {
+  const segments = source.trim().split('/');
+  if (segments.length < 4) throw new Error('Intent paths require a namespace followed by exactly three coordinate segments.');
+  const namespace = segments.slice(0, -3);
+  const coordinateSegments = segments.slice(-3);
+  validateNamespaceSegments(namespace);
+  if (!coordinateSegments.every((segment) => SIGNED_DELTA_PATTERN.test(segment))) {
+    throw new Error('Intent coordinates must use three signed translation segments such as +10/-2/+50c.');
+  }
+  const coordinate = coordinateSegments.map((segment) => {
+    const match = segment.match(SIGNED_DELTA_PATTERN)!;
+    const magnitude = parsePathNumber(match.groups!.magnitude);
+    return match.groups!.sign === '-' ? -magnitude : magnitude;
+  }) as [number, number, number];
+  return { namespace, coordinate };
 }
 
 export function normalizeNamespacePath(path: string): string {
