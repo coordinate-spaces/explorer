@@ -24,6 +24,7 @@ export interface ResolvedSpatialObject extends SpatialObject {
   materializedFrom?: string;
   collisionOrder?: number;
   anchorScale?: [number, number, number];
+  runtimeIntentId?: string;
 }
 
 export interface ResolvedConditionalVariant extends Omit<SpatialObject, 'box'> {

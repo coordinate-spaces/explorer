@@ -87,11 +87,12 @@ export class SimulationTimeline {
     stableSourceOrder: number,
     facts: readonly InteractionFact[],
     bindings: readonly PhysicsDirectiveBinding[],
+    additionalInputs: readonly PhysicsInput[] = [],
   ): SimulationFrame {
     if (tick <= this.world.tick) throw new Error('Simulation frames must advance; use seek before replaying a prior tick.');
     this.invalidateSnapshotsAfter(this.world.tick);
     const transitions = interactionTransitions(this.previousFacts, facts);
-    const inputs: PhysicsInput[] = [];
+    const inputs: PhysicsInput[] = [...additionalInputs];
     const addForces = (
       inputTick: number,
       activeFacts: readonly InteractionFact[],

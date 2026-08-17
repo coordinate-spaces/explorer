@@ -17,20 +17,24 @@ export interface ResolvedCoordinateIntent {
 /** Reduces transaction expressions. A frame id is applied at most once. */
 export class CoordinateIntentReducer {
   private states = new Map<string, ResolvedCoordinateIntent>();
+  private appliedFrames = new Map<string, Set<string>>();
 
   apply(frame: CoordinateIntentFrame, initial: Vector3Tuple = [0, 0, 0]): ResolvedCoordinateIntent {
     const previous = this.states.get(frame.id);
-    if (previous?.frameId === frame.frameId) return previous;
+    const applied = this.appliedFrames.get(frame.id) ?? new Set<string>();
+    if (applied.has(frame.frameId)) return previous ?? { id: frame.id, pointer: [...initial], frameId: frame.frameId };
     const pointer = frame.mode === 'absolute'
       ? [...frame.coordinate] as Vector3Tuple
       : frame.coordinate.map((value, axis) => value + (previous?.pointer[axis] ?? initial[axis])) as Vector3Tuple;
     const resolved = { id: frame.id, pointer, frameId: frame.frameId };
     this.states.set(frame.id, resolved);
+    applied.add(frame.frameId);
+    this.appliedFrames.set(frame.id, applied);
     return resolved;
   }
 
   get(id: string): ResolvedCoordinateIntent | undefined { return this.states.get(id); }
-  reset(): void { this.states.clear(); }
+  reset(): void { this.states.clear(); this.appliedFrames.clear(); }
 }
 
 export interface CharacterControllerResult {
@@ -63,7 +67,10 @@ export function coordinateIntentInputs(
   const desiredVelocity: Vector3Tuple = distance > 0 ? [dx / distance * desiredSpeed, 0, dz / distance * desiredSpeed] : [0, 0, 0];
   const dv: Vector3Tuple = [desiredVelocity[0] - state.linearVelocity[0], 0, desiredVelocity[2] - state.linearVelocity[2]];
   const dvLength = Math.hypot(dv[0], dv[2]);
-  const limit = (desiredSpeed === 0 ? deceleration : acceleration) / 60;
+  const horizontalSpeed = Math.hypot(state.linearVelocity[0], state.linearVelocity[2]);
+  const movingTowardTarget = distance > 0 && (state.linearVelocity[0] * dx + state.linearVelocity[2] * dz) > 0;
+  const braking = desiredSpeed === 0 || (movingTowardTarget && horizontalSpeed > desiredSpeed);
+  const limit = (braking ? deceleration : acceleration) / 60;
   const boundedDv = dvLength > limit && dvLength > 0 ? [dv[0] / dvLength * limit, 0, dv[2] / dvLength * limit] as Vector3Tuple : dv;
   const inputs: PhysicsInput[] = [{ kind: 'impulse', bodyId, tick, vector: boundedDv.map((value) => value * mass) as Vector3Tuple }];
 

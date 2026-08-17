@@ -9,7 +9,17 @@ describe('coordinate intent simulation', () => {
     const reducer = new CoordinateIntentReducer();
     expect(reducer.apply({ id: 'p', mode: 'absolute', coordinate: [10, 0, 5], frameId: '1' }).pointer).toEqual([10, 0, 5]);
     expect(reducer.apply({ id: 'p', mode: 'relative', coordinate: [2, 0, -1], frameId: '2' }).pointer).toEqual([12, 0, 4]);
+    expect(reducer.apply({ id: 'p', mode: 'absolute', coordinate: [10, 0, 5], frameId: '1' }).pointer).toEqual([12, 0, 4]);
     expect(reducer.apply({ id: 'p', mode: 'relative', coordinate: [2, 0, -1], frameId: '2' }).pointer).toEqual([12, 0, 4]);
+  });
+
+  it('uses the authored deceleration limit while slowing before arrival', () => {
+    const moving = { ...state, linearVelocity: [5, 0, 0] as [number, number, number] };
+    const result = coordinateIntentInputs('body', moving, [1, 0, 0], {
+      diagnostics: [], 'max-speed': 10, 'max-acceleration': 1, 'max-deceleration': 12,
+    }, 1, true);
+    expect(result.inputs[0]).toMatchObject({ kind: 'impulse' });
+    expect(Math.abs((result.inputs[0] as { vector: [number, number, number] }).vector[0])).toBeCloseTo(0.2);
   });
 
   it('bounds acceleration and derives facing from the pointer', () => {
