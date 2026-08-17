@@ -21,6 +21,7 @@ import { CENTIUNITS_PER_UNIT } from './units';
 import { dimensionsFromNodes, translateBoxWithinCoordinateSpace, wrapCoordinate } from './coordinateSpace';
 import type { CoordinateSpaceDimensions } from './coordinateSpace';
 import type { PhysicsFrame } from '../physics/types';
+import { authoredPhysicsEntityId } from '../physics/physicsIdentity';
 import { Euler, Quaternion } from 'three';
 
 export interface CreateSpatialDocumentOptions {
@@ -456,10 +457,7 @@ export function createSpatialDocument(source: string, options: CreateSpatialDocu
       });
     }
     if (node.origin?.sourceKind === 'secondary' && node.physics['physical-body'] !== true) return;
-    const component = node.namespacePath?.split('/').filter(Boolean)[0];
-    const identityPrefix = node.origin?.sourceKind === 'secondary'
-      ? `secondary:${node.origin.streamId ?? node.origin.publicKey ?? 'unknown'}:` : '';
-    const entity = `${identityPrefix}${component ? `component:${component}` : `node:${node.id}`}`;
+    const entity = authoredPhysicsEntityId(node);
     const mode = node.physics['physics-mode'] ?? 'dynamic';
     const established = physicsModeByEntity.get(entity);
     if (!established) physicsModeByEntity.set(entity, mode);

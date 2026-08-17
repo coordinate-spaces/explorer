@@ -2,27 +2,13 @@ import type { SpatialDocument } from '../model/SpatialDocument';
 import type { SpatialNode } from '../model/SpatialNode';
 import type { ColliderDefinition, ColliderShape, JointDefinition, RigidBodyDefinition, Vector3Tuple } from './types';
 import { Euler, Quaternion, Vector3 } from 'three';
+import { authoredPhysicsEntityId, physicsOriginScope, scopedPhysicsNamespace } from './physicsIdentity';
 
 export interface CompiledPhysicsScene { bodies: RigidBodyDefinition[]; joints: JointDefinition[] }
 
 function flatten(nodes: readonly SpatialNode[]): SpatialNode[] {
   return nodes.flatMap((node) => [node.renderable ? node : undefined, ...flatten(node.children ?? [])])
     .filter(Boolean) as SpatialNode[];
-}
-
-function entityId(node: SpatialNode): string {
-  const component = node.namespacePath?.split('/').filter(Boolean)[0];
-  const body = node.physics?.body;
-  const localId = component ? `component:${component}${body ? `/body:${body}` : ''}` : `node:${node.id}`;
-  return node.origin?.sourceKind === 'secondary'
-    ? `secondary:${node.origin.streamId ?? node.origin.publicKey ?? 'unknown'}:${localId}`
-    : localId;
-}
-
-function originScope(node: SpatialNode): string {
-  return node.origin?.sourceKind === 'secondary'
-    ? `secondary:${node.origin.streamId ?? node.origin.publicKey ?? 'unknown'}`
-    : 'baseline';
 }
 
 function colliderShape(node: SpatialNode): ColliderShape {
@@ -47,11 +33,11 @@ export function compileArticulatedPhysicsScene(document: SpatialDocument, revisi
   };
   const csgEntityByNodeId = new Map<string, string>();
   document.csgExpressions.forEach((expression) => {
-    const id = entityId(expression.base);
+    const id = authoredPhysicsEntityId(expression.base);
     csgEntityByNodeId.set(expression.base.id, id);
     expression.operations.forEach(({ tool }) => {
       // Visual CSG may cross projection streams, but physics bodies may not.
-      if (originScope(tool) === originScope(expression.base)) {
+      if (physicsOriginScope(tool) === physicsOriginScope(expression.base)) {
         csgEntityByNodeId.set(tool.id, id);
       }
     });
@@ -61,7 +47,7 @@ export function compileArticulatedPhysicsScene(document: SpatialDocument, revisi
   // while the explicit physical-body opt-in retains ordinary rigid-body semantics.
   const candidates = flatten(document.nodes);
   const physicsEntityId = (node: SpatialNode): string => {
-    const baseId = csgEntityByNodeId.get(node.id) ?? entityId(node);
+    const baseId = csgEntityByNodeId.get(node.id) ?? authoredPhysicsEntityId(node);
     if (node.origin?.sourceKind !== 'secondary') return baseId;
     // Sensor proxies and opted-in physical members cannot share one Rapier body:
     // their body modes, mass, solver participation, and state lifetimes differ.
@@ -144,7 +130,7 @@ export function compileArticulatedPhysicsScene(document: SpatialDocument, revisi
 
   const representativeByEntity = new Map<string, RigidBodyDefinition>();
   bodies.forEach((body) => { if (!representativeByEntity.has(body.entityId ?? body.id)) representativeByEntity.set(body.entityId ?? body.id, body); });
-  const entityByNamespace = new Map(candidates.map((node, index) => [node.namespacePath ?? '', bodies[index].entityId ?? bodies[index].id]));
+  const entityByNamespace = new Map(candidates.map((node, index) => [scopedPhysicsNamespace(node), bodies[index].entityId ?? bodies[index].id]));
   const joints: JointDefinition[] = [];
   const seenChildEntities = new Set<string>();
   candidates.forEach((node, index) => {
@@ -154,7 +140,7 @@ export function compileArticulatedPhysicsScene(document: SpatialDocument, revisi
     if (seenChildEntities.has(childEntityId)) return;
     seenChildEntities.add(childEntityId);
     const parentPath = spec['joint-parent'];
-    const parentEntityId = parentPath && entityByNamespace.get(parentPath);
+    const parentEntityId = parentPath && entityByNamespace.get(scopedPhysicsNamespace(node, parentPath));
     const anchor = spec['joint-anchor'];
     const axis = spec['joint-axis'];
     if (!parentPath || !parentEntityId) {
