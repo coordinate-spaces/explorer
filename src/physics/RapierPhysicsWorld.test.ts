@@ -18,6 +18,48 @@ describe('RapierPhysicsWorld', () => {
     expect(world.tick).toBe(1);
     world.dispose();
   });
+  it('applies authored force-based joint damping to a gravity-driven pendulum', () => {
+    const angle = Math.PI / 6;
+    const pivot: [number, number, number] = [0, 8, 0];
+    const makeWorld = (damping?: number) => {
+      const anchor: RigidBodyDefinition = { ...body, id: 'anchor', entityId: 'anchor-body', mode: 'static', position: [0, 8.5, 0] };
+      const rod: RigidBodyDefinition = { ...body, id: 'rod', entityId: 'rod-body', mass: 1,
+        position: [2.5 * Math.sin(angle), pivot[1] - 2.5 * Math.cos(angle), 0],
+        orientation: [0, 0, Math.sin(angle / 2), Math.cos(angle / 2)], canSleep: false,
+        colliders: [{ id: 'rod-collider', bodyId: 'rod', shape: 'cuboid', dimensions: [0.2, 5, 0.2], offset: [0, 0, 0] }] };
+      const joint: JointDefinition = { id: 'hinge', kind: 'revolute', parentEntityId: 'anchor-body', childEntityId: 'rod-body',
+        parentAnchor: [0, -0.5, 0], childAnchor: [0, 2.5, 0], parentAxis: [0, 0, 1], childAxis: [0, 0, 1], damping };
+      const world = new RapierPhysicsWorld(60); world.reconcileDefinitions([anchor, rod], [joint]);
+      return world;
+    };
+    const sample = (world: RapierPhysicsWorld) => {
+      const xs: number[] = [];
+      let maximumPivotError = 0;
+      for (let tick = 1; tick <= 900; tick += 1) {
+        const state = world.step().states.get('rod')!;
+        xs.push(state.position[0]);
+        maximumPivotError = Math.max(maximumPivotError, Math.abs(Math.hypot(state.position[0] - pivot[0], state.position[1] - pivot[1]) - 2.5));
+      }
+      const peaks = xs.slice(1, -1)
+        .filter((x, index) => Math.abs(x) > Math.abs(xs[index]) && Math.abs(x) >= Math.abs(xs[index + 2]))
+        .map(Math.abs);
+      return { xs, peaks, maximumPivotError };
+    };
+    const undampedWorld = makeWorld();
+    const dampedWorld = makeWorld(0.05);
+    const undamped = sample(undampedWorld);
+    const damped = sample(dampedWorld);
+
+    expect(Math.min(...undamped.xs)).toBeLessThan(-0.5);
+    expect(Math.min(...damped.xs)).toBeLessThan(-0.5);
+    expect(undamped.maximumPivotError).toBeLessThan(0.02);
+    expect(damped.maximumPivotError).toBeLessThan(0.02);
+    expect(undamped.peaks.at(-1)!).toBeGreaterThan(undamped.peaks[0] * 0.95);
+    expect(damped.peaks.length).toBeGreaterThan(5);
+    damped.peaks.slice(1).forEach((peak, index) => expect(peak).toBeLessThan(damped.peaks[index]));
+    expect(damped.peaks.at(-1)!).toBeLessThan(damped.peaks[0] * 0.98);
+    undampedWorld.dispose(); dampedWorld.dispose();
+  });
   it('swings a revolute pendulum while retaining its pivot distance', () => {
     const anchor: RigidBodyDefinition = { ...body, id: 'anchor', entityId: 'anchor-body', mode: 'static', position: [0, 8.5, 0] };
     const rod: RigidBodyDefinition = { ...body, id: 'rod', entityId: 'rod-body', mass: 1, position: [0, 5.5, 0],

@@ -46,12 +46,21 @@ only `revolute`.
 | `joint-anchor` | World-space pivot as three finite project-unit numbers. |
 | `joint-axis` | Non-zero world-space axis as three finite numbers. |
 | `joint-limits` | Optional ordered minimum/maximum angles in degrees. |
-| `joint-damping` | Optional non-negative passive angular damping. |
+| `joint-damping` | Optional non-negative passive angular damping coefficient in N·m·s/rad. |
 | `collide-connected` | Whether directly connected colliders contact; defaults to `false`. |
 
 The compiler normalizes the axis and resolves the pivot and axis into both body
 local frames. The engine adapter receives only local coordinates. Physics uses
 fixed ticks; joint limits are converted to radians at the compiler boundary.
+
+`joint-damping` is physical viscous damping, not a dimensionless motor strength.
+For a revolute joint Rapier's force-based zero-velocity motor applies
+`torque = -joint-damping * relative angular velocity`, so the authored unit is
+N·m·s/rad. Thus the documented `joint-damping: 0.05` means 0.05 N·m of opposing
+torque per rad/s of relative hinge speed. The adapter explicitly selects the
+force-based model instead of Rapier's default inertia-independent acceleration
+motor. Prismatic definitions use the analogous
+`force = -joint-damping * relative velocity`, in N·s per project unit.
 
 ## Validation and scope
 
