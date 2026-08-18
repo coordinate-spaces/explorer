@@ -63,6 +63,27 @@ function withCompilerDiagnostics(document: SpatialDocument, compiled: SpatialDoc
   return { ...document, diagnostics };
 }
 
+function withActivePhysicsJoints(document: SpatialDocument, compiled: SpatialDocument, world: RapierPhysicsWorld): SpatialDocument {
+  const articulations = world.inspectArticulations();
+  const entityByNodeId = new Map(world.snapshot().definitions.map((definition) => [definition.id, definition.entityId ?? definition.id]));
+  const assignedArticulationIds = new Set<string>();
+  const physicsJoints = renderable(compiled.nodes).flatMap((node) => {
+    const kind = node.physics?.joint;
+    if (!kind) return [];
+    const entityId = entityByNodeId.get(node.id);
+    const articulation = articulations.find((candidate) =>
+      candidate.childEntityId === entityId && !assignedArticulationIds.has(candidate.id));
+    if (articulation) assignedArticulationIds.add(articulation.id);
+    return [{
+      nodeId: node.id,
+      nodeName: node.namespacePath?.replace(/\/$/, '').split('/').pop() || node.id,
+      kind,
+      articulation,
+    }];
+  });
+  return { ...document, physicsJoints };
+}
+
 function withColliderStateById(nodes: readonly SpatialNode[], conditionalById: ReadonlyMap<string, SpatialNode>): SpatialNode[] {
   return nodes.map((node) => {
     const conditional = conditionalById.get(node.id);
@@ -170,7 +191,7 @@ export class AccumulativeSpatialTimeline {
     });
     return {
       tick: this.simulation.world.tick,
-      document: withCompilerDiagnostics(document, effective),
+      document: withActivePhysicsJoints(withCompilerDiagnostics(document, effective), effective, this.simulation.world as RapierPhysicsWorld),
     };
   }
 
@@ -211,12 +232,12 @@ export class AccumulativeSpatialTimeline {
     const frame = this.simulation.evaluate(tick, tick, 0, facts, bindings, controllerInputs);
     return {
       tick,
-      document: withCompilerDiagnostics(createSpatialDocument(source, {
+      document: withActivePhysicsJoints(withCompilerDiagnostics(createSpatialDocument(source, {
         originsByLine,
         physicsFrame: frame.physics,
         accumulativePhysics: true,
         interactionFacts: frame.facts,
-      }), effective),
+      }), effective), effective, this.simulation.world as RapierPhysicsWorld),
     };
   }
 }

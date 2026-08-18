@@ -592,6 +592,7 @@ export default function App() {
   const baselineRevision = useMemo(() => spatialBaselineRevision(authoringSource), [authoringSource]);
   const simulationSessionRef = useRef<SpatialSimulationSession | undefined>(undefined);
   const simulationBaselineRevisionRef = useRef<string | undefined>(undefined);
+  const sessionRevisionRef = useRef<string | undefined>(undefined);
   const [simulationReconstruction, setSimulationReconstruction] = useState(0);
   const appliedSimulationReconstructionRef = useRef(0);
   const [document, setDocument] = useState(() => createSpatialDocument(renderedBundle.source, {
@@ -619,12 +620,22 @@ export default function App() {
   }, [secondaryCameraChoices, secondaryCameraTarget, simulationMode]);
   useEffect(() => {
     if (simulationMode === 'stopped') {
-      setDocument(createSpatialDocument(renderedBundle.source, { originsByLine: renderedBundle.originsByLine }));
+      // Keep diagnostics tied to a real (non-running) session in editor mode.
+      // A plain document has no way to report which constraints Rapier accepted.
+      let diagnosticsSession = simulationSessionRef.current;
+      if (!diagnosticsSession || sessionRevisionRef.current !== baselineRevision) {
+        diagnosticsSession?.dispose();
+        diagnosticsSession = new SpatialSimulationSession(renderedBundle.source, renderedBundle.originsByLine, baselineRevision);
+        simulationSessionRef.current = diagnosticsSession;
+        sessionRevisionRef.current = baselineRevision;
+      }
+      setDocument(diagnosticsSession.setInput(renderedBundle.source, renderedBundle.originsByLine).document);
       return;
     }
     if (simulationBaselineRevisionRef.current !== baselineRevision) {
       simulationSessionRef.current?.dispose();
       simulationSessionRef.current = undefined;
+      sessionRevisionRef.current = undefined;
       simulationBaselineRevisionRef.current = undefined;
       setSimulationMode('stopped');
       setDocument(createSpatialDocument(renderedBundle.source, { originsByLine: renderedBundle.originsByLine }));
@@ -663,6 +674,7 @@ export default function App() {
   const startSimulation = useCallback(() => {
     simulationSessionRef.current?.dispose();
     simulationSessionRef.current = new SpatialSimulationSession(renderedBundle.source, renderedBundle.originsByLine, baselineRevision);
+    sessionRevisionRef.current = baselineRevision;
     simulationSessionRef.current.start();
     simulationBaselineRevisionRef.current = baselineRevision;
     if (simulationSource === 'local') setLocalCoordinateIntent((intent) => resetLocalCoordinateIntent(intent, selectedLocalDefinition));
@@ -674,6 +686,7 @@ export default function App() {
   const stopSimulation = useCallback(() => {
     simulationSessionRef.current?.dispose();
     simulationSessionRef.current = undefined;
+    sessionRevisionRef.current = undefined;
     simulationBaselineRevisionRef.current = undefined;
     setLocalCursorCaptured(false);
     setSimulationMode('stopped');
