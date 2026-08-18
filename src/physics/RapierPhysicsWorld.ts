@@ -387,6 +387,8 @@ export class RapierPhysicsWorld implements RigidBodyWorld {
     const node = nodes.find(({ id }) => id === definition.id);
     const localPose = this.memberLocalPoses.get(definition.id);
     if (!node || !localPose) return undefined;
+    // This is deliberately the same flattened-render contract used by
+    // SpatialPrimitive and ContentPrimitive.
     const transform = node.worldTransform ?? node.transform;
     const publishedMemberOrientation = new Quaternion().setFromEuler(new Euler(...transform.rotation, 'XYZ'));
     const bodyOrientation = publishedMemberOrientation

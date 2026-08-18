@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createSpatialDocument } from './createSpatialDocument';
+import { assertPublishedRenderNodeTransforms, createSpatialDocument } from './createSpatialDocument';
 import type { RigidBodyState } from '../physics/types';
 
 describe('physics document overlay', () => {
@@ -30,6 +30,16 @@ describe('physics document overlay', () => {
     expect(first.renderNodes[0].transform.position).toEqual([4, 5, 6]);
     expect(second.renderNodes[0].transform.position).toEqual([4, 5, 6]);
     expect(first.physicsTick).toBe(7);
+  });
+
+  it('rejects divergent world poses on published render nodes', () => {
+    const node = createSpatialDocument('"Ball/+0+1/+0+1/+0+1" : ""').renderNodes[0];
+    const divergent = {
+      ...node,
+      worldTransform: { ...node.worldTransform!, position: [node.transform.position[0] + 0.01, ...node.transform.position.slice(1)] as [number, number, number] },
+    };
+    expect(() => assertPublishedRenderNodeTransforms([divergent]))
+      .toThrow(/divergent transform and worldTransform/);
   });
 
   it('applies completed rigid-body orientation as well as translation', () => {

@@ -1,6 +1,7 @@
 import { Edges, Html, Text } from '@react-three/drei';
 import type { ThreeEvent } from '@react-three/fiber';
 import type { SpatialNode } from '../model/SpatialNode';
+import { spatialPrimitiveTransform } from './SpatialPrimitive';
 
 interface ContentPrimitiveProps {
   node: SpatialNode;
@@ -30,7 +31,7 @@ export function ContentPrimitive({ node, isSelected = false, onSelect }: Content
     return null;
   }
 
-  const { position, rotation, scale } = node.transform;
+  const { position, rotation, scale } = spatialPrimitiveTransform(node);
   const label = contentLabel(node);
 
   function handleClick(event: ThreeEvent<MouseEvent>) {

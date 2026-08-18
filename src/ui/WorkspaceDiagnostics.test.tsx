@@ -48,7 +48,7 @@ describe('workspace articulation diagnostics', () => {
     expect(initial).toContain('Physics tick: <output>0</output>');
     expect(running).toContain('Physics tick: <output>2</output>');
     expect(running).toContain('Session/revision: <code>pendulum-revision</code>');
-    expect(running).toContain('Rendered-anchor error:');
+    expect(running).toContain('Mesh-anchor error:');
 
     session.pause();
     session.advance(1);
@@ -56,7 +56,7 @@ describe('workspace articulation diagnostics', () => {
     session.dispose();
   });
 
-  it('measures rendered-anchor error from published node transforms rather than backend anchors', () => {
+  it('measures mesh-anchor error from the exact published mesh transforms rather than backend anchors', () => {
     const session = new SpatialSimulationSession(documentedPendulum);
     const world = session.timeline.simulation.world as RapierPhysicsWorld;
     const snapshot = world.snapshot();

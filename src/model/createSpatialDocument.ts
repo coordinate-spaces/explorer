@@ -90,6 +90,24 @@ function flattenRenderable(nodes: SpatialNode[]): SpatialNode[] {
     .filter(Boolean) as SpatialNode[];
 }
 
+const PUBLISHED_TRANSFORM_TOLERANCE = 1e-8;
+
+export function assertPublishedRenderNodeTransforms(nodes: readonly SpatialNode[]): void {
+  nodes.forEach((node) => {
+    if (!node.worldTransform) return;
+    const values = (transform: SpatialTransform) => [
+      ...transform.position,
+      ...transform.rotation,
+      ...transform.scale,
+    ];
+    const differs = values(node.transform).some((value, index) =>
+      Math.abs(value - values(node.worldTransform!)[index]) > PUBLISHED_TRANSFORM_TOLERANCE);
+    if (differs) {
+      throw new Error(`Published render node "${node.id}" has divergent transform and worldTransform after physics-frame application.`);
+    }
+  });
+}
+
 function applyRenderableStateToTree(
   nodes: SpatialNode[],
   renderableNodes: SpatialNode[],
@@ -473,6 +491,7 @@ export function createSpatialDocument(source: string, options: CreateSpatialDocu
   const groupedNodes = [...assignUnionGroups(physicalNodes), ...sensorNodes];
   const csg = buildCsgExpressions(groupedNodes);
   const renderNodes = csg.nodes.filter((node) => !node.csgConsumed && !node.csgExpressionId);
+  if (options.physicsFrame) assertPublishedRenderNodeTransforms(renderNodes);
   const nodes = applyRenderableStateToTree(effectiveTree, csg.nodes);
 
   return {
