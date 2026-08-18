@@ -22,8 +22,19 @@ describe('XYZDSL physics properties', () => {
     ['prismatic', ''], ['fixed', 'joint-damping: 1'],
   ])('diagnoses invalid %s joint property combinations', (kind, extra) => {
     const parsed = parseXyzDslDocument(`"A/+0+1/+0+1/+0+1" : "joint: ${kind}; joint-parent: Root/; joint-anchor: 0 1 0; ${extra}"`);
-    expect(parsed.ok).toBe(false);
-    expect(parsed.diagnostics.some(({ line }) => line === 1)).toBe(true);
+    expect(parsed.ok).toBe(true);
+    expect(resolveXyzDslDocument(parsed.value!).diagnostics.some(({ line }) => line === 1)).toBe(true);
+  });
+
+  it('validates a joint only after its inherited fields have been merged', () => {
+    const parsed = parseXyzDslDocument([
+      '"Assembly/+0+1/+0+1/+0+1" : "joint-anchor: 0 1 0; joint-axis: 0 0 1"',
+      '"Assembly/Rod/+0+1/+0+1/+0+1" : "joint: revolute; joint-parent: Root/"',
+    ].join('\n'));
+    expect(parsed.ok).toBe(true);
+    const resolved = resolveXyzDslDocument(parsed.value!);
+    expect(resolved.objects.find(({ physics }) => physics.joint)?.physics).toMatchObject({ joint: 'revolute', 'joint-anchor': [0, 1, 0], 'joint-axis': [0, 0, 1] });
+    expect(resolved.diagnostics).toEqual([]);
   });
   it('parses the complete vocabulary', () => {
     const parsed = parseXyzDslDocument('"Body/+0+1/+0+1/+0+1" : "physics-mode: kinematic; mass: 2.5; friction: .4; restitution: .2; linear-damping: 1; gravity-scale: -1; ccd: true; can-sleep: false; lock-translations: x,z; lock-rotations: all; sensor: true; collision-groups: 15"');

@@ -76,17 +76,6 @@ export function parsePhysicsDeclaration(declarations: XyzDslPropertyDeclaration[
     else result['joint-limits'] = values as [number, number];
   }
   number('joint-damping', { min: 0 });
-  if (result.joint) {
-    const hasAxis = latest.has('joint-axis'); const hasLimits = latest.has('joint-limits'); const hasDamping = latest.has('joint-damping');
-    if ((result.joint === 'fixed' || result.joint === 'spherical') && hasAxis) result.diagnostics.push(`Property joint-axis is invalid for ${result.joint} joints.`);
-    if ((result.joint === 'fixed' || result.joint === 'spherical') && hasLimits) result.diagnostics.push(`Property joint-limits is invalid for ${result.joint} joints.`);
-    if ((result.joint === 'fixed' || result.joint === 'spherical') && hasDamping) result.diagnostics.push(`Property joint-damping is invalid for ${result.joint} joints.`);
-    if ((result.joint === 'revolute' || result.joint === 'prismatic') && !hasAxis) result.diagnostics.push(`${result.joint} joints require joint-axis.`);
-    if (!latest.has('joint-anchor')) result.diagnostics.push(`${result.joint} joints require joint-anchor.`);
-  } else for (const key of ['joint-parent', 'joint-anchor', 'joint-axis', 'joint-limits', 'joint-damping', 'collide-connected']) {
-    if (latest.has(key)) result.diagnostics.push(`Property ${key} requires a joint declaration.`);
-  }
-
   const mode = latest.get('physics-mode');
   if (mode !== undefined) {
     if (MODES.has(mode as XyzDslPhysicsMode)) result['physics-mode'] = mode as XyzDslPhysicsMode;
@@ -122,4 +111,17 @@ export function parsePhysicsDeclaration(declarations: XyzDslPropertyDeclaration[
   for (const key of ['ccd', 'can-sleep', 'sensor', 'physical-body', 'collide-connected'] as const) boolean(key);
   axes('lock-translations'); axes('lock-rotations');
   return result;
+}
+
+/** Cross-field checks run after inheritance so a joint may be declared field-by-field. */
+export function validateResolvedJointPhysics(spec: XyzDslPhysicsSpec): string[] {
+  const diagnostics: string[] = [];
+  if (spec.joint) {
+    if ((spec.joint === 'fixed' || spec.joint === 'spherical') && spec['joint-axis'] !== undefined) diagnostics.push(`Property joint-axis is invalid for ${spec.joint} joints.`);
+    if ((spec.joint === 'fixed' || spec.joint === 'spherical') && spec['joint-limits'] !== undefined) diagnostics.push(`Property joint-limits is invalid for ${spec.joint} joints.`);
+    if ((spec.joint === 'fixed' || spec.joint === 'spherical') && spec['joint-damping'] !== undefined) diagnostics.push(`Property joint-damping is invalid for ${spec.joint} joints.`);
+    if ((spec.joint === 'revolute' || spec.joint === 'prismatic') && spec['joint-axis'] === undefined) diagnostics.push(`${spec.joint} joints require joint-axis.`);
+    if (spec['joint-anchor'] === undefined) diagnostics.push(`${spec.joint} joints require joint-anchor.`);
+  }
+  return diagnostics;
 }

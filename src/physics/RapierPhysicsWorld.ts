@@ -61,7 +61,21 @@ export class RapierPhysicsWorld implements RigidBodyWorld {
   reconcileDefinitions(next: readonly RigidBodyDefinition[], joints: readonly JointDefinition[] = []): void {
     // The overwhelmingly common reconciliation is an identical authored graph.
     // Avoid touching Rapier so handles, islands, warm-start impulses, and sleep state survive.
-    if (structurallyEqual([...this.definitions.values()], next) && structurallyEqual([...this.jointDefinitions.values()], joints)) return;
+    if (structurallyEqual([...this.definitions.values()], next) && structurallyEqual([...this.jointDefinitions.values()], joints)) {
+      // Kinematic definitions are authored poses, not retained simulation state. Inputs may
+      // have moved them since the previous reconciliation, so refresh them even on a graph no-op.
+      const refreshedEntities = new Set<string>();
+      next.forEach((definition) => {
+        const entityId = definition.entityId ?? definition.id;
+        if ((definition.mode ?? 'dynamic') !== 'kinematic' || refreshedEntities.has(entityId)) return;
+        refreshedEntities.add(entityId);
+        const body = this.bodyByEntity.get(entityId); if (!body) return;
+        const [x, y, z] = definition.position; const authoredRotation = rotation(definition.orientation ?? [0, 0, 0, 1]);
+        body.setTranslation({ x, y, z }, false); body.setRotation(authoredRotation, false);
+        body.setNextKinematicTranslation({ x, y, z }); body.setNextKinematicRotation(authoredRotation);
+      });
+      return;
+    }
     const previous = this.frame().states;
     const previousDefinitions = this.definitions;
     const modes = new Map<string, Set<string>>();

@@ -8,6 +8,16 @@ const body: RigidBodyDefinition = {
 };
 
 describe('RapierPhysicsWorld', () => {
+  it('refreshes authored kinematic poses during structurally identical reconciliation', () => {
+    const kinematic: RigidBodyDefinition = { ...body, mode: 'kinematic' };
+    const world = new RapierPhysicsWorld(); world.reconcileDefinitions([kinematic]);
+    world.enqueueInputs([{ kind: 'kinematic-target', bodyId: 'box', tick: 1, position: [4, 5, 6] }]);
+    expect(world.step().states.get('box')!.position).toEqual([4, 5, 6]);
+    world.reconcileDefinitions([kinematic]);
+    expect(world.frame().states.get('box')!.position).toEqual(kinematic.position);
+    expect(world.tick).toBe(1);
+    world.dispose();
+  });
   it('swings a revolute pendulum while retaining its pivot distance', () => {
     const anchor: RigidBodyDefinition = { ...body, id: 'anchor', entityId: 'anchor-body', mode: 'static', position: [0, 8.5, 0] };
     const rod: RigidBodyDefinition = { ...body, id: 'rod', entityId: 'rod-body', mass: 1, position: [0, 5.5, 0],
