@@ -1,4 +1,4 @@
-import { Vector3, type Box3, type Matrix4, type Mesh, type Quaternion } from 'three';
+import { Quaternion, Vector3, type Box3, type Matrix4, type Mesh } from 'three';
 import type { Vector3Tuple } from '../physics/types';
 
 export const MOUNTED_GEOMETRY_PIVOT_TOLERANCE = 0.02;
@@ -31,4 +31,14 @@ export function mountedChildAnchorWorld(mesh: Mesh, childAnchor?: Vector3Tuple):
   }
   if (!childAnchor) return undefined;
   return new Vector3(...childAnchor).divide(mesh.getWorldScale(new Vector3())).applyMatrix4(mesh.matrixWorld);
+}
+
+/** Maps a body-local joint axis through the pose represented by the mounted geometry. */
+export function mountedChildAxisWorld(mesh: Mesh, childAxis?: Vector3Tuple): Vector3 | undefined {
+  if (!childAxis) return undefined;
+  const axis = new Vector3(...childAxis);
+  if (mesh.userData.geometryInWorldSpace && Array.isArray(mesh.userData.bakedWorldQuaternion)) {
+    return axis.applyQuaternion(new Quaternion(...mesh.userData.bakedWorldQuaternion)).normalize();
+  }
+  return axis.transformDirection(mesh.matrixWorld);
 }

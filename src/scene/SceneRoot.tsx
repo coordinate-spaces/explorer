@@ -17,7 +17,7 @@ import { LocalCursorControls } from './LocalCursorControls';
 import type { LocalCursorInput } from '../simulation/localCursor';
 import { physicsEntityIdForNode } from '../physics/compilePhysicsScene';
 import type { MountedSceneDiagnostic } from './mountedSceneDiagnostics';
-import { boxTuple, matrixElements, mountedChildAnchorWorld, MOUNTED_GEOMETRY_PIVOT_TOLERANCE, quaternionTuple, vectorTuple } from './mountedSceneDiagnostics';
+import { boxTuple, matrixElements, mountedChildAnchorWorld, mountedChildAxisWorld, MOUNTED_GEOMETRY_PIVOT_TOLERANCE, quaternionTuple, vectorTuple } from './mountedSceneDiagnostics';
 
 export interface SceneRootProps {
   document: SpatialDocument;
@@ -54,6 +54,7 @@ function ArticulationDebugJoint({ joint, showBoundingBox }: {
 }) {
   const scene = useThree((state) => state.scene);
   const parentMarker = useRef<Mesh>(null);
+  const helperGroup = useRef<Object3D>(null);
   const childMarker = useRef<Mesh>(null);
   const parentLabel = useRef<Object3D>(null);
   const childLabel = useRef<Object3D>(null);
@@ -76,20 +77,27 @@ function ArticulationDebugJoint({ joint, showBoundingBox }: {
     const articulation = joint.articulation;
     const mesh = findMountedMesh(scene, joint.nodeId);
     const parent = articulation?.parentAnchorWorld && new Vector3(...articulation.parentAnchorWorld);
-    if (!articulation?.hasActiveHandle || !mesh || !parent) return;
+    if (!articulation?.hasActiveHandle || !mesh || !parent) {
+      if (helperGroup.current) helperGroup.current.visible = false;
+      return;
+    }
 
     // Every derived helper is recalculated from the actual mounted object, not the
     // node's authored transform. This also catches a substituted or wrongly scaled mesh.
     mesh.updateWorldMatrix(true, false);
     const child = mountedChildAnchorWorld(mesh, joint.childAnchor);
-    if (!child) return;
+    if (!child) {
+      if (helperGroup.current) helperGroup.current.visible = false;
+      return;
+    }
+    if (helperGroup.current) helperGroup.current.visible = true;
     parentMarker.current?.position.copy(parent);
     childMarker.current?.position.copy(child);
     parentLabel.current?.position.copy(parent).addScalar(0.12);
     childLabel.current?.position.copy(child).addScalar(0.12);
     anchorLine.geometry.setFromPoints([parent, child]);
 
-    const axis = new Vector3(...(joint.childAxis ?? [0, 0, 1])).transformDirection(mesh.matrixWorld);
+    const axis = mountedChildAxisWorld(mesh, joint.childAxis ?? [0, 0, 1])!;
     const halfAxis = axis.multiplyScalar(DEBUG_AXIS_LENGTH / 2);
     axisLine.geometry.setFromPoints([
       parent.clone().sub(halfAxis), parent.clone().add(halfAxis),
@@ -106,7 +114,7 @@ function ArticulationDebugJoint({ joint, showBoundingBox }: {
   });
 
   const initialBounds = useMemo(() => new Box3(new Vector3(), new Vector3()), []);
-  return <group>
+  return <group ref={helperGroup} visible={false}>
     <mesh ref={parentMarker} renderOrder={1000}>
       <sphereGeometry args={[0.12, 20, 12]} />
       <meshBasicMaterial color="#ff2bd6" depthTest={false} />
