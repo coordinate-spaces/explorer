@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Euler, Quaternion, Vector3 } from 'three';
+import { BoxGeometry, Euler, Mesh, MeshBasicMaterial, Quaternion, Scene, Vector3 } from 'three';
 import { spatialBaselineRevision } from '../transactions/AccumulativeSpatialTimeline';
 import { SpatialSimulationSession } from './SpatialSimulationSession';
 import type { XyzDslDeclarationOrigin } from '../xyzdsl/types';
@@ -69,6 +69,35 @@ describe('application spatial simulation session', () => {
     expect(Math.abs(finalCoordinate - initialCoordinate)).toBeGreaterThan(0.01);
     expect(meshTransform.position).not.toEqual(initialMeshTransform.position);
     expect(meshTransform.rotation).not.toEqual(initialMeshTransform.rotation);
+    session.dispose();
+  });
+
+  it('publishes a late pendulum pose that mounts directly in the scene at the physics pivot', () => {
+    const session = new SpatialSimulationSession(documentedPendulum);
+    const rodId = session.timeline.simulation.world.snapshot().definitions
+      .find(({ entityId }) => entityId?.endsWith('body:Rod'))!.id;
+    session.start();
+    for (let tick = 0; tick < 360; tick += 1) session.advance(1 / 60);
+
+    const document = session.frame().document;
+    const rod = document.renderNodes.find(({ id }) => id === rodId)!;
+    const pose = spatialPrimitiveTransform(rod);
+    const mountedScene = new Scene();
+    const mountedRod = new Mesh(new BoxGeometry(1, 1, 1), new MeshBasicMaterial());
+    mountedRod.userData.fullStableNodeId = rodId;
+    mountedRod.position.fromArray(pose.position);
+    mountedRod.rotation.fromArray([...pose.rotation, 'XYZ']);
+    mountedRod.scale.fromArray(pose.scale);
+    mountedScene.add(mountedRod); // Same direct-child contract as SceneRoot/Canvas.
+    mountedScene.updateMatrixWorld(true);
+
+    const center = mountedRod.getWorldPosition(new Vector3());
+    const pivot = new Vector3(...document.physicsJoints![0].articulation!.parentAnchorWorld!);
+    const geometryTop = new Vector3(0, 0.5, 0).applyMatrix4(mountedRod.matrixWorld);
+    expect(center.distanceTo(new Vector3(18.263, 2.5, 26.502))).toBeGreaterThan(10);
+    expect(center.distanceTo(new Vector3(0.5, 5.5, 0.5))).toBeLessThan(4);
+    expect(geometryTop.distanceTo(pivot)).toBeLessThan(0.02);
+    expect(rod.renderTransform).toBe(rod.transform);
     session.dispose();
   });
 

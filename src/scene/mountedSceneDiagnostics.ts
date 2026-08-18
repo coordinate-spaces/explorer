@@ -1,5 +1,6 @@
 import { Quaternion, Vector3, type Box3, type Matrix4, type Mesh } from 'three';
 import type { Vector3Tuple } from '../physics/types';
+import type { SpatialTransform } from '../model/transform';
 
 export const MOUNTED_GEOMETRY_PIVOT_TOLERANCE = 0.02;
 
@@ -11,8 +12,16 @@ export interface MountedSceneDiagnostic {
   worldPosition?: readonly number[];
   worldQuaternion?: readonly number[];
   worldScale?: readonly number[];
+  nodeTransform?: SpatialTransform;
+  nodeWorldTransform?: SpatialTransform;
+  renderTransform?: SpatialTransform;
+  mountedLocalPosition?: readonly number[];
+  parentObjectType?: string;
+  parentMatrix?: readonly number[];
+  mountedGeometryTop?: readonly number[];
   topWorldPosition?: readonly number[];
-  mountedAnchorWorld?: readonly number[];
+  mountedBodyAnchorWorld?: readonly number[];
+  bodyAnchorReconstructionError?: number;
   worldBoundingBox?: { min: readonly number[]; max: readonly number[] };
   parentAnchorWorld?: readonly number[];
   pivotError?: number;

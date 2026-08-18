@@ -11,7 +11,7 @@ import { resolveMaterialTextures } from './textureRegistry';
 
 /** The authoritative pose consumed by a flattened render-node mesh. */
 export function spatialPrimitiveTransform(node: SpatialNode) {
-  return node.worldTransform ?? node.transform;
+  return node.renderTransform ?? node.transform;
 }
 
 interface SpatialPrimitiveProps {
@@ -108,6 +108,9 @@ export function SpatialPrimitive({ node, physicsEntityId, isSelected = false, on
         unionGroupId: node.unionGroupId,
         geometry: node.geometry.kind,
         rotation,
+        nodeTransform: node.transform,
+        nodeWorldTransform: node.worldTransform,
+        renderTransform: node.renderTransform,
       }}
     >
       <PrimitiveGeometry geometry={node.geometry} />

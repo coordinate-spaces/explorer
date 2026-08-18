@@ -83,8 +83,16 @@ export function WorkspaceDiagnostics({ declarationDiagnostics, rejectedTransacti
             <small>Mounted mesh count: {diagnostic.meshCount}</small>
             <small>Mounted world position: {position(diagnostic.worldPosition)}</small>
             <small>Mounted world scale: {position(diagnostic.worldScale)}</small>
-            <small>Mounted top world position: {position(diagnostic.topWorldPosition)}</small>
-            <small>Mounted-geometry pivot error: {number(diagnostic.pivotError)}</small>
+            <small>Mounted geometry top: {position(diagnostic.mountedGeometryTop ?? diagnostic.topWorldPosition)}</small>
+            <small>Parent physics pivot: {position(diagnostic.parentAnchorWorld)}</small>
+            <small>Direct top-to-pivot distance: {number(diagnostic.pivotError)}</small>
+            <small>Mounted body-anchor reconstruction: {position(diagnostic.mountedBodyAnchorWorld)}</small>
+            <small>Body-anchor reconstruction distance: {number(diagnostic.bodyAnchorReconstructionError)}</small>
+            <small>Published node transform: {position(diagnostic.nodeTransform?.position)}</small>
+            <small>Published node world transform: {position(diagnostic.nodeWorldTransform?.position)}</small>
+            <small>Authoritative render transform: {position(diagnostic.renderTransform?.position)}</small>
+            <small>Mounted local position: {position(diagnostic.mountedLocalPosition)}</small>
+            <small>Mounted parent: {diagnostic.parentObjectType ?? 'n/a'}; matrix: {position(diagnostic.parentMatrix)}</small>
             {diagnostic.error ? <strong>Scene error: {diagnostic.error}</strong> : null}
           </div></li>
         ))}</ul>}
