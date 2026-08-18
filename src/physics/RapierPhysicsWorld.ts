@@ -1,6 +1,6 @@
 import RAPIER from '@dimforge/rapier3d-compat';
 import type { RigidBodyWorld } from './RigidBodyWorld';
-import type { ColliderDefinition, InteractionQueryOptions, InteractionQueryResult, JointDefinition, PhysicsFrame, PhysicsInput, PhysicsSnapshot, RigidBodyDefinition, RigidBodyState, Vector3Tuple } from './types';
+import type { ArticulationInspection, ColliderDefinition, InteractionQueryOptions, InteractionQueryResult, JointDefinition, PhysicsFrame, PhysicsInput, PhysicsSnapshot, RigidBodyDefinition, RigidBodyState, Vector3Tuple } from './types';
 import { Quaternion, Vector3 } from 'three';
 
 await RAPIER.init();
@@ -59,6 +59,9 @@ export class RapierPhysicsWorld implements RigidBodyWorld {
   }
 
   reconcileDefinitions(next: readonly RigidBodyDefinition[], joints: readonly JointDefinition[] = []): void {
+    // The overwhelmingly common reconciliation is an identical authored graph.
+    // Avoid touching Rapier so handles, islands, warm-start impulses, and sleep state survive.
+    if (structurallyEqual([...this.definitions.values()], next) && structurallyEqual([...this.jointDefinitions.values()], joints)) return;
     const previous = this.frame().states;
     const previousDefinitions = this.definitions;
     const modes = new Map<string, Set<string>>();
@@ -138,16 +141,26 @@ export class RapierPhysicsWorld implements RigidBodyWorld {
       const parent = this.bodyByEntity.get(definition.parentEntityId);
       const child = this.bodyByEntity.get(definition.childEntityId);
       if (!parent || !child) throw new Error(`Joint ${definition.id} references a missing rigid body.`);
-      const data = RAPIER.JointData.revoluteWithAxes(
-        { x: definition.parentAnchor[0], y: definition.parentAnchor[1], z: definition.parentAnchor[2] },
-        { x: definition.childAnchor[0], y: definition.childAnchor[1], z: definition.childAnchor[2] },
-        { x: definition.parentAxis[0], y: definition.parentAxis[1], z: definition.parentAxis[2] },
-        { x: definition.childAxis[0], y: definition.childAxis[1], z: definition.childAxis[2] },
-      );
-      const joint = this.world.createImpulseJoint(data, parent, child, true) as RAPIER.RevoluteImpulseJoint;
+      const a = { x: definition.parentAnchor[0], y: definition.parentAnchor[1], z: definition.parentAnchor[2] };
+      const b = { x: definition.childAnchor[0], y: definition.childAnchor[1], z: definition.childAnchor[2] };
+      const data = definition.kind === 'revolute'
+        ? RAPIER.JointData.revoluteWithAxes(a, b, vector(definition.parentAxis), vector(definition.childAxis))
+        : definition.kind === 'prismatic'
+          ? RAPIER.JointData.prismatic(a, b, vector(definition.parentAxis))
+          : definition.kind === 'fixed'
+            ? RAPIER.JointData.fixed(a, rotation(definition.parentFrame), b, rotation(definition.childFrame))
+            : RAPIER.JointData.spherical(a, b);
+      const joint = this.world.createImpulseJoint(data, parent, child, true);
       joint.setContactsEnabled(definition.collideConnected ?? false);
-      if (definition.limits) joint.setLimits(...definition.limits);
-      if (definition.damping && definition.damping > 0) joint.configureMotorVelocity(0, definition.damping);
+      if (definition.kind === 'revolute') {
+        const revolute = joint as RAPIER.RevoluteImpulseJoint;
+        if (definition.limits) revolute.setLimits(...definition.limits);
+        if (definition.damping && definition.damping > 0) revolute.configureMotorVelocity(0, definition.damping);
+      } else if (definition.kind === 'prismatic') {
+        const prismatic = joint as RAPIER.PrismaticImpulseJoint;
+        if (definition.limits) prismatic.setLimits(...definition.limits);
+        if (definition.damping && definition.damping > 0) prismatic.configureMotorVelocity(0, definition.damping);
+      }
       this.jointById.set(definition.id, joint);
     });
   }
@@ -298,7 +311,31 @@ export class RapierPhysicsWorld implements RigidBodyWorld {
       .map((result) => Object.freeze(result)));
   }
 
-  snapshot(): PhysicsSnapshot { return { schemaVersion: 1, backend: 'rapier-0.20', tick: this.currentTick, states: [...this.frame().states.values()], definitions: [...this.definitions.values()], joints: [...this.jointDefinitions.values()] }; }
+  inspectArticulations(): readonly ArticulationInspection[] {
+    return [...this.jointDefinitions.values()].map((definition) => {
+      const joint = this.jointById.get(definition.id);
+      const parent = this.bodyByEntity.get(definition.parentEntityId); const child = this.bodyByEntity.get(definition.childEntityId);
+      let coordinate: number | undefined;
+      if (joint && parent && child && definition.kind === 'prismatic') {
+        const axis = new Vector3(...definition.parentAxis).applyQuaternion(quaternionTupleToThree(parent.rotation())).normalize();
+        const pa = new Vector3(...definition.parentAnchor).applyQuaternion(quaternionTupleToThree(parent.rotation())).add(new Vector3(...tuple(parent.translation())));
+        const pb = new Vector3(...definition.childAnchor).applyQuaternion(quaternionTupleToThree(child.rotation())).add(new Vector3(...tuple(child.translation())));
+        coordinate = pb.sub(pa).dot(axis);
+      } else if (joint && parent && child && definition.kind === 'revolute') {
+        const relative = quaternionTupleToThree(parent.rotation()).invert().multiply(quaternionTupleToThree(child.rotation())).normalize();
+        coordinate = 2 * Math.atan2(new Vector3(relative.x, relative.y, relative.z).dot(new Vector3(...definition.parentAxis).normalize()), relative.w);
+      }
+      let pivotError: number | undefined;
+      if (parent && child) {
+        const pa = new Vector3(...definition.parentAnchor).applyQuaternion(quaternionTupleToThree(parent.rotation())).add(new Vector3(...tuple(parent.translation())));
+        const pb = new Vector3(...definition.childAnchor).applyQuaternion(quaternionTupleToThree(child.rotation())).add(new Vector3(...tuple(child.translation())));
+        pivotError = pa.distanceTo(pb);
+      }
+      return { id: definition.id, parentEntityId: definition.parentEntityId, childEntityId: definition.childEntityId,
+        kind: definition.kind, coordinate, limits: 'limits' in definition ? definition.limits : undefined, pivotError };
+    });
+  }
+  snapshot(): PhysicsSnapshot { return structuredClone({ schemaVersion: 1 as const, backend: 'rapier-0.20', tick: this.currentTick, states: [...this.frame().states.values()], definitions: [...this.definitions.values()], joints: [...this.jointDefinitions.values()] }); }
   restore(snapshot: PhysicsSnapshot): void {
     this.definitions.clear();
     this.reconcileDefinitions(snapshot.definitions, snapshot.joints ?? []);
@@ -347,3 +384,7 @@ function compareRepresentative(a: InteractionQueryResult, b: InteractionQueryRes
 function quaternionTupleToThree(value: { x: number; y: number; z: number; w: number }): Quaternion {
   return new Quaternion(value.x, value.y, value.z, value.w);
 }
+
+function vector(value: Vector3Tuple): { x: number; y: number; z: number } { return { x: value[0], y: value[1], z: value[2] }; }
+function rotation(value: readonly number[]): { x: number; y: number; z: number; w: number } { return { x: value[0], y: value[1], z: value[2], w: value[3] }; }
+function structurallyEqual(a: unknown, b: unknown): boolean { return JSON.stringify(a) === JSON.stringify(b); }

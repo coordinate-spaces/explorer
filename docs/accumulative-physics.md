@@ -199,3 +199,9 @@ application. Explicit interaction vectors are per-frame translations. Weighted
 translations use the existing cursor-amount / target-amount / 100 distance
 conversion. Force and impulse bindings remain an application API until their
 physical units are standardized.
+
+### Articulation persistence
+
+Passive fixed, revolute, prismatic, and spherical constraints participate in the same stable-ID lifecycle as rigid bodies and colliders. No-op reconciliation retains the existing constraint graph and sleeping solver islands. Snapshots deep-copy authored body and joint definitions; restoration reconstructs constraints before applying poses, velocities, sleep flags, and the saved simulation tick. Identical fixed-timestep replay is expected to reproduce articulated chains within ordinary floating-point solver tolerance.
+
+Angular engine-boundary values are radians; linear anchors and slider limits are project units. DSL revolute limits are authored in degrees and converted during compilation. Tree graphs only are supported: duplicate IDs, missing/self endpoints, multiple parents, invalid axes/frames/limits, and cycles are rejected. Closed loops, active motors, cursor joints, and spherical cone/twist limits are not supported.

@@ -63,8 +63,8 @@ export function parsePhysicsDeclaration(declarations: XyzDslPropertyDeclaration[
   }
   const joint = latest.get('joint');
   if (joint !== undefined) {
-    if (joint === 'revolute') result.joint = joint;
-    else result.diagnostics.push(`Invalid joint "${joint}"; Release A supports revolute only.`);
+    if (['revolute', 'fixed', 'prismatic', 'spherical'].includes(joint)) result.joint = joint as XyzDslPhysicsSpec['joint'];
+    else result.diagnostics.push(`Invalid joint "${joint}"; expected revolute, fixed, prismatic, or spherical.`);
   }
   const jointParent = latest.get('joint-parent');
   if (jointParent !== undefined) result['joint-parent'] = jointParent.endsWith('/') ? jointParent : `${jointParent}/`;
@@ -72,10 +72,20 @@ export function parsePhysicsDeclaration(declarations: XyzDslPropertyDeclaration[
   const limits = latest.get('joint-limits');
   if (limits !== undefined) {
     const values = limits.split(/[\s,]+/).filter(Boolean).map(Number);
-    if (values.length !== 2 || values.some((value) => !Number.isFinite(value)) || values[0] > values[1]) result.diagnostics.push(`Invalid joint-limits "${limits}"; expected ordered minimum and maximum degrees.`);
+    if (values.length !== 2 || values.some((value) => !Number.isFinite(value)) || values[0] > values[1]) result.diagnostics.push(`Invalid joint-limits "${limits}"; expected an ordered finite minimum and maximum.`);
     else result['joint-limits'] = values as [number, number];
   }
   number('joint-damping', { min: 0 });
+  if (result.joint) {
+    const hasAxis = latest.has('joint-axis'); const hasLimits = latest.has('joint-limits'); const hasDamping = latest.has('joint-damping');
+    if ((result.joint === 'fixed' || result.joint === 'spherical') && hasAxis) result.diagnostics.push(`Property joint-axis is invalid for ${result.joint} joints.`);
+    if ((result.joint === 'fixed' || result.joint === 'spherical') && hasLimits) result.diagnostics.push(`Property joint-limits is invalid for ${result.joint} joints.`);
+    if ((result.joint === 'fixed' || result.joint === 'spherical') && hasDamping) result.diagnostics.push(`Property joint-damping is invalid for ${result.joint} joints.`);
+    if ((result.joint === 'revolute' || result.joint === 'prismatic') && !hasAxis) result.diagnostics.push(`${result.joint} joints require joint-axis.`);
+    if (!latest.has('joint-anchor')) result.diagnostics.push(`${result.joint} joints require joint-anchor.`);
+  } else for (const key of ['joint-parent', 'joint-anchor', 'joint-axis', 'joint-limits', 'joint-damping', 'collide-connected']) {
+    if (latest.has(key)) result.diagnostics.push(`Property ${key} requires a joint declaration.`);
+  }
 
   const mode = latest.get('physics-mode');
   if (mode !== undefined) {
