@@ -79,6 +79,9 @@ function withActivePhysicsJoints(document: SpatialDocument, compiled: SpatialDoc
       nodeName: node.namespacePath?.replace(/\/$/, '').split('/').pop() || node.id,
       kind,
       articulation,
+      renderedAnchorError: articulation?.parentAnchorWorld && articulation.childAnchorWorld
+        ? Math.hypot(...articulation.parentAnchorWorld.map((value, index) => value - articulation.childAnchorWorld![index]))
+        : undefined,
     }];
   });
   return { ...document, physicsJoints };

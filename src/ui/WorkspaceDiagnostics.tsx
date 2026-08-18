@@ -7,13 +7,16 @@ interface WorkspaceDiagnosticsProps {
   rejectedTransactions: readonly RejectedTransaction[];
   physicsJoints?: readonly PhysicsJointDiagnostic[];
   onSelectLine: (line: number) => void;
+  sessionIdentifier?: string;
+  readOnly?: boolean;
+  physicsTick?: number;
 }
 
 export function physicsJointErrorCount(physicsJoints: readonly PhysicsJointDiagnostic[] = []): number {
   return physicsJoints.filter(({ articulation }) => !articulation || articulation.error).length;
 }
 
-export function WorkspaceDiagnostics({ declarationDiagnostics, rejectedTransactions, physicsJoints = [], onSelectLine }: WorkspaceDiagnosticsProps) {
+export function WorkspaceDiagnostics({ declarationDiagnostics, rejectedTransactions, physicsJoints = [], onSelectLine, sessionIdentifier, readOnly = false, physicsTick }: WorkspaceDiagnosticsProps) {
   const installedJoints = physicsJoints.flatMap(({ articulation }) => articulation ? [articulation] : []);
   const articulationErrors = physicsJointErrorCount(physicsJoints);
   const total = declarationDiagnostics.length + rejectedTransactions.length + articulationErrors;
@@ -29,6 +32,9 @@ export function WorkspaceDiagnostics({ declarationDiagnostics, rejectedTransacti
         </div>
         <span className={`workspace-count ${total ? 'is-warning' : 'is-success'}`}>{total}</span>
       </div>
+
+      {sessionIdentifier ? <p className="diagnostics-session">Session/revision: <code>{sessionIdentifier}</code></p> : null}
+      <p className="diagnostics-tick">Physics tick: <output>{physicsTick ?? 0}</output></p>
 
       {total === 0 ? <p className="workspace-empty-state">No declaration, transaction, or physics installation issues detected.</p> : null}
 
@@ -46,6 +52,7 @@ export function WorkspaceDiagnostics({ declarationDiagnostics, rejectedTransacti
                   <small>Parent: {joint.articulation.parentEntityId} ({joint.articulation.parentMode ?? 'unknown'})</small>
                   <small>Child: {joint.articulation.childEntityId} ({joint.articulation.childMode ?? 'unknown'})</small>
                   <small>Pivot error: {number(joint.articulation.pivotError)}</small>
+                  <small>Rendered-anchor error: {number(joint.renderedAnchorError)}</small>
                   <small>Parent anchor world: {position(joint.articulation.parentAnchorWorld)}</small>
                   <small>Child anchor world: {position(joint.articulation.childAnchorWorld)}</small>
                   {joint.articulation.kind === 'revolute' ? <small>Coordinate: {number(joint.articulation.coordinate)} rad; limits: {joint.articulation.limits ? `${number(joint.articulation.limits[0])} to ${number(joint.articulation.limits[1])} rad` : 'none'}</small> : null}
@@ -70,7 +77,7 @@ export function WorkspaceDiagnostics({ declarationDiagnostics, rejectedTransacti
           <ul>
             {declarationDiagnostics.map((diagnostic, index) => (
               <li key={`${diagnostic.line}-${index}`}>
-                <button type="button" onClick={() => onSelectLine(diagnostic.line)}>
+                <button type="button" disabled={readOnly} onClick={() => onSelectLine(diagnostic.line)}>
                   <span>Line {diagnostic.line}</span>
                   <strong>{diagnostic.message}</strong>
                 </button>

@@ -591,6 +591,7 @@ export default function App() {
   const renderedSource = renderedBundle.source;
   const baselineRevision = useMemo(() => spatialBaselineRevision(authoringSource), [authoringSource]);
   const simulationSessionRef = useRef<SpatialSimulationSession | undefined>(undefined);
+  const simulationSessionIdentifierRef = useRef<string | undefined>(undefined);
   const simulationBaselineRevisionRef = useRef<string | undefined>(undefined);
   const sessionRevisionRef = useRef<string | undefined>(undefined);
   const [simulationReconstruction, setSimulationReconstruction] = useState(0);
@@ -677,6 +678,7 @@ export default function App() {
     sessionRevisionRef.current = baselineRevision;
     simulationSessionRef.current.start();
     simulationBaselineRevisionRef.current = baselineRevision;
+    simulationSessionIdentifierRef.current = `${baselineRevision}:${Date.now()}`;
     if (simulationSource === 'local') setLocalCoordinateIntent((intent) => resetLocalCoordinateIntent(intent, selectedLocalDefinition));
     setAppMode('viewer');
     setDrawerOpen(false);
@@ -688,6 +690,7 @@ export default function App() {
     simulationSessionRef.current = undefined;
     sessionRevisionRef.current = undefined;
     simulationBaselineRevisionRef.current = undefined;
+    simulationSessionIdentifierRef.current = undefined;
     setLocalCursorCaptured(false);
     setSimulationMode('stopped');
   }, []);
@@ -1140,6 +1143,9 @@ export default function App() {
             onRotate={rotateSelectedDeclaration}
           />
         ) : null}
+        diagnosticsSessionIdentifier={simulationMode === 'stopped'
+          ? baselineRevision
+          : simulationSessionIdentifierRef.current}
       />
     </main>
   );

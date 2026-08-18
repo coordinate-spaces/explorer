@@ -24,6 +24,37 @@ function diagnostics(source: string): string {
 }
 
 describe('workspace articulation diagnostics', () => {
+  it('publishes live application diagnostics while running and keeps the paused frame readable', () => {
+    const session = new SpatialSimulationSession(documentedPendulum, undefined, 'pendulum-revision');
+    const render = () => {
+      const { document } = session.frame();
+      return renderToStaticMarkup(<WorkspaceDiagnostics
+        declarationDiagnostics={document.diagnostics}
+        rejectedTransactions={[]}
+        physicsJoints={document.physicsJoints}
+        physicsTick={document.physicsTick}
+        sessionIdentifier="pendulum-revision"
+        onSelectLine={() => undefined}
+        readOnly
+      />);
+    };
+
+    session.start();
+    const initial = render();
+    session.advance(1 / 60);
+    session.advance(1 / 60);
+    const running = render();
+    expect(initial).toContain('Physics tick: <output>0</output>');
+    expect(running).toContain('Physics tick: <output>2</output>');
+    expect(running).toContain('Session/revision: <code>pendulum-revision</code>');
+    expect(running).toContain('Rendered-anchor error:');
+
+    session.pause();
+    session.advance(1);
+    expect(render()).toContain('Physics tick: <output>2</output>');
+    session.dispose();
+  });
+
   it('counts both missing and unhealthy active articulations', () => {
     expect(physicsJointErrorCount([
       { nodeId: 'missing', nodeName: 'Missing', kind: 'revolute' },
