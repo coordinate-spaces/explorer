@@ -308,7 +308,7 @@ export function XyzDslDrawer({
           />
           ) : null}
 
-          {auxiliaryView === 'diagnostics' ? <WorkspaceDiagnostics declarationDiagnostics={document.diagnostics} rejectedTransactions={rejectedTransactions} onSelectLine={selectDiagnosticLine} /> : null}
+          {auxiliaryView === 'diagnostics' ? <WorkspaceDiagnostics declarationDiagnostics={document.diagnostics} rejectedTransactions={rejectedTransactions} physicsJoints={document.physicsJoints} onSelectLine={selectDiagnosticLine} /> : null}
             </div>
           </section>
           </div>
