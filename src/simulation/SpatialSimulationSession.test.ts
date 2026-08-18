@@ -17,12 +17,13 @@ const contactOrigins = () => new Map<number, XyzDslDeclarationOrigin>([
   [2, { sourceKind: 'secondary', streamId: 'local-cursor' }],
 ]);
 
-const documentedPendulum = [
-  '"Pendulum/+0+1/+0+1/+0+1" : ""',
+const documentedPendulumAt = (component = '+0+1/+0+1/+0+1', rotation = '') => [
+  `"Pendulum/${component}" : "${rotation}"`,
   '"Pendulum/Anchor/+45c+10c/+8+1/+45c+10c" : "body: Anchor; physics-mode: static"',
   '"Pendulum/Ceiling/+0+4/+8+1/+0+1" : "body: Anchor; physics-mode: static"',
   '"Pendulum/Rod/+83c+20c/+304c+5/+45c+10c" : "body: Rod; mass: 1; rotation: 0,0,10; joint: revolute; joint-parent: Pendulum/Anchor/; joint-anchor: 0.5 8 0.5; joint-axis: 0 0 1; joint-limits: -170 170; joint-damping: 0.05"',
 ].join('\n');
+const documentedPendulum = documentedPendulumAt();
 
 describe('application spatial simulation session', () => {
   it('renders the nested documented pendulum at its resolved world pose while retaining its pivot', () => {
@@ -57,7 +58,8 @@ describe('application spatial simulation session', () => {
       .multiply(new Vector3(...meshTransform.scale))
       .applyEuler(new Euler(...meshTransform.rotation, 'XYZ'))
       .add(new Vector3(...meshTransform.position));
-    expect(transformedTop.distanceTo(new Vector3(0.5, 8, 0.5))).toBeLessThan(0.02);
+    const installedPivot = session.timeline.simulation.world.inspectArticulations!()[0].parentAnchorWorld!;
+    expect(transformedTop.distanceTo(new Vector3(...installedPivot))).toBeLessThan(0.02);
     expect(Math.abs(state.position[0] - initialX)).toBeGreaterThan(0.05);
     expect(session.timeline.simulation.world.snapshot().joints).toEqual([
       expect.objectContaining({ kind: 'revolute', childEntityId: rod.entityId }),
@@ -70,6 +72,24 @@ describe('application spatial simulation session', () => {
     expect(meshTransform.position).not.toEqual(initialMeshTransform.position);
     expect(meshTransform.rotation).not.toEqual(initialMeshTransform.rotation);
     session.dispose();
+  });
+
+  it('keeps the documented component-local declaration when the pendulum is translated and rotated', () => {
+    const original = new SpatialSimulationSession(documentedPendulum);
+    const transformed = new SpatialSimulationSession(documentedPendulumAt('+15+1/+2+1/+4+1', 'rotation: 20,35,-10'));
+    const jointFrame = (session: SpatialSimulationSession) => {
+      const joint = session.timeline.simulation.world.snapshot().joints![0];
+      const { id: _id, parentEntityId: _parent, childEntityId: _child, ...frame } = joint;
+      return frame;
+    };
+
+    expect(jointFrame(transformed)).toEqual(jointFrame(original));
+    expect(transformed.timeline.simulation.world.snapshot().definitions.map(({ position }) => position))
+      .not.toEqual(original.timeline.simulation.world.snapshot().definitions.map(({ position }) => position));
+    expect(transformed.timeline.simulation.world.snapshot().definitions.map(({ orientation }) => orientation))
+      .not.toEqual(original.timeline.simulation.world.snapshot().definitions.map(({ orientation }) => orientation));
+    original.dispose();
+    transformed.dispose();
   });
 
   it('publishes a late pendulum pose that mounts directly in the scene at the physics pivot', () => {
