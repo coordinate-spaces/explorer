@@ -65,7 +65,8 @@ function withCompilerDiagnostics(document: SpatialDocument, compiled: SpatialDoc
 
 function withActivePhysicsJoints(document: SpatialDocument, compiled: SpatialDocument, world: RapierPhysicsWorld): SpatialDocument {
   const articulations = world.inspectArticulations();
-  const entityByNodeId = new Map(world.snapshot().definitions.map((definition) => [definition.id, definition.entityId ?? definition.id]));
+  const snapshot = world.snapshot();
+  const entityByNodeId = new Map(snapshot.definitions.map((definition) => [definition.id, definition.entityId ?? definition.id]));
   const assignedArticulationIds = new Set<string>();
   const physicsJoints = renderable(compiled.nodes).flatMap((node) => {
     const kind = node.physics?.joint;
@@ -74,13 +75,18 @@ function withActivePhysicsJoints(document: SpatialDocument, compiled: SpatialDoc
     const articulation = articulations.find((candidate) =>
       candidate.childEntityId === entityId && !assignedArticulationIds.has(candidate.id));
     if (articulation) assignedArticulationIds.add(articulation.id);
+    const definition = articulation ? snapshot.joints?.find(({ id }) => id === articulation.id) : undefined;
+    const parentRenderedAnchor = definition
+      ? world.publishedAnchorWorld(definition.parentEntityId, definition.parentAnchor, document.renderNodes) : undefined;
+    const childRenderedAnchor = definition
+      ? world.publishedAnchorWorld(definition.childEntityId, definition.childAnchor, document.renderNodes) : undefined;
     return [{
       nodeId: node.id,
       nodeName: node.namespacePath?.replace(/\/$/, '').split('/').pop() || node.id,
       kind,
       articulation,
-      renderedAnchorError: articulation?.parentAnchorWorld && articulation.childAnchorWorld
-        ? Math.hypot(...articulation.parentAnchorWorld.map((value, index) => value - articulation.childAnchorWorld![index]))
+      renderedAnchorError: parentRenderedAnchor && childRenderedAnchor
+        ? Math.hypot(...parentRenderedAnchor.map((value, index) => value - childRenderedAnchor[index]))
         : undefined,
     }];
   });

@@ -201,6 +201,18 @@ button {
 .runtime-diagnostics-panel > summary { cursor: pointer; font-weight: 700; }
 .runtime-diagnostics-panel[open] > summary { margin-bottom: 0.75rem; }
 
+@media (max-width: 66rem) {
+  .runtime-diagnostics-panel {
+    max-height: calc(50vh - 1.5rem);
+  }
+
+  .runtime-playback-controls {
+    top: auto;
+    bottom: 5rem;
+    max-height: calc(50vh - 4.5rem);
+  }
+}
+
 .runtime-playback-controls > summary {
   cursor: pointer;
   font-weight: 700;
