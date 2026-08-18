@@ -12,8 +12,8 @@ export interface PhysicsJointDiagnostic {
   kind: JointDefinition['kind'];
   /** The installed constraint, when this declaration survived compilation and world reconciliation. */
   articulation?: ArticulationInspection;
-  /** Published-pose anchor error evaluated through the transforms passed to flattened meshes; this does not inspect mounted Three.js geometry. */
-  meshAnchorError?: number;
+  /** Published-pose anchor error evaluated through flattened-node poses; this does not inspect mounted Three.js geometry. */
+  publishedPoseAnchorError?: number;
   /** Child-body-local physics-space anchor, used to inspect mounted geometry at the corresponding point. */
   childAnchor?: JointDefinition['childAnchor'];
   /** Child-body-local physics-space hinge axis, retained for constraint visualization. */

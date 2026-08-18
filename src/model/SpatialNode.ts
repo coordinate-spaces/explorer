@@ -23,7 +23,7 @@ export interface SpatialNode {
   content?: XyzDslContentSpec;
   geometry: SpatialGeometry;
   transform: SpatialTransform;
-  /** Authored/materialized component-local pose before scene publication. */
+  /** Authored/materialized pose relative to the nearest concrete parent node; a root has no parent. */
   localTransform?: SpatialTransform;
   /** Resolved world-space pose before a completed render document is published. */
   worldTransform?: SpatialTransform;

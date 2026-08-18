@@ -48,7 +48,7 @@ describe('workspace articulation diagnostics', () => {
     expect(initial).toContain('Physics tick: <output>0</output>');
     expect(running).toContain('Physics tick: <output>2</output>');
     expect(running).toContain('Session/revision: <code>pendulum-revision</code>');
-    expect(running).toContain('Mesh-anchor error:');
+    expect(running).toContain('Published-pose anchor error:');
 
     session.pause();
     session.advance(1);
@@ -56,7 +56,7 @@ describe('workspace articulation diagnostics', () => {
     session.dispose();
   });
 
-  it('measures mesh-anchor error from the exact published mesh transforms rather than backend anchors', () => {
+  it('measures published-pose anchor error from published node poses rather than backend anchors', () => {
     const session = new SpatialSimulationSession(documentedPendulum);
     const world = session.timeline.simulation.world as RapierPhysicsWorld;
     const snapshot = world.snapshot();
@@ -120,11 +120,12 @@ describe('workspace articulation diagnostics', () => {
     expect(markup).toContain('(static)');
     expect(markup).toContain('Child:');
     expect(markup).toContain('(dynamic)');
-    expect(markup).toMatch(/Pivot error: \d+\.\d{8}/);
+    expect(markup).toMatch(/Backend runtime pivot error: \d+\.\d{8}/);
+    expect(markup).toMatch(/Published-pose anchor error: \d+\.\d{8}/);
     expect(markup).toContain('Coordinate:');
     expect(markup).toContain('limits: -2.96705973 to 2.96705973 rad');
-    expect(markup).toContain('Parent anchor world: [');
-    expect(markup).toContain('Child anchor world: [');
+    expect(markup).toContain('Runtime world-space parent anchor: [');
+    expect(markup).toContain('Runtime world-space child anchor: [');
   });
 
   it('reports an invalid parent as rejected and not installed', () => {

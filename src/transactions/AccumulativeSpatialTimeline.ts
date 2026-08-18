@@ -76,9 +76,9 @@ function withActivePhysicsJoints(document: SpatialDocument, compiled: SpatialDoc
       candidate.childEntityId === entityId && !assignedArticulationIds.has(candidate.id));
     if (articulation) assignedArticulationIds.add(articulation.id);
     const definition = articulation ? snapshot.joints?.find(({ id }) => id === articulation.id) : undefined;
-    const parentRenderedAnchor = definition
+    const parentPublishedWorldAnchor = definition
       ? world.publishedAnchorWorld(definition.parentEntityId, definition.parentAnchor, document.renderNodes) : undefined;
-    const childRenderedAnchor = definition
+    const childPublishedWorldAnchor = definition
       ? world.publishedAnchorWorld(definition.childEntityId, definition.childAnchor, document.renderNodes) : undefined;
     return [{
       nodeId: node.id,
@@ -88,8 +88,8 @@ function withActivePhysicsJoints(document: SpatialDocument, compiled: SpatialDoc
       childAnchor: definition?.childAnchor,
       childAxis: definition && (definition.kind === 'revolute' || definition.kind === 'prismatic')
         ? definition.childAxis : undefined,
-      meshAnchorError: parentRenderedAnchor && childRenderedAnchor
-        ? Math.hypot(...parentRenderedAnchor.map((value, index) => value - childRenderedAnchor[index]))
+      publishedPoseAnchorError: parentPublishedWorldAnchor && childPublishedWorldAnchor
+        ? Math.hypot(...parentPublishedWorldAnchor.map((value, index) => value - childPublishedWorldAnchor[index]))
         : undefined,
     }];
   });
