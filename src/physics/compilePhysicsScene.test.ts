@@ -53,6 +53,24 @@ describe('compilePhysicsScene', () => {
       expect.stringContaining('Articulation properties are component-local'),
     ]));
   });
+  it('rebases template-local parents for every materialized component instance', () => {
+    const document = createSpatialDocument(`"Pendulum/" : ""
+"Pendulum/Anchor/+45c+10c/+8+1/+45c+10c" : "body: Anchor; physics-mode: static"
+"Pendulum/Rod/+45c+10c/+3+5/+45c+10c" : "body: Rod; joint: revolute; joint-parent: Pendulum/Anchor/; joint-anchor: 0.5 8 0.5; joint-axis: 0 0 1"
+"Left/+2+1/+0+1/+0+1" : "ref: Pendulum/"
+"Right/+15+1/+2+1/+4+1" : "ref: Pendulum/; rotation: 20,35,-10"`);
+    const scene = compileArticulatedPhysicsScene(document);
+    expect(scene.joints).toHaveLength(2);
+    expect(scene.joints.map(({ parentEntityId, childEntityId }) => ({ parentEntityId, childEntityId }))).toEqual([
+      { parentEntityId: 'component:Left/body:Anchor', childEntityId: 'component:Left/body:Rod' },
+      { parentEntityId: 'component:Right/body:Anchor', childEntityId: 'component:Right/body:Rod' },
+    ]);
+    const frames = scene.joints.map(({ id: _id, parentEntityId: _parent, childEntityId: _child, ...frame }) => frame);
+    expect(frames[1]).toEqual(frames[0]);
+    expect(document.diagnostics.map(({ message }) => message)).not.toEqual(expect.arrayContaining([
+      expect.stringContaining('outside the child component'),
+    ]));
+  });
   it('compiles body, collider, locks, groups, and no transaction-derived mass', () => {
     const origins = new Map([[1, { sourceKind: 'baseline' as const, transactionAmount: 999 }]]);
     const document = createSpatialDocument('"Body/+0+2/+0+2/+0+2" : "physics-mode: static; mass: 3; friction: .2; restitution: .4; linear-damping: 2; gravity-scale: .5; ccd: true; can-sleep: false; lock-translations: x; lock-rotations: y,z; sensor: true; collision-groups: 12; solver-groups: 34"', { originsByLine: origins });
