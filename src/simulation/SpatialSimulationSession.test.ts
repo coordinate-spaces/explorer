@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Quaternion, Vector3 } from 'three';
+import { Euler, Quaternion, Vector3 } from 'three';
 import { spatialBaselineRevision } from '../transactions/AccumulativeSpatialTimeline';
 import { SpatialSimulationSession } from './SpatialSimulationSession';
 import type { XyzDslDeclarationOrigin } from '../xyzdsl/types';
@@ -35,7 +35,14 @@ describe('application spatial simulation session', () => {
     ]);
 
     session.start();
-    for (let tick = 0; tick < 45; tick += 1) session.advance(1 / 60);
+    for (let tick = 0; tick < 45; tick += 1) {
+      session.advance(1 / 60);
+      const articulation = session.timeline.simulation.world.inspectArticulations!()[0];
+      expect(articulation.tick).toBe(tick + 1);
+      expect(articulation.hasActiveHandle).toBe(true);
+      expect(articulation.pivotError).toBeLessThan(0.02);
+      expect(articulation.error).toBeUndefined();
+    }
 
     const state = session.timeline.simulation.world.frame().states.get(rod.id)!;
     const transformedTop = new Vector3(0, 2.5, 0)
@@ -46,6 +53,10 @@ describe('application spatial simulation session', () => {
     expect(session.timeline.simulation.world.snapshot().joints).toEqual([
       expect.objectContaining({ kind: 'revolute', childEntityId: rod.entityId }),
     ]);
+    const publishedRod = session.frame().document.renderNodes.find(({ id }) => id === rod.id)!;
+    expect(publishedRod.transform.position).toEqual(state.position);
+    const publishedOrientation = new Quaternion().setFromEuler(new Euler(...publishedRod.transform.rotation, 'XYZ'));
+    expect(Math.abs(publishedOrientation.dot(new Quaternion(...state.orientation)))).toBeCloseTo(1, 6);
     session.dispose();
   });
 

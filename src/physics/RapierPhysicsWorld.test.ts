@@ -35,6 +35,24 @@ describe('RapierPhysicsWorld', () => {
     expect(world.frame().states.get('rod')!.position).toEqual(state.position);
     world.dispose();
   });
+  it('preserves excessive-pivot observations across same-tick timeline restores', () => {
+    const anchor: RigidBodyDefinition = { ...body, id: 'anchor', entityId: 'anchor-body', mode: 'static', position: [0, 8.5, 0] };
+    const rod: RigidBodyDefinition = { ...body, id: 'rod', entityId: 'rod-body', position: [0, 5.5, 0] };
+    const joint: JointDefinition = { id: 'hinge', kind: 'revolute', parentEntityId: 'anchor-body', childEntityId: 'rod-body',
+      parentAnchor: [0, -0.5, 0], childAnchor: [0, 2.5, 0], parentAxis: [0, 0, 1], childAxis: [0, 0, 1] };
+    const world = new RapierPhysicsWorld(); world.reconcileDefinitions([anchor, rod], [joint]);
+
+    for (let sample = 1; sample <= 3; sample += 1) {
+      world.step();
+      const snapshot = world.snapshot();
+      snapshot.states.find(({ id }) => id === 'rod')!.position[0] += 1;
+      world.restore(snapshot);
+      const inspection = world.inspectArticulations()[0];
+      expect(inspection.pivotError).toBeGreaterThan(0.02);
+      expect(inspection.error).toBe(sample === 3 ? 'persistent-pivot-error' : undefined);
+    }
+    world.dispose();
+  });
   it('integrates gravity and resolves a rigid-body contact with the ground', () => {
     const world = new RapierPhysicsWorld(); world.reconcileDefinitions([body]);
     expect(world.step().states.get('box')!.position[1]).toBeLessThan(2.5);
