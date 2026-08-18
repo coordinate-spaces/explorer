@@ -5,7 +5,7 @@ import { Brush, Evaluator, INTERSECTION, SUBTRACTION, ADDITION } from 'three-bvh
 import type { MeshStandardMaterialParameters } from 'three';
 import type { CsgExpression, CsgOperationNode } from '../model/csg';
 import type { SpatialNode } from '../model/SpatialNode';
-import { materialParameters, needsPhysicalMaterial } from './SpatialPrimitive';
+import { materialParameters, needsPhysicalMaterial, spatialPrimitiveTransform } from './SpatialPrimitive';
 import { bufferGeometryForSpatialGeometry } from './primitiveGeometry';
 
 interface CsgPrimitiveProps {
@@ -16,7 +16,7 @@ interface CsgPrimitiveProps {
 
 function brushFor(node: SpatialNode): Brush {
   const brush = new Brush(bufferGeometryForSpatialGeometry(node.geometry));
-  const { position, rotation, scale } = node.transform;
+  const { position, rotation, scale } = spatialPrimitiveTransform(node);
   brush.position.set(...position);
   brush.rotation.set(...rotation);
   brush.scale.set(...scale);

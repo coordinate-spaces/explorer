@@ -3,6 +3,7 @@ import { Euler, Quaternion, Vector3 } from 'three';
 import { spatialBaselineRevision } from '../transactions/AccumulativeSpatialTimeline';
 import { SpatialSimulationSession } from './SpatialSimulationSession';
 import type { XyzDslDeclarationOrigin } from '../xyzdsl/types';
+import { spatialPrimitiveTransform } from '../scene/SpatialPrimitive';
 
 const fallingBody = '"Body/+0+1/+10+1/+0+1":"physics-mode: dynamic; can-sleep: false"';
 const bodyY = (session: SpatialSimulationSession) => session.frame().document.renderNodes[0].transform.position[1];
@@ -24,7 +25,7 @@ const documentedPendulum = [
 ].join('\n');
 
 describe('application spatial simulation session', () => {
-  it('compiles and advances the documented pendulum while retaining its revolute pivot', () => {
+  it('renders the nested documented pendulum at its resolved world pose while retaining its pivot', () => {
     const session = new SpatialSimulationSession(documentedPendulum);
     const snapshot = session.timeline.simulation.world.snapshot();
     const rod = snapshot.definitions.find(({ entityId }) => entityId?.endsWith('body:Rod'))!;
@@ -35,7 +36,11 @@ describe('application spatial simulation session', () => {
     ]);
 
     session.start();
-    for (let tick = 0; tick < 45; tick += 1) {
+    const initialMeshTransform = spatialPrimitiveTransform(
+      session.frame().document.renderNodes.find(({ id }) => id === rod.id)!,
+    );
+    const initialCoordinate = session.timeline.simulation.world.inspectArticulations!()[0].coordinate!;
+    for (let tick = 0; tick < 360; tick += 1) {
       session.advance(1 / 60);
       const articulation = session.timeline.simulation.world.inspectArticulations!()[0];
       expect(articulation.tick).toBe(tick + 1);
@@ -45,18 +50,25 @@ describe('application spatial simulation session', () => {
     }
 
     const state = session.timeline.simulation.world.frame().states.get(rod.id)!;
-    const transformedTop = new Vector3(0, 2.5, 0)
-      .applyQuaternion(new Quaternion(...state.orientation))
-      .add(new Vector3(...state.position));
+    const publishedRod = session.frame().document.renderNodes.find(({ id }) => id === rod.id)!;
+    expect(publishedRod.namespacePath).toBe('Pendulum/Rod/');
+    const meshTransform = spatialPrimitiveTransform(publishedRod);
+    const transformedTop = new Vector3(0, 0.5, 0)
+      .multiply(new Vector3(...meshTransform.scale))
+      .applyEuler(new Euler(...meshTransform.rotation, 'XYZ'))
+      .add(new Vector3(...meshTransform.position));
     expect(transformedTop.distanceTo(new Vector3(0.5, 8, 0.5))).toBeLessThan(0.02);
     expect(Math.abs(state.position[0] - initialX)).toBeGreaterThan(0.05);
     expect(session.timeline.simulation.world.snapshot().joints).toEqual([
       expect.objectContaining({ kind: 'revolute', childEntityId: rod.entityId }),
     ]);
-    const publishedRod = session.frame().document.renderNodes.find(({ id }) => id === rod.id)!;
     expect(publishedRod.transform.position).toEqual(state.position);
     const publishedOrientation = new Quaternion().setFromEuler(new Euler(...publishedRod.transform.rotation, 'XYZ'));
     expect(Math.abs(publishedOrientation.dot(new Quaternion(...state.orientation)))).toBeCloseTo(1, 6);
+    const finalCoordinate = session.timeline.simulation.world.inspectArticulations!()[0].coordinate!;
+    expect(Math.abs(finalCoordinate - initialCoordinate)).toBeGreaterThan(0.01);
+    expect(meshTransform.position).not.toEqual(initialMeshTransform.position);
+    expect(meshTransform.rotation).not.toEqual(initialMeshTransform.rotation);
     session.dispose();
   });
 

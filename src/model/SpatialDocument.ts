@@ -12,8 +12,8 @@ export interface PhysicsJointDiagnostic {
   kind: JointDefinition['kind'];
   /** The installed constraint, when this declaration survived compilation and world reconciliation. */
   articulation?: ArticulationInspection;
-  /** Separation between the two anchors represented by the published render frame. */
-  renderedAnchorError?: number;
+  /** Separation between anchors evaluated through the exact transforms passed to flattened meshes. */
+  meshAnchorError?: number;
 }
 
 export interface SpatialDocument {

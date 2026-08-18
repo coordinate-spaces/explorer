@@ -52,7 +52,7 @@ export function WorkspaceDiagnostics({ declarationDiagnostics, rejectedTransacti
                   <small>Parent: {joint.articulation.parentEntityId} ({joint.articulation.parentMode ?? 'unknown'})</small>
                   <small>Child: {joint.articulation.childEntityId} ({joint.articulation.childMode ?? 'unknown'})</small>
                   <small>Pivot error: {number(joint.articulation.pivotError)}</small>
-                  <small>Rendered-anchor error: {number(joint.renderedAnchorError)}</small>
+                  <small>Mesh-anchor error: {number(joint.meshAnchorError)}</small>
                   <small>Parent anchor world: {position(joint.articulation.parentAnchorWorld)}</small>
                   <small>Child anchor world: {position(joint.articulation.childAnchorWorld)}</small>
                   {joint.articulation.kind === 'revolute' ? <small>Coordinate: {number(joint.articulation.coordinate)} rad; limits: {joint.articulation.limits ? `${number(joint.articulation.limits[0])} to ${number(joint.articulation.limits[1])} rad` : 'none'}</small> : null}

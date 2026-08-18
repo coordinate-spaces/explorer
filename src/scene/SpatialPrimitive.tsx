@@ -7,6 +7,11 @@ import type { SpatialNode } from '../model/SpatialNode';
 import { defaultBoxMaterial, unionHighlightMaterial } from './materials';
 import { resolveMaterialTextures } from './textureRegistry';
 
+/** The authoritative pose consumed by a flattened render-node mesh. */
+export function spatialPrimitiveTransform(node: SpatialNode) {
+  return node.worldTransform ?? node.transform;
+}
+
 interface SpatialPrimitiveProps {
   node: SpatialNode;
   isSelected?: boolean;
@@ -75,7 +80,7 @@ export function needsPhysicalMaterial(node: SpatialNode): boolean {
 }
 
 export function SpatialPrimitive({ node, isSelected = false, onSelect }: SpatialPrimitiveProps) {
-  const { position, rotation, scale } = node.transform;
+  const { position, rotation, scale } = spatialPrimitiveTransform(node);
   const material = materialParameters(node);
 
   function handleClick(event: ThreeEvent<MouseEvent>) {
