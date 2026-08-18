@@ -130,7 +130,8 @@ Unjointed components retain their existing top-level compound-body behavior.
 The experimental release supports passive revolute motion, optional degree-based
 `joint-limits`, damping, and connected-body collision control. The same declaration can be translated (for example to X = 15), rotated, or instantiated multiple times without changing its anchor, axis, limits, or damping. Authored component-local values compile once to immutable body-local engine frames; runtime world poses are used only for simulation and rendering. Motors, cursor
 joint targeting, other joint kinds, and closed loops are intentionally deferred.
-See [the experimental articulation contract](docs/experimental-articulation.md).
+See the canonical [articulation coordinate-space contract](docs/experimental-articulation.md#canonical-articulation-coordinate-space-contract),
+including its normative conversion graph, invariants, and diagnostic meanings.
 
 ## Interaction directives
 

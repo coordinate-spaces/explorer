@@ -379,7 +379,7 @@ export class RapierPhysicsWorld implements RigidBodyWorld {
     });
   }
 
-  /** Resolve a body-local anchor through a node pose in the published render document. */
+  /** Derive a published-world-space anchor from a body-local physics-space anchor and a published node pose. */
   publishedAnchorWorld(entityId: string, anchor: Vector3Tuple, nodes: readonly SpatialNode[]): Vector3Tuple | undefined {
     const definition = [...this.definitions.values()].find((candidate) =>
       (candidate.entityId ?? candidate.id) === entityId && nodes.some(({ id }) => id === candidate.id));

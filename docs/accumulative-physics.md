@@ -1,5 +1,11 @@
 # Accumulative physics
 
+Articulation compilation, runtime diagnostics, and rendering **MUST** follow the
+canonical [articulation coordinate-space contract](experimental-articulation.md#canonical-articulation-coordinate-space-contract).
+In particular, runtime, published, and mounted world-space observations are not
+authored articulation input and **MUST NOT** be fed back into body-local joint
+frame compilation.
+
 ## Current backend
 
 Runtime simulations use Rapier through the engine-neutral `RigidBodyWorld`

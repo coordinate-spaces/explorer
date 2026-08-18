@@ -7,6 +7,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
+    "check:articulation-docs": "node scripts/check-articulation-docs.mjs",
     "preview": "vite preview",
     "test": "vitest run"
   },
