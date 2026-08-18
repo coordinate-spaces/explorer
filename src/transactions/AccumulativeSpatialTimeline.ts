@@ -85,6 +85,7 @@ function withActivePhysicsJoints(document: SpatialDocument, compiled: SpatialDoc
       nodeName: node.namespacePath?.replace(/\/$/, '').split('/').pop() || node.id,
       kind,
       articulation,
+      childAnchor: definition?.childAnchor,
       meshAnchorError: parentRenderedAnchor && childRenderedAnchor
         ? Math.hypot(...parentRenderedAnchor.map((value, index) => value - childRenderedAnchor[index]))
         : undefined,

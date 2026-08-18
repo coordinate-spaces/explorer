@@ -17,7 +17,7 @@ import { LocalCursorControls } from './LocalCursorControls';
 import type { LocalCursorInput } from '../simulation/localCursor';
 import { physicsEntityIdForNode } from '../physics/compilePhysicsScene';
 import type { MountedSceneDiagnostic } from './mountedSceneDiagnostics';
-import { boxTuple, matrixElements, MOUNTED_GEOMETRY_PIVOT_TOLERANCE, quaternionTuple, vectorTuple } from './mountedSceneDiagnostics';
+import { boxTuple, matrixElements, mountedChildAnchorWorld, MOUNTED_GEOMETRY_PIVOT_TOLERANCE, quaternionTuple, vectorTuple } from './mountedSceneDiagnostics';
 
 interface SceneRootProps {
   document: SpatialDocument;
@@ -63,11 +63,12 @@ function MountedSceneDiagnostics({ document, onPublish }: { document: SpatialDoc
       const scale = mesh.getWorldScale(new Vector3());
       mesh.geometry.computeBoundingBox();
       const bounds = mesh.geometry.boundingBox?.clone().applyMatrix4(mesh.matrixWorld);
+      const mountedAnchor = mountedChildAnchorWorld(mesh, joint.childAnchor);
       const parent = articulation.parentAnchorWorld ? new Vector3(...articulation.parentAnchorWorld) : undefined;
-      const pivotError = parent?.distanceTo(top);
+      const pivotError = parent && mountedAnchor ? parent.distanceTo(mountedAnchor) : undefined;
       const error = pivotError !== undefined && !Number.isFinite(pivotError) ? 'non-finite-mounted-geometry-pivot-error'
         : pivotError !== undefined && pivotError > MOUNTED_GEOMETRY_PIVOT_TOLERANCE ? 'mounted-geometry-pivot-error' : undefined;
-      return [{ ...base, matrixWorld: matrixElements(mesh.matrixWorld), worldPosition: vectorTuple(position), worldQuaternion: quaternionTuple(quaternion), worldScale: vectorTuple(scale), topWorldPosition: vectorTuple(top), worldBoundingBox: bounds ? boxTuple(bounds) : undefined, parentAnchorWorld: articulation.parentAnchorWorld, pivotError, error }];
+      return [{ ...base, matrixWorld: matrixElements(mesh.matrixWorld), worldPosition: vectorTuple(position), worldQuaternion: quaternionTuple(quaternion), worldScale: vectorTuple(scale), topWorldPosition: vectorTuple(top), mountedAnchorWorld: mountedAnchor ? vectorTuple(mountedAnchor) : undefined, worldBoundingBox: bounds ? boxTuple(bounds) : undefined, parentAnchorWorld: articulation.parentAnchorWorld, pivotError, error }];
     });
     const serialized = JSON.stringify(diagnostics);
     if (serialized !== previous.current) { previous.current = serialized; onPublish(diagnostics); }
@@ -155,6 +156,7 @@ export function SceneRoot({
         <CsgPrimitive
           key={expression.id}
           expression={expression}
+          physicsEntityId={physicsEntityIdForNode(spatialDocument, expression.base)}
           isSelected={expression.base.id === selectedNodeId}
           onSelect={onSelectNode}
         />

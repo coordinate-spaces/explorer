@@ -14,6 +14,8 @@ export interface PhysicsJointDiagnostic {
   articulation?: ArticulationInspection;
   /** Separation between anchors evaluated through the exact transforms passed to flattened meshes. */
   meshAnchorError?: number;
+  /** Child pivot in rigid-body local units, used to inspect the mounted mesh at that point. */
+  childAnchor?: JointDefinition['childAnchor'];
 }
 
 export interface SpatialDocument {
