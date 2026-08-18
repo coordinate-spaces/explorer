@@ -23,3 +23,13 @@ describe('runtime secondary controls', () => {
       .toContain('<SecondaryProjectionPanel');
   });
 });
+
+describe('workspace information architecture', () => {
+  it('uses one diagnostics center and separate auxiliary views', () => {
+    expect(drawerSource).toContain('<WorkspaceDiagnostics');
+    expect(drawerSource).toContain("['connections', 'Connections']");
+    expect(drawerSource).toContain("['diagnostics', `Diagnostics · ${diagnosticCount}`]");
+    expect(drawerSource).not.toContain('aria-label="Spatial declaration diagnostics"');
+    expect(drawerSource).not.toContain('aria-label="Spatial transaction diagnostics"');
+  });
+});

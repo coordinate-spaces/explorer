@@ -8,6 +8,9 @@ import { XyzDslTransactionControls } from './XyzDslTransactionControls';
 import { SecondaryProjectionPanel } from './SecondaryProjectionPanel';
 import { XyzDslTreeView } from './XyzDslTreeView';
 import { usePersistentState } from './usePersistentState';
+import { WorkspaceDiagnostics } from './WorkspaceDiagnostics';
+
+type AuxiliaryView = 'connections' | 'baseline' | 'projections' | 'diagnostics';
 
 function describeAuthoringState(
   hasRemoteBaseline: boolean,
@@ -165,6 +168,8 @@ export function XyzDslDrawer({
 }: XyzDslDrawerProps) {
   const isEditorMode = appMode === 'editor';
   const [activeView, setActiveView] = usePersistentState<'explorer' | 'source'>('xyzdsl-drawer-view-v1', 'explorer');
+  const [auxiliaryView, setAuxiliaryView] = usePersistentState<AuxiliaryView>('xyzdsl-auxiliary-view-v1', 'connections');
+  const diagnosticCount = document.diagnostics.length + rejectedTransactions.length;
   return (
     <aside className={`xyzdsl-drawer xyzdsl-drawer--${appMode} ${isOpen ? 'is-open' : ''}`}>
       <div className="mode-controls" aria-label="Application mode">
@@ -209,9 +214,10 @@ export function XyzDslDrawer({
             ))}
           </div>
 
+          <div className="workspace-body">
           <div className="workspace-primary" role="tabpanel">
             {activeView === 'explorer' ? (
-              <XyzDslTreeView document={document} selectedNodeId={selectedNodeId} onSelectNode={onSelectNode} />
+              <XyzDslTreeView document={document} selectedNodeId={selectedNodeId} onSelectNode={onSelectNode} onShowDiagnostics={() => setAuxiliaryView('diagnostics')} />
             ) : (
               <XyzDslEditor
                 actions={
@@ -230,8 +236,20 @@ export function XyzDslDrawer({
 
           {inspector ? <div className="workspace-properties">{inspector}</div> : null}
 
-          <details className="workspace-more">
-            <summary>Connections &amp; diagnostics</summary>
+          <section className="workspace-auxiliary" aria-label="Workspace tools">
+            <nav className="workspace-subtabs" aria-label="Workspace tool sections">
+              {([
+                ['connections', 'Connections'],
+                ['baseline', 'Baseline'],
+                ['projections', `Projections · ${secondaryProjections.length}`],
+                ['diagnostics', `Diagnostics · ${diagnosticCount}`],
+              ] as const).map(([view, label]) => (
+                <button key={view} type="button" aria-pressed={auxiliaryView === view} onClick={() => setAuxiliaryView(view)}>{label}</button>
+              ))}
+            </nav>
+
+            <div className="workspace-auxiliary-panel">
+            {auxiliaryView === 'connections' ? (
             <XyzDslTransactionControls
             publicKey={transactionPublicKey}
             publicKeyShareUrl={transactionPublicKeyShareUrl}
@@ -250,8 +268,9 @@ export function XyzDslDrawer({
             onReload={onReloadTransactions}
             onUseTip={onUseTransactionTip}
             />
+            ) : null}
 
-          {mappedTransactionSource.trim().length > 0 ? (
+          {auxiliaryView === 'baseline' && mappedTransactionSource.trim().length > 0 ? (
             <details className="remote-baseline-reference">
               <summary>Original remote declarations</summary>
               <label className="xyzdsl-editor xyzdsl-editor-readonly">
@@ -260,8 +279,9 @@ export function XyzDslDrawer({
                 <textarea spellCheck={false} value={mappedTransactionSource} wrap="off" readOnly />
               </label>
             </details>
-          ) : null}
+          ) : auxiliaryView === 'baseline' ? <p className="workspace-empty-state">No remote baseline is loaded.</p> : null}
 
+          {auxiliaryView === 'projections' ? (
           <SecondaryProjectionPanel
             projections={secondaryProjections}
             onReplay={onSecondaryReplay}
@@ -270,40 +290,12 @@ export function XyzDslDrawer({
             onPlaybackSeek={onSecondaryPlaybackSeek}
             onLoadHistory={onLoadSecondaryHistory}
           />
-
-
-          {document.diagnostics.length > 0 ? (
-            <details className="diagnostics" aria-label="Spatial declaration diagnostics">
-              <summary>Diagnostics</summary>
-              <ul>
-                {document.diagnostics.map((diagnostic, index) => (
-                  <li key={`${diagnostic.line}-${index}`}>
-                    <strong>Line {diagnostic.line}:</strong> {diagnostic.message}
-                  </li>
-                ))}
-              </ul>
-            </details>
           ) : null}
 
-          {rejectedTransactions.length > 0 ? (
-            <details className="diagnostics" aria-label="Spatial transaction diagnostics">
-              <summary>Spatial transaction diagnostics</summary>
-              <ul>
-                {rejectedTransactions.map((rejection) => (
-                  <li key={rejection.id}>
-                    <strong>{rejection.id}:</strong> {rejection.memoPreview || '(empty memo)'}
-                    <ul>
-                      {rejection.reasons.map((reason) => (
-                        <li key={reason}>{reason}</li>
-                      ))}
-                    </ul>
-                  </li>
-                ))}
-              </ul>
-            </details>
-          ) : null}
-
-          </details>
+          {auxiliaryView === 'diagnostics' ? <WorkspaceDiagnostics declarationDiagnostics={document.diagnostics} rejectedTransactions={rejectedTransactions} /> : null}
+            </div>
+          </section>
+          </div>
         </div>
       ) : null}
       {!authoringAvailable && secondaryProjections.length > 0 ? (
