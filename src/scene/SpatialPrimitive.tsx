@@ -1,6 +1,8 @@
 import { Edges, RoundedBoxGeometry } from '@react-three/drei';
 import type { ThreeEvent } from '@react-three/fiber';
 import type { MeshPhysicalMaterialParameters, MeshStandardMaterialParameters } from 'three';
+import type { Mesh } from 'three';
+import { useRef } from 'react';
 import type { SpatialGeometry } from '../model/geometry';
 import { normalizedXyzDslStrength, normalizedRoundedBoxRadius } from './primitiveGeometry';
 import type { SpatialNode } from '../model/SpatialNode';
@@ -14,6 +16,7 @@ export function spatialPrimitiveTransform(node: SpatialNode) {
 
 interface SpatialPrimitiveProps {
   node: SpatialNode;
+  physicsEntityId?: string;
   isSelected?: boolean;
   onSelect?: (id: string) => void;
 }
@@ -79,7 +82,8 @@ export function needsPhysicalMaterial(node: SpatialNode): boolean {
   );
 }
 
-export function SpatialPrimitive({ node, isSelected = false, onSelect }: SpatialPrimitiveProps) {
+export function SpatialPrimitive({ node, physicsEntityId, isSelected = false, onSelect }: SpatialPrimitiveProps) {
+  const mountedMeshRef = useRef<Mesh>(null);
   const { position, rotation, scale } = spatialPrimitiveTransform(node);
   const material = materialParameters(node);
 
@@ -90,6 +94,7 @@ export function SpatialPrimitive({ node, isSelected = false, onSelect }: Spatial
 
   return (
     <mesh
+      ref={mountedMeshRef}
       castShadow
       receiveShadow
       position={position}
@@ -98,6 +103,8 @@ export function SpatialPrimitive({ node, isSelected = false, onSelect }: Spatial
       onClick={handleClick}
       userData={{
         spatialNodeId: node.id,
+        fullStableNodeId: node.id,
+        physicsEntityId,
         unionGroupId: node.unionGroupId,
         geometry: node.geometry.kind,
         rotation,

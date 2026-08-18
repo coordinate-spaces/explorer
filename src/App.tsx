@@ -28,6 +28,7 @@ import { SelectedNodeInspector } from './ui/SelectedNodeInspector';
 import { usePersistentState } from './ui/usePersistentState';
 import { CoordinateIntentConsole } from './ui/CoordinateIntentConsole';
 import { advanceLocalCoordinateIntent, DEFAULT_LOCAL_COORDINATE_INTENT, LOCAL_CURSOR_STREAM_ID, localCoordinateIntentXyzDsl, localIntentDefinitions, resetLocalCoordinateIntent, type LocalCursorInput } from './simulation/localCursor';
+import type { MountedSceneDiagnostic } from './scene/mountedSceneDiagnostics';
 
 const INITIAL_XYZDSL = `"+2+4/+0+6/+1+3" : "geometry: cylinder; color: 0x333333; metalness: 0.8; roughness: 0.2"
 "+2+4/+7+6/+0+10c" : "geometry: cone; color: yellow; metalness: 0.2; roughness: 0.5"
@@ -599,6 +600,7 @@ export default function App() {
   const [document, setDocument] = useState(() => createSpatialDocument(renderedBundle.source, {
     originsByLine: renderedBundle.originsByLine,
   }));
+  const [mountedSceneDiagnostics, setMountedSceneDiagnostics] = useState<readonly MountedSceneDiagnostic[]>([]);
   const secondaryCameraChoices = useMemo(() => {
     const choices = new Map<string, SecondaryCameraTarget>();
     document.renderNodes.forEach((node) => {
@@ -1022,6 +1024,7 @@ export default function App() {
         document={document}
         selectedNodeId={selectedSceneNodeId}
         onSelectNode={handleSelectNode}
+        onMountedDiagnostics={setMountedSceneDiagnostics}
         secondaryCameraTarget={simulationMode === 'stopped' ? undefined : secondaryCameraTarget}
         localCursorControl={simulationMode !== 'stopped' && simulationSource === 'local' ? {
           enabled: simulationMode === 'running',
@@ -1146,6 +1149,7 @@ export default function App() {
         diagnosticsSessionIdentifier={simulationMode === 'stopped'
           ? baselineRevision
           : simulationSessionIdentifierRef.current}
+        mountedSceneDiagnostics={mountedSceneDiagnostics}
       />
     </main>
   );

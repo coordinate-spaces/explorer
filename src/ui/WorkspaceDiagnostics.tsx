@@ -1,6 +1,7 @@
 import type { ParseDiagnostic } from '../xyzdsl/types';
 import type { RejectedTransaction } from '../transactions/types';
 import type { PhysicsJointDiagnostic } from '../model/SpatialDocument';
+import type { MountedSceneDiagnostic } from '../scene/mountedSceneDiagnostics';
 
 interface WorkspaceDiagnosticsProps {
   declarationDiagnostics: readonly ParseDiagnostic[];
@@ -10,16 +11,18 @@ interface WorkspaceDiagnosticsProps {
   sessionIdentifier?: string;
   readOnly?: boolean;
   physicsTick?: number;
+  mountedSceneDiagnostics?: readonly MountedSceneDiagnostic[];
 }
 
 export function physicsJointErrorCount(physicsJoints: readonly PhysicsJointDiagnostic[] = []): number {
   return physicsJoints.filter(({ articulation }) => !articulation || articulation.error).length;
 }
 
-export function WorkspaceDiagnostics({ declarationDiagnostics, rejectedTransactions, physicsJoints = [], onSelectLine, sessionIdentifier, readOnly = false, physicsTick }: WorkspaceDiagnosticsProps) {
+export function WorkspaceDiagnostics({ declarationDiagnostics, rejectedTransactions, physicsJoints = [], mountedSceneDiagnostics = [], onSelectLine, sessionIdentifier, readOnly = false, physicsTick }: WorkspaceDiagnosticsProps) {
   const installedJoints = physicsJoints.flatMap(({ articulation }) => articulation ? [articulation] : []);
   const articulationErrors = physicsJointErrorCount(physicsJoints);
-  const total = declarationDiagnostics.length + rejectedTransactions.length + articulationErrors;
+  const mountedErrors = mountedSceneDiagnostics.filter(({ error }) => error).length;
+  const total = declarationDiagnostics.length + rejectedTransactions.length + articulationErrors + mountedErrors;
   const number = (value: number | undefined) => value === undefined ? 'n/a' : Number.isFinite(value) ? value.toFixed(8) : String(value);
   const position = (value: readonly number[] | undefined) => value ? `[${value.map((component) => number(component)).join(', ')}]` : 'n/a';
 
@@ -69,6 +72,22 @@ export function WorkspaceDiagnostics({ declarationDiagnostics, rejectedTransacti
             ))}
           </ul>
         )}
+      </div>
+
+      <div className="diagnostic-group mounted-scene-diagnostics">
+        <h3>Mounted articulated meshes <span>{mountedSceneDiagnostics.length}</span></h3>
+        {mountedSceneDiagnostics.length === 0 ? <p className="workspace-empty-state">No mounted articulated child measurements are available.</p> : <ul>{mountedSceneDiagnostics.map((diagnostic) => (
+          <li key={`${diagnostic.physicsEntityId}:${diagnostic.nodeId}`}><div className={`diagnostic-row ${diagnostic.error ? 'diagnostic-row-error' : ''}`}>
+            <span>{diagnostic.physicsEntityId}</span>
+            <strong>Mounted node ID: {diagnostic.nodeId}</strong>
+            <small>Mounted mesh count: {diagnostic.meshCount}</small>
+            <small>Mounted world position: {position(diagnostic.worldPosition)}</small>
+            <small>Mounted world scale: {position(diagnostic.worldScale)}</small>
+            <small>Mounted top world position: {position(diagnostic.topWorldPosition)}</small>
+            <small>Mounted-geometry pivot error: {number(diagnostic.pivotError)}</small>
+            {diagnostic.error ? <strong>Scene error: {diagnostic.error}</strong> : null}
+          </div></li>
+        ))}</ul>}
       </div>
 
       {declarationDiagnostics.length > 0 ? (

@@ -1,7 +1,7 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { OrbitControls, PerspectiveCamera } from '@react-three/drei';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { Vector3 } from 'three';
+import { Box3, Mesh, Quaternion, Vector3 } from 'three';
 import type { SpatialDocument } from '../model/SpatialDocument';
 import type { SpatialNode } from '../model/SpatialNode';
 import { XyzCoordinateSpace } from './XyzCoordinateSpace';
@@ -15,6 +15,9 @@ import {
 } from './secondaryCamera';
 import { LocalCursorControls } from './LocalCursorControls';
 import type { LocalCursorInput } from '../simulation/localCursor';
+import { physicsEntityIdForNode } from '../physics/compilePhysicsScene';
+import type { MountedSceneDiagnostic } from './mountedSceneDiagnostics';
+import { boxTuple, matrixElements, MOUNTED_GEOMETRY_PIVOT_TOLERANCE, quaternionTuple, vectorTuple } from './mountedSceneDiagnostics';
 
 interface SceneRootProps {
   document: SpatialDocument;
@@ -27,9 +30,50 @@ interface SceneRootProps {
     onCaptureChange: (captured: boolean) => void;
     onInput: (input: LocalCursorInput) => void;
   };
+  onMountedDiagnostics?: (diagnostics: readonly MountedSceneDiagnostic[]) => void;
 }
 
 const DEFAULT_ORBIT_TARGET: [number, number, number] = [6, 5, 4];
+
+function MountedSceneDiagnostics({ document, onPublish }: { document: SpatialDocument; onPublish?: (value: readonly MountedSceneDiagnostic[]) => void }) {
+  const scene = useThree((state) => state.scene);
+  const previous = useRef('');
+
+  useFrame(() => {
+    if (!onPublish) return;
+    const meshes = new Map<string, Mesh[]>();
+    scene.traverse((object) => {
+      if (!(object instanceof Mesh) || typeof object.userData.fullStableNodeId !== 'string') return;
+      const matches = meshes.get(object.userData.fullStableNodeId) ?? [];
+      matches.push(object);
+      meshes.set(object.userData.fullStableNodeId, matches);
+    });
+    const diagnostics = (document.physicsJoints ?? []).flatMap((joint): MountedSceneDiagnostic[] => {
+      const articulation = joint.articulation;
+      if (!articulation) return [];
+      const candidates = meshes.get(joint.nodeId) ?? [];
+      const nodeId = joint.nodeId;
+      const base = { nodeId, physicsEntityId: articulation.childEntityId, meshCount: candidates.length };
+      if (candidates.length !== 1) return [{ ...base, error: candidates.length ? 'multiple-mounted-meshes' : 'missing-mounted-mesh' }];
+      const mesh = candidates[0];
+      mesh.updateWorldMatrix(true, false);
+      const top = new Vector3(0, 0.5, 0).applyMatrix4(mesh.matrixWorld);
+      const position = mesh.getWorldPosition(new Vector3());
+      const quaternion = mesh.getWorldQuaternion(new Quaternion());
+      const scale = mesh.getWorldScale(new Vector3());
+      mesh.geometry.computeBoundingBox();
+      const bounds = mesh.geometry.boundingBox?.clone().applyMatrix4(mesh.matrixWorld);
+      const parent = articulation.parentAnchorWorld ? new Vector3(...articulation.parentAnchorWorld) : undefined;
+      const pivotError = parent?.distanceTo(top);
+      const error = pivotError !== undefined && !Number.isFinite(pivotError) ? 'non-finite-mounted-geometry-pivot-error'
+        : pivotError !== undefined && pivotError > MOUNTED_GEOMETRY_PIVOT_TOLERANCE ? 'mounted-geometry-pivot-error' : undefined;
+      return [{ ...base, matrixWorld: matrixElements(mesh.matrixWorld), worldPosition: vectorTuple(position), worldQuaternion: quaternionTuple(quaternion), worldScale: vectorTuple(scale), topWorldPosition: vectorTuple(top), worldBoundingBox: bounds ? boxTuple(bounds) : undefined, parentAnchorWorld: articulation.parentAnchorWorld, pivotError, error }];
+    });
+    const serialized = JSON.stringify(diagnostics);
+    if (serialized !== previous.current) { previous.current = serialized; onPublish(diagnostics); }
+  });
+  return null;
+}
 
 function selectedOrbitNode(spatialDocument: SpatialDocument, selectedNodeId?: string): SpatialNode | undefined {
   if (!selectedNodeId) {
@@ -71,6 +115,7 @@ export function SceneRoot({
   onSelectNode,
   secondaryCameraTarget,
   localCursorControl,
+  onMountedDiagnostics,
 }: SceneRootProps) {
   const orbitTarget = useMemo(() => {
     const selectedNode = selectedOrbitNode(spatialDocument, selectedNodeId);
@@ -104,6 +149,7 @@ export function SceneRoot({
         />
       ) : null}
       <Lighting />
+      <MountedSceneDiagnostics document={spatialDocument} onPublish={onMountedDiagnostics} />
       <XyzCoordinateSpace {...spatialDocument.coordinateSpace} />
       {spatialDocument.csgExpressions.map((expression) => (
         <CsgPrimitive
@@ -117,7 +163,7 @@ export function SceneRoot({
         node.content?.kind ? (
           <ContentPrimitive key={node.id} isSelected={node.id === selectedNodeId} node={node} onSelect={onSelectNode} />
         ) : (
-          <SpatialPrimitive key={node.id} isSelected={node.id === selectedNodeId} node={node} onSelect={onSelectNode} />
+          <SpatialPrimitive key={node.id} physicsEntityId={physicsEntityIdForNode(spatialDocument, node)} isSelected={node.id === selectedNodeId} node={node} onSelect={onSelectNode} />
         )
       ))}
       <OrbitControls enabled={!secondaryCameraNode && !localCursorControl?.captured} target={orbitTarget} maxPolarAngle={Math.PI} />

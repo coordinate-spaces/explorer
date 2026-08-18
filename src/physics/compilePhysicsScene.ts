@@ -6,6 +6,18 @@ import { authoredPhysicsEntityId, physicsOriginScope, scopedPhysicsNamespace } f
 
 export interface CompiledPhysicsScene { bodies: RigidBodyDefinition[]; joints: JointDefinition[] }
 
+/** Returns the exact stable entity identity attached to a rendered Three.js primitive. */
+export function physicsEntityIdForNode(document: SpatialDocument, node: SpatialNode): string {
+  let baseId = authoredPhysicsEntityId(node);
+  document.csgExpressions.forEach((expression) => {
+    if (expression.base.id === node.id || (expression.operations.some(({ tool }) => tool.id === node.id)
+      && physicsOriginScope(node) === physicsOriginScope(expression.base))) baseId = authoredPhysicsEntityId(expression.base);
+  });
+  return node.origin?.sourceKind === 'secondary'
+    ? `${baseId}:${node.physics?.['physical-body'] === true ? 'physical' : 'cursor-sensor'}`
+    : baseId;
+}
+
 function flatten(nodes: readonly SpatialNode[]): SpatialNode[] {
   return nodes.flatMap((node) => [node.renderable ? node : undefined, ...flatten(node.children ?? [])])
     .filter(Boolean) as SpatialNode[];
@@ -31,28 +43,10 @@ export function compileArticulatedPhysicsScene(document: SpatialDocument, revisi
       document.diagnostics.push(diagnostic);
     }
   };
-  const csgEntityByNodeId = new Map<string, string>();
-  document.csgExpressions.forEach((expression) => {
-    const id = authoredPhysicsEntityId(expression.base);
-    csgEntityByNodeId.set(expression.base.id, id);
-    expression.operations.forEach(({ tool }) => {
-      // Visual CSG may cross projection streams, but physics bodies may not.
-      if (physicsOriginScope(tool) === physicsOriginScope(expression.base)) {
-        csgEntityByNodeId.set(tool.id, id);
-      }
-    });
-  });
-
   // All secondary primitives are compiled: ordinary cursors are zero-mass sensors,
   // while the explicit physical-body opt-in retains ordinary rigid-body semantics.
   const candidates = flatten(document.nodes);
-  const physicsEntityId = (node: SpatialNode): string => {
-    const baseId = csgEntityByNodeId.get(node.id) ?? authoredPhysicsEntityId(node);
-    if (node.origin?.sourceKind !== 'secondary') return baseId;
-    // Sensor proxies and opted-in physical members cannot share one Rapier body:
-    // their body modes, mass, solver participation, and state lifetimes differ.
-    return `${baseId}:${node.physics?.['physical-body'] === true ? 'physical' : 'cursor-sensor'}`;
-  };
+  const physicsEntityId = (node: SpatialNode): string => physicsEntityIdForNode(document, node);
   const modeByEntity = new Map<string, NonNullable<RigidBodyDefinition['mode']>>();
   candidates.forEach((node) => {
     const id = physicsEntityId(node);
