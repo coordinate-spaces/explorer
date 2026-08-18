@@ -171,7 +171,8 @@ export function XyzDslDrawer({
   const isEditorMode = appMode === 'editor';
   const [activeView, setActiveView] = usePersistentState<'explorer' | 'source'>('xyzdsl-drawer-view-v1', 'explorer');
   const [auxiliaryView, setAuxiliaryView] = usePersistentState<AuxiliaryView>('xyzdsl-auxiliary-view-v1', 'connections');
-  const diagnosticCount = document.diagnostics.length + rejectedTransactions.length;
+  const diagnosticCount = document.diagnostics.length + rejectedTransactions.length
+    + (document.physicsJoints?.filter(({ articulation }) => !articulation).length ?? 0);
   const primaryRef = useRef<HTMLDivElement>(null);
   const auxiliaryRef = useRef<HTMLElement>(null);
 

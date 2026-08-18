@@ -66,15 +66,19 @@ function withCompilerDiagnostics(document: SpatialDocument, compiled: SpatialDoc
 function withActivePhysicsJoints(document: SpatialDocument, compiled: SpatialDocument, world: RapierPhysicsWorld): SpatialDocument {
   const articulations = world.inspectArticulations();
   const entityByNodeId = new Map(world.snapshot().definitions.map((definition) => [definition.id, definition.entityId ?? definition.id]));
+  const assignedArticulationIds = new Set<string>();
   const physicsJoints = renderable(compiled.nodes).flatMap((node) => {
     const kind = node.physics?.joint;
     if (!kind) return [];
     const entityId = entityByNodeId.get(node.id);
+    const articulation = articulations.find((candidate) =>
+      candidate.childEntityId === entityId && !assignedArticulationIds.has(candidate.id));
+    if (articulation) assignedArticulationIds.add(articulation.id);
     return [{
       nodeId: node.id,
       nodeName: node.namespacePath?.replace(/\/$/, '').split('/').pop() || node.id,
       kind,
-      articulation: articulations.find(({ childEntityId }) => childEntityId === entityId),
+      articulation,
     }];
   });
   return { ...document, physicsJoints };

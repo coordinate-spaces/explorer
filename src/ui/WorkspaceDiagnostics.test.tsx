@@ -39,4 +39,12 @@ describe('workspace articulation diagnostics', () => {
     expect(markup).toContain('Rod declares a revolute joint, but no constraint was installed in the active physics world.');
     expect(markup).toContain('Joint parent &quot;Pendulum/Missing/&quot; was not found.');
   });
+
+  it('does not count one compound constraint once for every declaring primitive', () => {
+    const duplicateDeclaration = '"Pendulum/RodPart/+83c+20c/+304c+1/+45c+10c" : "body: Rod; mass: 1; joint: revolute; joint-parent: Pendulum/Anchor/; joint-anchor: 0.5 8 0.5; joint-axis: 0 0 1"';
+    const markup = diagnostics(`${documentedPendulum}\n${duplicateDeclaration}`);
+    expect(markup).toContain('Installed joints <span>1</span>');
+    expect(markup.match(/<strong>revolute<\/strong>/g)).toHaveLength(1);
+    expect(markup).toContain('RodPart declares a revolute joint, but no constraint was installed in the active physics world.');
+  });
 });
