@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createSpatialDocument } from '../model/createSpatialDocument';
 import { compileArticulatedPhysicsScene, compilePhysicsScene } from './compilePhysicsScene';
+import { Quaternion, Vector3 } from 'three';
 
 describe('compilePhysicsScene', () => {
   const portablePendulum = (component = '+0+1/+0+1/+0+1', rotation = '') => `"Pendulum/${component}" : "${rotation}"
@@ -70,6 +71,32 @@ describe('compilePhysicsScene', () => {
     expect(document.diagnostics.map(({ message }) => message)).not.toEqual(expect.arrayContaining([
       expect.stringContaining('outside the child component'),
     ]));
+  });
+  it('scales materialized articulation anchors consistently with ref-scale bodies', () => {
+    const document = createSpatialDocument(`"Pendulum/" : ""
+"Pendulum/Anchor/+0+1/+8+1/+0+1" : "body: Anchor; physics-mode: static"
+"Pendulum/Rod/+0+1/+3+5/+0+1" : "body: Rod; joint: revolute; joint-parent: Pendulum/Anchor/; joint-anchor: 0.5 8 0.5; joint-axis: 0 0 1"
+"Scaled/+10+2/+0+16/+2+2" : "ref: Pendulum/; ref-scale: true"`);
+    const scene = compileArticulatedPhysicsScene(document);
+    const joint = scene.joints[0];
+    const endpoint = (entityId: string, anchor: [number, number, number]) => {
+      const body = scene.bodies.find((entry) => entry.entityId === entityId)!;
+      return new Vector3(...anchor).applyQuaternion(new Quaternion(...body.orientation!)).add(new Vector3(...body.position));
+    };
+    const parentPivot = endpoint(joint.parentEntityId, joint.parentAnchor);
+    const childPivot = endpoint(joint.childEntityId, joint.childAnchor);
+    expect(parentPivot.distanceTo(childPivot)).toBeLessThan(1e-9);
+  });
+
+  it('uses the concrete tree when lexical namespace segments have no node', () => {
+    const document = createSpatialDocument(`"C/+0+1/+0+1/+0+1" : ""
+"C/Group/+2+1/+1+1/+3+1" : ""
+"C/Group/A/Parent/+0+1/+4+1/+0+1" : "body: Parent; physics-mode: static"
+"C/Group/A/Child/+0+1/+1+3/+0+1" : "body: Child; joint: revolute; joint-parent: C/Group/A/Parent/; joint-anchor: 2.5 5 3.5; joint-axis: 0 0 1"`);
+    const scene = compileArticulatedPhysicsScene(document);
+    const joint = scene.joints[0];
+    expect(joint.parentAnchor).toEqual([0, -0.5, 0]);
+    expect(joint.childAnchor).toEqual([0, 1.5, 0]);
   });
   it('compiles body, collider, locks, groups, and no transaction-derived mass', () => {
     const origins = new Map([[1, { sourceKind: 'baseline' as const, transactionAmount: 999 }]]);

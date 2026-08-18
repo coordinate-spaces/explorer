@@ -23,9 +23,6 @@ function flatten(nodes: readonly SpatialNode[]): SpatialNode[] {
   return nodes.flatMap((node) => [node.renderable ? node : undefined, ...flatten(node.children ?? [])])
     .filter(Boolean) as SpatialNode[];
 }
-function flattenAll(nodes: readonly SpatialNode[]): SpatialNode[] {
-  return nodes.flatMap((node) => [node, ...flattenAll(node.children ?? [])]);
-}
 
 function colliderShape(node: SpatialNode): ColliderShape {
   switch (node.geometry.kind) {
@@ -50,7 +47,12 @@ export function compileArticulatedPhysicsScene(document: SpatialDocument, revisi
   // All secondary primitives are compiled: ordinary cursors are zero-mass sensors,
   // while the explicit physical-body opt-in retains ordinary rigid-body semantics.
   const candidates = flatten(document.nodes);
-  const hierarchyNodes = flattenAll(document.nodes);
+  const hierarchyParent = new Map<SpatialNode, SpatialNode>();
+  const indexHierarchy = (nodes: readonly SpatialNode[], parent?: SpatialNode) => nodes.forEach((entry) => {
+    if (parent) hierarchyParent.set(entry, parent);
+    indexHierarchy(entry.children ?? [], entry);
+  });
+  indexHierarchy(document.nodes);
   // Articulation is authored in the immutable coordinate system of the
   // materialized top-level component.  Never use a published/render transform
   // here: it may contain a pose supplied by PhysicsFrame.
@@ -67,11 +69,17 @@ export function compileArticulatedPhysicsScene(document: SpatialDocument, revisi
     let current: SpatialNode | undefined = node;
     while (current && current !== root) {
       chain.unshift(current);
-      current = hierarchyNodes.find((candidate) => candidate.namespacePath === current?.parentNamespacePath
-        && physicsOriginScope(candidate) === physicsOriginScope(node));
+      current = hierarchyParent.get(current);
     }
-    return chain.reduce((pose, entry) => composeTransforms(pose, entry.localTransform ?? entry.transform), identityTransform());
+    // A materialized ref-scale is part of the instance's authored coordinate
+    // mapping. Keep its scale while deliberately excluding root translation and
+    // rotation, which only place the complete articulation in world space.
+    const pose = identityTransform();
+    pose.scale = [...(root.localTransform?.scale ?? [1, 1, 1])];
+    return chain.reduce((result, entry) => composeTransforms(result, entry.localTransform ?? entry.transform), pose);
   };
+  const componentScaleFor = (node: SpatialNode): Vector3Tuple =>
+    [...(componentRootFor(node)?.localTransform?.scale ?? [1, 1, 1])] as Vector3Tuple;
   const physicsEntityId = (node: SpatialNode): string => physicsEntityIdForNode(document, node);
   const modeByEntity = new Map<string, NonNullable<RigidBodyDefinition['mode']>>();
   candidates.forEach((node) => {
@@ -188,12 +196,15 @@ export function compileArticulatedPhysicsScene(document: SpatialDocument, revisi
     const childNode = candidates[bodies.indexOf(child)];
     const parentPose = componentPoseFor(parentNode);
     const childPose = componentPoseFor(childNode);
+    const componentScale = componentScaleFor(childNode);
+    const scaledAnchor = new Vector3(...anchor).multiply(new Vector3(...componentScale));
     const localPoint = (pose: ReturnType<typeof componentPoseFor>): Vector3Tuple => {
       const q = new Quaternion().setFromEuler(new Euler(...pose.rotation, 'XYZ')).invert();
-      const point = new Vector3(...anchor).sub(new Vector3(...pose.position)).applyQuaternion(q);
+      const point = scaledAnchor.clone().sub(new Vector3(...pose.position)).applyQuaternion(q);
       return [point.x, point.y, point.z];
     };
-    const componentAxis = new Vector3(...(axis ?? [1, 0, 0] as Vector3Tuple)).normalize();
+    const componentAxis = new Vector3(...(axis ?? [1, 0, 0] as Vector3Tuple))
+      .multiply(new Vector3(...componentScale)).normalize();
     const axisIn = (pose: ReturnType<typeof componentPoseFor>): Vector3Tuple => {
       const local = componentAxis.clone().applyQuaternion(new Quaternion().setFromEuler(new Euler(...pose.rotation, 'XYZ')).invert()).normalize();
       return [local.x, local.y, local.z];
