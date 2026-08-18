@@ -11,8 +11,10 @@ interface WorkspaceDiagnosticsProps {
 
 export function WorkspaceDiagnostics({ declarationDiagnostics, rejectedTransactions, physicsJoints = [], onSelectLine }: WorkspaceDiagnosticsProps) {
   const installedJoints = physicsJoints.flatMap(({ articulation }) => articulation ? [articulation] : []);
-  const missingJoints = physicsJoints.length - installedJoints.length;
-  const total = declarationDiagnostics.length + rejectedTransactions.length + missingJoints;
+  const articulationErrors = physicsJoints.filter(({ articulation }) => !articulation || articulation.error).length;
+  const total = declarationDiagnostics.length + rejectedTransactions.length + articulationErrors;
+  const number = (value: number | undefined) => value === undefined ? 'n/a' : Number.isFinite(value) ? value.toFixed(8) : String(value);
+  const position = (value: readonly number[] | undefined) => value ? `[${value.map((component) => number(component)).join(', ')}]` : 'n/a';
 
   return (
     <section className="workspace-diagnostics workspace-section" aria-label="Workspace diagnostics">
@@ -32,11 +34,18 @@ export function WorkspaceDiagnostics({ declarationDiagnostics, rejectedTransacti
           <ul>
             {physicsJoints.map((joint) => joint.articulation ? (
               <li key={joint.nodeId}>
-                <div className="diagnostic-row">
+                <div className={`diagnostic-row ${joint.articulation.error ? 'diagnostic-row-error' : ''}`}>
                   <span>{joint.articulation.id}</span>
                   <strong>{joint.articulation.kind}</strong>
-                  <small>Parent: {joint.articulation.parentEntityId}</small>
-                  <small>Child: {joint.articulation.childEntityId}</small>
+                  <small>Handle: {joint.articulation.hasActiveHandle ? 'active' : 'missing'}</small>
+                  <small>Tick: {joint.articulation.tick}</small>
+                  <small>Parent: {joint.articulation.parentEntityId} ({joint.articulation.parentMode ?? 'unknown'})</small>
+                  <small>Child: {joint.articulation.childEntityId} ({joint.articulation.childMode ?? 'unknown'})</small>
+                  <small>Pivot error: {number(joint.articulation.pivotError)}</small>
+                  <small>Parent anchor world: {position(joint.articulation.parentAnchorWorld)}</small>
+                  <small>Child anchor world: {position(joint.articulation.childAnchorWorld)}</small>
+                  {joint.articulation.kind === 'revolute' ? <small>Coordinate: {number(joint.articulation.coordinate)} rad; limits: {joint.articulation.limits ? `${number(joint.articulation.limits[0])} to ${number(joint.articulation.limits[1])} rad` : 'none'}</small> : null}
+                  {joint.articulation.error ? <strong>Physics error: {joint.articulation.error}</strong> : null}
                 </div>
               </li>
             ) : (

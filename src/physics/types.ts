@@ -35,8 +35,16 @@ export type JointDefinition = RevoluteJointDefinition | PrismaticJointDefinition
 
 export interface ArticulationInspection {
   id: string; parentEntityId: string; childEntityId: string; kind: JointDefinition['kind'];
+  tick: number;
+  hasActiveHandle: boolean;
+  parentMode?: RigidBodyMode;
+  childMode?: RigidBodyMode;
+  parentAnchorWorld?: Vector3Tuple;
+  childAnchorWorld?: Vector3Tuple;
   /** Radians for revolute, project units for prismatic. */
   coordinate?: number; limits?: [number, number]; pivotError?: number;
+  /** A backend integrity failure suitable for surfacing as an application error. */
+  error?: 'missing-handle' | 'non-finite-pivot-error' | 'persistent-pivot-error';
 }
 
 export interface ColliderDefinition {

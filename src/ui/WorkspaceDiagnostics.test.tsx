@@ -29,8 +29,17 @@ describe('workspace articulation diagnostics', () => {
     expect(markup).toContain('Installed joints <span>1</span>');
     expect(markup).toContain('<strong>revolute</strong>');
     expect(markup).toContain('joint:');
+    expect(markup).toContain('Handle: active');
+    expect(markup).toContain('Tick: 0');
     expect(markup).toContain('Parent:');
+    expect(markup).toContain('(static)');
     expect(markup).toContain('Child:');
+    expect(markup).toContain('(dynamic)');
+    expect(markup).toMatch(/Pivot error: \d+\.\d{8}/);
+    expect(markup).toContain('Coordinate:');
+    expect(markup).toContain('limits: -2.96705973 to 2.96705973 rad');
+    expect(markup).toContain('Parent anchor world: [');
+    expect(markup).toContain('Child anchor world: [');
   });
 
   it('reports an invalid parent as rejected and not installed', () => {

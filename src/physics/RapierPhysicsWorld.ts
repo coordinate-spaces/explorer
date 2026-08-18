@@ -9,6 +9,8 @@ const tuple = ({ x, y, z }: { x: number; y: number; z: number }): Vector3Tuple =
 const quaternion = (value: readonly number[] | undefined): Quaternion => new Quaternion(...(value ?? [0, 0, 0, 1]) as [number, number, number, number]);
 const quaternionTuple = (value: Quaternion): [number, number, number, number] => [value.x, value.y, value.z, value.w];
 interface MemberLocalPose { position: Vector3Tuple; orientation: [number, number, number, number] }
+const ARTICULATION_PIVOT_TOLERANCE = 0.02;
+const EXCESSIVE_PIVOT_SAMPLES = 3;
 
 /** Rapier-backed fixed-timestep world. Stable authored IDs never expose engine handles. */
 export class RapierPhysicsWorld implements RigidBodyWorld {
@@ -22,6 +24,7 @@ export class RapierPhysicsWorld implements RigidBodyWorld {
   private memberLocalPoses = new Map<string, MemberLocalPose>();
   private jointDefinitions = new Map<string, JointDefinition>();
   private jointById = new Map<string, RAPIER.ImpulseJoint>();
+  private excessivePivotSamples = new Map<string, { tick: number; count: number }>();
   private queuedInputs = new Map<number, PhysicsInput[]>();
   private currentTick = 0;
 
@@ -95,6 +98,7 @@ export class RapierPhysicsWorld implements RigidBodyWorld {
     this.colliderIdByHandle.clear(); this.memberByColliderId.clear(); this.memberLocalPoses.clear();
     this.jointDefinitions = new Map(joints.map((joint) => [joint.id, { ...joint }]));
     this.jointById.clear();
+    this.excessivePivotSamples.clear();
 
     const groups = new Map<string, RigidBodyDefinition[]>();
     next.forEach((definition) => {
@@ -328,25 +332,40 @@ export class RapierPhysicsWorld implements RigidBodyWorld {
   inspectArticulations(): readonly ArticulationInspection[] {
     return [...this.jointDefinitions.values()].map((definition) => {
       const joint = this.jointById.get(definition.id);
+      const hasActiveHandle = Boolean(joint && this.world.getImpulseJoint(joint.handle));
       const parent = this.bodyByEntity.get(definition.parentEntityId); const child = this.bodyByEntity.get(definition.childEntityId);
+      const modeFor = (entityId: string) => [...this.definitions.values()]
+        .find((candidate) => (candidate.entityId ?? candidate.id) === entityId)?.mode ?? 'dynamic';
+      const parentAnchorWorld = parent
+        ? tuple(new Vector3(...definition.parentAnchor).applyQuaternion(quaternionTupleToThree(parent.rotation())).add(new Vector3(...tuple(parent.translation()))))
+        : undefined;
+      const childAnchorWorld = child
+        ? tuple(new Vector3(...definition.childAnchor).applyQuaternion(quaternionTupleToThree(child.rotation())).add(new Vector3(...tuple(child.translation()))))
+        : undefined;
       let coordinate: number | undefined;
-      if (joint && parent && child && definition.kind === 'prismatic') {
+      if (hasActiveHandle && parent && child && definition.kind === 'prismatic') {
         const axis = new Vector3(...definition.parentAxis).applyQuaternion(quaternionTupleToThree(parent.rotation())).normalize();
         const pa = new Vector3(...definition.parentAnchor).applyQuaternion(quaternionTupleToThree(parent.rotation())).add(new Vector3(...tuple(parent.translation())));
         const pb = new Vector3(...definition.childAnchor).applyQuaternion(quaternionTupleToThree(child.rotation())).add(new Vector3(...tuple(child.translation())));
         coordinate = pb.sub(pa).dot(axis);
-      } else if (joint && parent && child && definition.kind === 'revolute') {
+      } else if (hasActiveHandle && parent && child && definition.kind === 'revolute') {
         const relative = quaternionTupleToThree(parent.rotation()).invert().multiply(quaternionTupleToThree(child.rotation())).normalize();
         coordinate = 2 * Math.atan2(new Vector3(relative.x, relative.y, relative.z).dot(new Vector3(...definition.parentAxis).normalize()), relative.w);
       }
       let pivotError: number | undefined;
-      if (parent && child) {
-        const pa = new Vector3(...definition.parentAnchor).applyQuaternion(quaternionTupleToThree(parent.rotation())).add(new Vector3(...tuple(parent.translation())));
-        const pb = new Vector3(...definition.childAnchor).applyQuaternion(quaternionTupleToThree(child.rotation())).add(new Vector3(...tuple(child.translation())));
-        pivotError = pa.distanceTo(pb);
-      }
+      if (parentAnchorWorld && childAnchorWorld) pivotError = new Vector3(...parentAnchorWorld).distanceTo(new Vector3(...childAnchorWorld));
+      const previousSample = this.excessivePivotSamples.get(definition.id);
+      const excessive = Number.isFinite(pivotError) && pivotError! > ARTICULATION_PIVOT_TOLERANCE;
+      const excessiveSamples = previousSample?.tick === this.currentTick ? previousSample.count
+        : excessive ? (previousSample?.count ?? 0) + 1 : 0;
+      this.excessivePivotSamples.set(definition.id, { tick: this.currentTick, count: excessiveSamples });
+      const error = !hasActiveHandle ? 'missing-handle' as const
+        : !Number.isFinite(pivotError) ? 'non-finite-pivot-error' as const
+          : excessiveSamples >= EXCESSIVE_PIVOT_SAMPLES ? 'persistent-pivot-error' as const : undefined;
       return { id: definition.id, parentEntityId: definition.parentEntityId, childEntityId: definition.childEntityId,
-        kind: definition.kind, coordinate, limits: 'limits' in definition ? definition.limits : undefined, pivotError };
+        kind: definition.kind, tick: this.currentTick, hasActiveHandle, parentMode: modeFor(definition.parentEntityId),
+        childMode: modeFor(definition.childEntityId), parentAnchorWorld, childAnchorWorld,
+        coordinate, limits: 'limits' in definition ? definition.limits : undefined, pivotError, error };
     });
   }
   snapshot(): PhysicsSnapshot { return structuredClone({ schemaVersion: 1 as const, backend: 'rapier-0.20', tick: this.currentTick, states: [...this.frame().states.values()], definitions: [...this.definitions.values()], joints: [...this.jointDefinitions.values()] }); }
@@ -374,7 +393,7 @@ export class RapierPhysicsWorld implements RigidBodyWorld {
     this.queuedInputs.clear();
   }
   dispose(): void { this.world.free(); this.definitions.clear(); this.bodyByEntity.clear(); this.entityByBodyHandle.clear();
-    this.colliderById.clear(); this.colliderIdByHandle.clear(); this.memberByColliderId.clear(); this.memberLocalPoses.clear(); this.jointDefinitions.clear(); this.jointById.clear(); this.queuedInputs.clear(); }
+    this.colliderById.clear(); this.colliderIdByHandle.clear(); this.memberByColliderId.clear(); this.memberLocalPoses.clear(); this.jointDefinitions.clear(); this.jointById.clear(); this.excessivePivotSamples.clear(); this.queuedInputs.clear(); }
 }
 
 function groupsCompatible(a = 0xffffffff, b = 0xffffffff): boolean {
