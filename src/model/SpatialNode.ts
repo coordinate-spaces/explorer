@@ -25,6 +25,8 @@ export interface SpatialNode {
   transform: SpatialTransform;
   localTransform?: SpatialTransform;
   worldTransform?: SpatialTransform;
+  /** Authoritative world pose for a node published in the flattened render list. */
+  renderTransform?: SpatialTransform;
   /** World transform before periodic secondary-cursor wrapping. */
   unwrappedTransform?: SpatialTransform;
   namespacePath?: string;

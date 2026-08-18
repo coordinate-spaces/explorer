@@ -17,7 +17,7 @@ import { LocalCursorControls } from './LocalCursorControls';
 import type { LocalCursorInput } from '../simulation/localCursor';
 import { physicsEntityIdForNode } from '../physics/compilePhysicsScene';
 import type { MountedSceneDiagnostic } from './mountedSceneDiagnostics';
-import { boxTuple, matrixElements, mountedChildAnchorWorld, mountedChildAxisWorld, MOUNTED_GEOMETRY_PIVOT_TOLERANCE, quaternionTuple, vectorTuple } from './mountedSceneDiagnostics';
+import { boxTuple, geometryTopIsJointPivot, matrixElements, mountedChildAnchorWorld, mountedChildAxisWorld, MOUNTED_GEOMETRY_PIVOT_TOLERANCE, quaternionTuple, vectorTuple } from './mountedSceneDiagnostics';
 
 export interface SceneRootProps {
   document: SpatialDocument;
@@ -169,12 +169,25 @@ function MountedSceneDiagnostics({ document, onPublish }: { document: SpatialDoc
       const scale = mesh.getWorldScale(new Vector3());
       mesh.geometry.computeBoundingBox();
       const bounds = mesh.geometry.boundingBox?.clone().applyMatrix4(mesh.matrixWorld);
-      const mountedAnchor = mountedChildAnchorWorld(mesh, joint.childAnchor);
+      const mountedBodyAnchor = mountedChildAnchorWorld(mesh, joint.childAnchor);
       const parent = articulation.parentAnchorWorld ? new Vector3(...articulation.parentAnchorWorld) : undefined;
-      const pivotError = parent && mountedAnchor ? parent.distanceTo(mountedAnchor) : undefined;
-      const error = pivotError !== undefined && !Number.isFinite(pivotError) ? 'non-finite-mounted-geometry-pivot-error'
-        : pivotError !== undefined && pivotError > MOUNTED_GEOMETRY_PIVOT_TOLERANCE ? 'mounted-geometry-pivot-error' : undefined;
-      return [{ ...base, matrixWorld: matrixElements(mesh.matrixWorld), worldPosition: vectorTuple(position), worldQuaternion: quaternionTuple(quaternion), worldScale: vectorTuple(scale), topWorldPosition: vectorTuple(top), mountedAnchorWorld: mountedAnchor ? vectorTuple(mountedAnchor) : undefined, worldBoundingBox: bounds ? boxTuple(bounds) : undefined, parentAnchorWorld: articulation.parentAnchorWorld, pivotError, error }];
+      // This is deliberately the endpoint of the mounted geometry.  A body-local
+      // anchor reconstruction can agree with physics even when the mesh itself
+      // was mounted with a completely unrelated transform.
+      const pivotError = parent ? parent.distanceTo(top) : undefined;
+      const bodyAnchorReconstructionError = parent && mountedBodyAnchor
+        ? parent.distanceTo(mountedBodyAnchor) : undefined;
+      const topIsJointPivot = geometryTopIsJointPivot(mesh, joint.childAnchor);
+      // Keep the direct measurement visible for every mesh, but make it a
+      // health error only when the declaration says this endpoint is the joint.
+      // In particular, a CSG mesh has world-baked vertices and an identity mount.
+      const error = topIsJointPivot && pivotError !== undefined && !Number.isFinite(pivotError) ? 'non-finite-mounted-geometry-pivot-error'
+        : topIsJointPivot && pivotError !== undefined && pivotError > MOUNTED_GEOMETRY_PIVOT_TOLERANCE ? 'mounted-geometry-pivot-error' : undefined;
+      const node = document.renderNodes.find(({ id }) => id === nodeId);
+      return [{ ...base, nodeTransform: node?.transform, nodeWorldTransform: node?.worldTransform,
+        renderTransform: node?.renderTransform, mountedLocalPosition: vectorTuple(mesh.position),
+        parentObjectType: mesh.parent?.type, parentMatrix: mesh.parent ? matrixElements(mesh.parent.matrixWorld) : undefined,
+        matrixWorld: matrixElements(mesh.matrixWorld), worldPosition: vectorTuple(position), worldQuaternion: quaternionTuple(quaternion), worldScale: vectorTuple(scale), mountedGeometryTop: vectorTuple(top), geometryTopIsJointPivot: topIsJointPivot, topWorldPosition: vectorTuple(top), mountedBodyAnchorWorld: mountedBodyAnchor ? vectorTuple(mountedBodyAnchor) : undefined, bodyAnchorReconstructionError, worldBoundingBox: bounds ? boxTuple(bounds) : undefined, parentAnchorWorld: articulation.parentAnchorWorld, pivotError, error }];
     });
     const serialized = JSON.stringify(diagnostics);
     if (serialized !== previous.current) { previous.current = serialized; onPublish(diagnostics); }
@@ -207,7 +220,7 @@ function SecondaryCursorCamera({
   }, [camera]);
 
   useFrame(() => {
-    const pose = secondaryCameraPose(node.worldTransform ?? node.transform);
+    const pose = secondaryCameraPose(node.renderTransform ?? node.transform);
     camera.position.fromArray(pose.position);
     camera.lookAt(camera.position.clone().add(new Vector3(...pose.direction)));
     camera.updateProjectionMatrix();
@@ -229,7 +242,7 @@ export function SceneRoot({
   const orbitTarget = useMemo(() => {
     const selectedNode = selectedOrbitNode(spatialDocument, selectedNodeId);
 
-    return selectedNode?.transform.position ?? DEFAULT_ORBIT_TARGET;
+    return selectedNode?.renderTransform?.position ?? selectedNode?.transform.position ?? DEFAULT_ORBIT_TARGET;
   }, [selectedNodeId, spatialDocument]);
   const secondaryCameraNode = useMemo(() => secondaryCameraTarget
     ? spatialDocument.renderNodes.find((node) => node.origin?.sourceKind === 'secondary'

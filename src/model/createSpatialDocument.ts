@@ -90,6 +90,17 @@ function flattenRenderable(nodes: SpatialNode[]): SpatialNode[] {
     .filter(Boolean) as SpatialNode[];
 }
 
+/**
+ * Flattened nodes are mounted directly below the R3F scene.  Capture that
+ * contract at publication time rather than making renderers guess between the
+ * historical `transform` and `worldTransform` fields.  `transform` is the
+ * flattened pose throughout this compiler (including after a physics frame);
+ * `worldTransform` is retained for hierarchy/authoring bookkeeping.
+ */
+function publishRenderTransform(node: SpatialNode): SpatialNode {
+  return { ...node, renderTransform: node.transform };
+}
+
 const PUBLISHED_TRANSFORM_TOLERANCE = 1e-8;
 
 export function assertPublishedRenderNodeTransforms(nodes: readonly SpatialNode[]): void {
@@ -488,7 +499,7 @@ export function createSpatialDocument(source: string, options: CreateSpatialDocu
   const sensorNodes = effectiveRenderable.filter((node) => node.origin?.sourceKind === 'secondary');
   // Authored documents preserve their baseline coordinates. World packing is a
   // simulation concern and is represented by the supplied physics frame.
-  const groupedNodes = [...assignUnionGroups(physicalNodes), ...sensorNodes];
+  const groupedNodes = [...assignUnionGroups(physicalNodes), ...sensorNodes].map(publishRenderTransform);
   const csg = buildCsgExpressions(groupedNodes);
   const renderNodes = csg.nodes.filter((node) => !node.csgConsumed && !node.csgExpressionId);
   if (options.physicsFrame) assertPublishedRenderNodeTransforms(renderNodes);
