@@ -4,7 +4,7 @@ import type { SpatialNode } from './SpatialNode';
 import type { InteractionFact } from './interactions';
 import type { CoordinateSpaceDimensions } from './coordinateSpace';
 import type { ResolvedIntent } from '../xyzdsl/resolveDocument';
-import type { ArticulationInspection, JointDefinition } from '../physics/types';
+import type { ArticulationInspection, JointDefinition, Vector3Tuple } from '../physics/types';
 
 export interface PhysicsJointDiagnostic {
   nodeId: string;
@@ -16,6 +16,8 @@ export interface PhysicsJointDiagnostic {
   meshAnchorError?: number;
   /** Child pivot in rigid-body local units, used to inspect the mounted mesh at that point. */
   childAnchor?: JointDefinition['childAnchor'];
+  /** Child-local hinge axis, retained so the renderer can visualize the installed constraint. */
+  childAxis?: Vector3Tuple;
 }
 
 export interface SpatialDocument {

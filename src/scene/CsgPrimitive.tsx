@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { Edges } from '@react-three/drei';
 import type { ThreeEvent } from '@react-three/fiber';
 import { Brush, Evaluator, INTERSECTION, SUBTRACTION, ADDITION } from 'three-bvh-csg';
-import type { MeshStandardMaterialParameters } from 'three';
+import { Euler, Quaternion, type MeshStandardMaterialParameters } from 'three';
 import type { CsgExpression, CsgOperationNode } from '../model/csg';
 import type { SpatialNode } from '../model/SpatialNode';
 import { materialParameters, needsPhysicalMaterial, spatialPrimitiveTransform } from './SpatialPrimitive';
@@ -55,6 +55,8 @@ export function CsgPrimitive({ expression, physicsEntityId, isSelected = false, 
     return result.geometry;
   }, [expression]);
   const material = materialParameters(expression.base);
+  const { rotation } = spatialPrimitiveTransform(expression.base);
+  const bakedWorldQuaternion = new Quaternion().setFromEuler(new Euler(...rotation, 'XYZ')).toArray();
 
   function handleClick(event: ThreeEvent<MouseEvent>) {
     event.stopPropagation();
@@ -74,6 +76,7 @@ export function CsgPrimitive({ expression, physicsEntityId, isSelected = false, 
         csgExpressionId: expression.id,
         geometryInWorldSpace: true,
         authoredJointAnchor: expression.base.physics?.['joint-anchor'],
+        bakedWorldQuaternion,
       }}
     >
       {isSelected ? <Edges color="#facc15" /> : null}

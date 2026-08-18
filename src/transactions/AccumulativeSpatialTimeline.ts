@@ -86,6 +86,8 @@ function withActivePhysicsJoints(document: SpatialDocument, compiled: SpatialDoc
       kind,
       articulation,
       childAnchor: definition?.childAnchor,
+      childAxis: definition && (definition.kind === 'revolute' || definition.kind === 'prismatic')
+        ? definition.childAxis : undefined,
       meshAnchorError: parentRenderedAnchor && childRenderedAnchor
         ? Math.hypot(...parentRenderedAnchor.map((value, index) => value - childRenderedAnchor[index]))
         : undefined,
