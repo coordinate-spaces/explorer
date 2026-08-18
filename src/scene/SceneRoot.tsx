@@ -17,7 +17,7 @@ import { LocalCursorControls } from './LocalCursorControls';
 import type { LocalCursorInput } from '../simulation/localCursor';
 import { physicsEntityIdForNode } from '../physics/compilePhysicsScene';
 import type { MountedSceneDiagnostic } from './mountedSceneDiagnostics';
-import { boxTuple, matrixElements, mountedChildAnchorWorld, mountedChildAxisWorld, MOUNTED_GEOMETRY_PIVOT_TOLERANCE, quaternionTuple, vectorTuple } from './mountedSceneDiagnostics';
+import { boxTuple, geometryTopIsJointPivot, matrixElements, mountedChildAnchorWorld, mountedChildAxisWorld, MOUNTED_GEOMETRY_PIVOT_TOLERANCE, quaternionTuple, vectorTuple } from './mountedSceneDiagnostics';
 
 export interface SceneRootProps {
   document: SpatialDocument;
@@ -177,13 +177,17 @@ function MountedSceneDiagnostics({ document, onPublish }: { document: SpatialDoc
       const pivotError = parent ? parent.distanceTo(top) : undefined;
       const bodyAnchorReconstructionError = parent && mountedBodyAnchor
         ? parent.distanceTo(mountedBodyAnchor) : undefined;
-      const error = pivotError !== undefined && !Number.isFinite(pivotError) ? 'non-finite-mounted-geometry-pivot-error'
-        : pivotError !== undefined && pivotError > MOUNTED_GEOMETRY_PIVOT_TOLERANCE ? 'mounted-geometry-pivot-error' : undefined;
+      const topIsJointPivot = geometryTopIsJointPivot(mesh, joint.childAnchor);
+      // Keep the direct measurement visible for every mesh, but make it a
+      // health error only when the declaration says this endpoint is the joint.
+      // In particular, a CSG mesh has world-baked vertices and an identity mount.
+      const error = topIsJointPivot && pivotError !== undefined && !Number.isFinite(pivotError) ? 'non-finite-mounted-geometry-pivot-error'
+        : topIsJointPivot && pivotError !== undefined && pivotError > MOUNTED_GEOMETRY_PIVOT_TOLERANCE ? 'mounted-geometry-pivot-error' : undefined;
       const node = document.renderNodes.find(({ id }) => id === nodeId);
       return [{ ...base, nodeTransform: node?.transform, nodeWorldTransform: node?.worldTransform,
         renderTransform: node?.renderTransform, mountedLocalPosition: vectorTuple(mesh.position),
         parentObjectType: mesh.parent?.type, parentMatrix: mesh.parent ? matrixElements(mesh.parent.matrixWorld) : undefined,
-        matrixWorld: matrixElements(mesh.matrixWorld), worldPosition: vectorTuple(position), worldQuaternion: quaternionTuple(quaternion), worldScale: vectorTuple(scale), mountedGeometryTop: vectorTuple(top), topWorldPosition: vectorTuple(top), mountedBodyAnchorWorld: mountedBodyAnchor ? vectorTuple(mountedBodyAnchor) : undefined, bodyAnchorReconstructionError, worldBoundingBox: bounds ? boxTuple(bounds) : undefined, parentAnchorWorld: articulation.parentAnchorWorld, pivotError, error }];
+        matrixWorld: matrixElements(mesh.matrixWorld), worldPosition: vectorTuple(position), worldQuaternion: quaternionTuple(quaternion), worldScale: vectorTuple(scale), mountedGeometryTop: vectorTuple(top), geometryTopIsJointPivot: topIsJointPivot, topWorldPosition: vectorTuple(top), mountedBodyAnchorWorld: mountedBodyAnchor ? vectorTuple(mountedBodyAnchor) : undefined, bodyAnchorReconstructionError, worldBoundingBox: bounds ? boxTuple(bounds) : undefined, parentAnchorWorld: articulation.parentAnchorWorld, pivotError, error }];
     });
     const serialized = JSON.stringify(diagnostics);
     if (serialized !== previous.current) { previous.current = serialized; onPublish(diagnostics); }

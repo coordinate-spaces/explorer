@@ -1,6 +1,6 @@
 import { BoxGeometry, Mesh, Quaternion, Vector3 } from 'three';
 import { describe, expect, it } from 'vitest';
-import { mountedChildAnchorWorld, mountedChildAxisWorld } from './mountedSceneDiagnostics';
+import { geometryTopIsJointPivot, mountedChildAnchorWorld, mountedChildAxisWorld } from './mountedSceneDiagnostics';
 
 describe('mounted scene diagnostics', () => {
   it('measures the authored child pivot instead of assuming the normalized top', () => {
@@ -20,6 +20,17 @@ describe('mounted scene diagnostics', () => {
     mesh.updateWorldMatrix(true, false);
 
     expect(mountedChildAnchorWorld(mesh, [100, 100, 100])?.toArray()).toEqual([7, 8, 9]);
+    expect(geometryTopIsJointPivot(mesh, [0, 0.5, 0])).toBe(false);
+  });
+
+  it('classifies endpoint health only when the compiled anchor is the geometry top', () => {
+    const mesh = new Mesh(new BoxGeometry(1, 1, 1));
+    mesh.scale.set(0.2, 5, 0.1);
+    mesh.updateWorldMatrix(true, false);
+
+    expect(geometryTopIsJointPivot(mesh, [0, 2.5, 0])).toBe(true);
+    expect(geometryTopIsJointPivot(mesh, [0, 0, 0])).toBe(false);
+    expect(geometryTopIsJointPivot(mesh, [0, -2.5, 0])).toBe(false);
   });
 
   it('uses the baked body orientation for a CSG hinge axis', () => {

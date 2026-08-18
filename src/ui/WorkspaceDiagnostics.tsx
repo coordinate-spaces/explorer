@@ -84,6 +84,7 @@ export function WorkspaceDiagnostics({ declarationDiagnostics, rejectedTransacti
             <small>Mounted world position: {position(diagnostic.worldPosition)}</small>
             <small>Mounted world scale: {position(diagnostic.worldScale)}</small>
             <small>Mounted geometry top: {position(diagnostic.mountedGeometryTop ?? diagnostic.topWorldPosition)}</small>
+            <small>Geometry top is declared joint pivot: {diagnostic.geometryTopIsJointPivot ? 'yes' : 'no'}</small>
             <small>Parent physics pivot: {position(diagnostic.parentAnchorWorld)}</small>
             <small>Direct top-to-pivot distance: {number(diagnostic.pivotError)}</small>
             <small>Mounted body-anchor reconstruction: {position(diagnostic.mountedBodyAnchorWorld)}</small>
