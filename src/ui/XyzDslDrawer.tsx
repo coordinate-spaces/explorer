@@ -9,6 +9,7 @@ import { SecondaryProjectionPanel } from './SecondaryProjectionPanel';
 import { XyzDslTreeView } from './XyzDslTreeView';
 import { usePersistentState } from './usePersistentState';
 import { physicsJointErrorCount, WorkspaceDiagnostics } from './WorkspaceDiagnostics';
+import type { MountedSceneDiagnostic } from '../scene/mountedSceneDiagnostics';
 
 type AuxiliaryView = 'connections' | 'baseline' | 'projections' | 'diagnostics';
 
@@ -126,6 +127,7 @@ interface XyzDslDrawerProps {
   onSelectLine: (line: number) => void;
   inspector?: ReactNode;
   diagnosticsSessionIdentifier?: string;
+  mountedSceneDiagnostics?: readonly MountedSceneDiagnostic[];
 }
 
 export function XyzDslDrawer({
@@ -169,12 +171,13 @@ export function XyzDslDrawer({
   onSelectLine,
   inspector,
   diagnosticsSessionIdentifier,
+  mountedSceneDiagnostics = [],
 }: XyzDslDrawerProps) {
   const isEditorMode = appMode === 'editor';
   const [activeView, setActiveView] = usePersistentState<'explorer' | 'source'>('xyzdsl-drawer-view-v1', 'explorer');
   const [auxiliaryView, setAuxiliaryView] = usePersistentState<AuxiliaryView>('xyzdsl-auxiliary-view-v1', 'connections');
   const diagnosticCount = document.diagnostics.length + rejectedTransactions.length
-    + physicsJointErrorCount(document.physicsJoints);
+    + physicsJointErrorCount(document.physicsJoints) + mountedSceneDiagnostics.filter(({ error }) => error).length;
   const primaryRef = useRef<HTMLDivElement>(null);
   const auxiliaryRef = useRef<HTMLElement>(null);
 
@@ -311,7 +314,7 @@ export function XyzDslDrawer({
           />
           ) : null}
 
-          {auxiliaryView === 'diagnostics' ? <WorkspaceDiagnostics declarationDiagnostics={document.diagnostics} rejectedTransactions={rejectedTransactions} physicsJoints={document.physicsJoints} physicsTick={document.physicsTick} sessionIdentifier={diagnosticsSessionIdentifier} onSelectLine={selectDiagnosticLine} /> : null}
+          {auxiliaryView === 'diagnostics' ? <WorkspaceDiagnostics declarationDiagnostics={document.diagnostics} rejectedTransactions={rejectedTransactions} physicsJoints={document.physicsJoints} mountedSceneDiagnostics={mountedSceneDiagnostics} physicsTick={document.physicsTick} sessionIdentifier={diagnosticsSessionIdentifier} onSelectLine={selectDiagnosticLine} /> : null}
             </div>
           </section>
           </div>
@@ -324,6 +327,7 @@ export function XyzDslDrawer({
             declarationDiagnostics={document.diagnostics}
             rejectedTransactions={rejectedTransactions}
             physicsJoints={document.physicsJoints}
+            mountedSceneDiagnostics={mountedSceneDiagnostics}
             physicsTick={document.physicsTick}
             sessionIdentifier={diagnosticsSessionIdentifier}
             onSelectLine={() => undefined}

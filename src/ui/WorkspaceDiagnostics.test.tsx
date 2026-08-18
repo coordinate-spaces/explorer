@@ -89,6 +89,26 @@ describe('workspace articulation diagnostics', () => {
     ])).toBe(2);
   });
 
+  it('renders measurements taken from the mounted articulated mesh', () => {
+    const markup = renderToStaticMarkup(<WorkspaceDiagnostics
+      declarationDiagnostics={[]}
+      rejectedTransactions={[]}
+      physicsJoints={[]}
+      mountedSceneDiagnostics={[{
+        nodeId: 'stable-child', physicsEntityId: 'component:Child', meshCount: 1,
+        worldPosition: [1, 2, 3], worldScale: [4, 5, 6], topWorldPosition: [1, 4.5, 3], pivotError: 0.001,
+      }]}
+      onSelectLine={() => undefined}
+    />);
+
+    expect(markup).toContain('Mounted node ID: stable-child');
+    expect(markup).toContain('Mounted mesh count: 1');
+    expect(markup).toContain('Mounted world position: [1.00000000, 2.00000000, 3.00000000]');
+    expect(markup).toContain('Mounted world scale: [4.00000000, 5.00000000, 6.00000000]');
+    expect(markup).toContain('Mounted top world position: [1.00000000, 4.50000000, 3.00000000]');
+    expect(markup).toContain('Mounted-geometry pivot error: 0.00100000');
+  });
+
   it('reports the documented pendulum constraint installed in the active session', () => {
     const markup = diagnostics(documentedPendulum);
     expect(markup).toContain('Installed joints <span>1</span>');

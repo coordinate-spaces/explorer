@@ -10,6 +10,7 @@ import { bufferGeometryForSpatialGeometry } from './primitiveGeometry';
 
 interface CsgPrimitiveProps {
   expression: CsgExpression;
+  physicsEntityId?: string;
   isSelected?: boolean;
   onSelect?: (id: string) => void;
 }
@@ -41,7 +42,7 @@ function csgOperation({ op }: CsgOperationNode) {
   }
 }
 
-export function CsgPrimitive({ expression, isSelected = false, onSelect }: CsgPrimitiveProps) {
+export function CsgPrimitive({ expression, physicsEntityId, isSelected = false, onSelect }: CsgPrimitiveProps) {
   const geometry = useMemo(() => {
     const evaluator = new Evaluator();
     evaluator.attributes = ['position', 'normal', 'uv'];
@@ -66,7 +67,14 @@ export function CsgPrimitive({ expression, isSelected = false, onSelect }: CsgPr
       receiveShadow
       geometry={geometry}
       onClick={handleClick}
-      userData={{ spatialNodeId: expression.base.id, csgExpressionId: expression.id }}
+      userData={{
+        spatialNodeId: expression.base.id,
+        fullStableNodeId: expression.base.id,
+        physicsEntityId,
+        csgExpressionId: expression.id,
+        geometryInWorldSpace: true,
+        authoredJointAnchor: expression.base.physics?.['joint-anchor'],
+      }}
     >
       {isSelected ? <Edges color="#facc15" /> : null}
       {needsPhysicalMaterial(expression.base) ? (
