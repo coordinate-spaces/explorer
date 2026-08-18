@@ -5,18 +5,38 @@ export type QuaternionTuple = [number, number, number, number];
 export type RigidBodyMode = 'dynamic' | 'kinematic' | 'static';
 export type ColliderShape = 'cuboid' | 'ball' | 'cylinder' | 'cone' | 'capsule';
 
-export interface JointDefinition {
+interface JointDefinitionBase {
   id: string;
-  kind: 'revolute';
   parentEntityId: string;
   childEntityId: string;
   parentAnchor: Vector3Tuple;
   childAnchor: Vector3Tuple;
-  parentAxis: Vector3Tuple;
-  childAxis: Vector3Tuple;
-  limits?: [number, number];
-  damping?: number;
   collideConnected?: boolean;
+}
+
+/** Engine-neutral hinge. Anchors and axes are body-local; angular limits are radians. */
+export interface RevoluteJointDefinition extends JointDefinitionBase {
+  kind: 'revolute'; parentAxis: Vector3Tuple; childAxis: Vector3Tuple;
+  limits?: [number, number]; damping?: number;
+}
+/** Engine-neutral slider. Anchors/axes are body-local; limits are project units. */
+export interface PrismaticJointDefinition extends JointDefinitionBase {
+  kind: 'prismatic'; parentAxis: Vector3Tuple; childAxis: Vector3Tuple;
+  limits?: [number, number]; damping?: number;
+}
+/** A weld whose independent frames are expressed in each body's local coordinates. */
+export interface FixedJointDefinition extends JointDefinitionBase {
+  kind: 'fixed'; parentFrame: QuaternionTuple; childFrame: QuaternionTuple;
+}
+/** A ball-and-socket pivot. Cone/twist limits are deliberately unsupported. */
+export interface SphericalJointDefinition extends JointDefinitionBase { kind: 'spherical' }
+
+export type JointDefinition = RevoluteJointDefinition | PrismaticJointDefinition | FixedJointDefinition | SphericalJointDefinition;
+
+export interface ArticulationInspection {
+  id: string; parentEntityId: string; childEntityId: string; kind: JointDefinition['kind'];
+  /** Radians for revolute, project units for prismatic. */
+  coordinate?: number; limits?: [number, number]; pivotError?: number;
 }
 
 export interface ColliderDefinition {

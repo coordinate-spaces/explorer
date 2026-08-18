@@ -110,7 +110,7 @@ export interface XyzDslMaterialSpec {
 }
 
 export type XyzDslPhysicsMode = 'dynamic' | 'static' | 'kinematic';
-export type XyzDslJointKind = 'revolute';
+export type XyzDslJointKind = 'revolute' | 'fixed' | 'prismatic' | 'spherical';
 
 /** Authored/resolved physics, deliberately separate from visual material. */
 export interface XyzDslPhysicsSpec {
@@ -120,9 +120,9 @@ export interface XyzDslPhysicsSpec {
   'joint-parent'?: string;
   /** Authored world-space pivot in project units. */
   'joint-anchor'?: [number, number, number];
-  /** Authored world-space revolute axis. */
+  /** Authored world-space revolute or prismatic axis. */
   'joint-axis'?: [number, number, number];
-  /** Revolute limits in degrees. */
+  /** Revolute limits in degrees; prismatic limits in project units. */
   'joint-limits'?: [number, number];
   'joint-damping'?: number;
   'collide-connected'?: boolean;

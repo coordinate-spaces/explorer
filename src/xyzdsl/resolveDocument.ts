@@ -11,6 +11,7 @@ import type {
   SpatialObject,
 } from './types';
 import { canonicalNamespacePath } from './pathParser';
+import { validateResolvedJointPhysics } from './physicsParser';
 
 export interface ResolvedSpatialObject extends SpatialObject {
   box: XyzDslBoxSpec;
@@ -528,6 +529,9 @@ export function resolveXyzDslDocument(objects: SpatialObject[]): {
     const { properties, diagnostics: propertyDiagnostics } =
       resolvePropertiesFor(object, ordinaryObjects);
     diagnostics.push(...propertyDiagnostics);
+    validateResolvedJointPhysics(properties.physics).forEach((message) => diagnostics.push({
+      line: object.lineNumber, source: object.source, message,
+    }));
 
     const namespace = options.namespace ?? object.namespace;
     const namespacePath = canonicalNamespacePath(namespace);

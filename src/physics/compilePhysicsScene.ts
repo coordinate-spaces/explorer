@@ -151,8 +151,9 @@ export function compileArticulatedPhysicsScene(document: SpatialDocument, revisi
       diagnose({ line: Number(node.metadata?.lineNumber ?? 0), source: node.source, message: 'Joint endpoints must resolve to different rigid bodies.' });
       return;
     }
-    if (!anchor || !axis || Math.hypot(...axis) === 0) {
-      diagnose({ line: Number(node.metadata?.lineNumber ?? 0), source: node.source, message: 'Revolute joints require a finite joint-anchor and a non-zero joint-axis.' });
+    const needsAxis = spec.joint === 'revolute' || spec.joint === 'prismatic';
+    if (!anchor || anchor.some((v) => !Number.isFinite(v)) || (needsAxis && (!axis || axis.some((v) => !Number.isFinite(v)) || Math.hypot(...axis) === 0))) {
+      diagnose({ line: Number(node.metadata?.lineNumber ?? 0), source: node.source, message: `${spec.joint} joints require a finite joint-anchor${needsAxis ? ' and a non-zero finite joint-axis' : ''}.` });
       return;
     }
     const parent = representativeByEntity.get(parentEntityId)!;
@@ -162,19 +163,24 @@ export function compileArticulatedPhysicsScene(document: SpatialDocument, revisi
       const point = new Vector3(...anchor).sub(new Vector3(...body.position)).applyQuaternion(q);
       return [point.x, point.y, point.z];
     };
-    const worldAxis = new Vector3(...axis).normalize();
+    const worldAxis = new Vector3(...(axis ?? [1, 0, 0] as Vector3Tuple)).normalize();
     const axisIn = (body: RigidBodyDefinition): Vector3Tuple => {
       const local = worldAxis.clone().applyQuaternion(new Quaternion(...(body.orientation ?? [0, 0, 0, 1])).invert());
       return [local.x, local.y, local.z];
     };
-    joints.push({
+    const base = {
       id: `joint:${childEntityId}`,
-      kind: 'revolute', parentEntityId, childEntityId,
+      parentEntityId, childEntityId,
       parentAnchor: localPoint(parent), childAnchor: localPoint(child),
-      parentAxis: axisIn(parent), childAxis: axisIn(child),
-      limits: spec['joint-limits']?.map((degrees) => degrees * Math.PI / 180) as [number, number] | undefined,
-      damping: spec['joint-damping'], collideConnected: spec['collide-connected'] ?? false,
-    });
+      collideConnected: spec['collide-connected'] ?? false,
+    };
+    if (spec.joint === 'fixed') joints.push({ ...base, kind: 'fixed',
+      parentFrame: quaternionTuple(new Quaternion(...(parent.orientation ?? [0, 0, 0, 1])).invert()),
+      childFrame: quaternionTuple(new Quaternion(...(child.orientation ?? [0, 0, 0, 1])).invert()) });
+    else if (spec.joint === 'spherical') joints.push({ ...base, kind: 'spherical' });
+    else joints.push({ ...base, kind: spec.joint, parentAxis: axisIn(parent), childAxis: axisIn(child),
+      limits: spec['joint-limits']?.map((value) => spec.joint === 'revolute' ? value * Math.PI / 180 : value) as [number, number] | undefined,
+      damping: spec['joint-damping'] });
   });
   const jointByChild = new Map(joints.map((joint) => [joint.childEntityId, joint]));
   const cyclicJointIds = new Set<string>();
@@ -193,9 +199,27 @@ export function compileArticulatedPhysicsScene(document: SpatialDocument, revisi
       current = jointByChild.get(current.parentEntityId);
     }
   });
-  if (cyclicJointIds.size > 0) diagnose({
-    line: 0, source: '',
-    message: `Cyclic articulation is not supported in Release A: ${[...cyclicJointIds].sort().join(', ')}.`,
+  if (cyclicJointIds.size > 0) {
+    candidates.filter((node, index) => cyclicJointIds.has(`joint:${bodies[index].entityId ?? bodies[index].id}`)).forEach((node) => diagnose({
+      line: Number(node.metadata?.lineNumber ?? 0), source: node.source,
+      message: `Cyclic articulation is not supported: ${[...cyclicJointIds].sort().join(', ')}.`,
+    }));
+  }
+  const validJoints = joints.filter(({ id }) => !cyclicJointIds.has(id));
+  const connected = new Set(validJoints.flatMap((joint) => [joint.parentEntityId, joint.childEntityId]));
+  const roots = [...connected].filter((id) => !validJoints.some((joint) => joint.childEntityId === id));
+  if (connected.size && !roots.some((id) => (representativeByEntity.get(id)?.mode ?? 'dynamic') !== 'dynamic')) {
+    const node = candidates.find((candidate, index) => connected.has(bodies[index].entityId ?? bodies[index].id));
+    diagnose({ line: Number(node?.metadata?.lineNumber ?? 0), source: node?.source ?? '', message: 'Dynamic articulation tree has no static or kinematic root.' });
+  }
+  validJoints.forEach((joint) => {
+    const a = representativeByEntity.get(joint.parentEntityId)?.mass ?? 1; const b = representativeByEntity.get(joint.childEntityId)?.mass ?? 1;
+    if (Math.max(a, b) / Math.min(a, b) > 100) {
+      const index = bodies.findIndex((body) => (body.entityId ?? body.id) === joint.childEntityId); const node = candidates[index];
+      diagnose({ line: Number(node?.metadata?.lineNumber ?? 0), source: node?.source ?? '', message: `Extreme connected-body mass ratio (${Math.max(a,b) / Math.min(a,b)}:1) may be unstable.` });
+    }
   });
-  return { bodies, joints: joints.filter(({ id }) => !cyclicJointIds.has(id)) };
+  return { bodies, joints: validJoints };
 }
+
+function quaternionTuple(value: Quaternion): [number, number, number, number] { return [value.x, value.y, value.z, value.w]; }
