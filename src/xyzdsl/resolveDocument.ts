@@ -342,6 +342,23 @@ function namespaceStartsWith(namespace: string[], prefix: string[]): boolean {
   return prefix.every((segment, index) => namespace[index] === segment);
 }
 
+/** Rebase a template-local joint parent into one materialized ref instance. */
+function materializedPhysics(
+  physics: XyzDslPhysicsSpec,
+  templateNamespace: string[],
+  instanceNamespace: string[],
+): XyzDslPhysicsSpec {
+  const parent = physics['joint-parent']?.split('/').filter(Boolean);
+  if (!parent || !namespaceStartsWith(parent, templateNamespace)) return physics;
+  return {
+    ...physics,
+    'joint-parent': canonicalNamespacePath([
+      ...instanceNamespace,
+      ...parent.slice(templateNamespace.length),
+    ]),
+  };
+}
+
 function hasConcreteAncestorInstance(
   object: SpatialObject,
   concreteNamespaces: Set<string>,
@@ -655,6 +672,7 @@ export function resolveXyzDslDocument(objects: SpatialObject[]): {
         },
       );
 
+      const instancePhysics = mergeXyzDslPhysicsSpecs(properties.physics, authoredInstance.physics);
       materializedObjects.push({
         ...resolvedDescendant,
         id: `${object.id}->${resolvedDescendant.namespacePath}${resolvedDescendant.box.source}#${objectIndex + 1}-${descendantIndex + 1}`,
@@ -664,9 +682,12 @@ export function resolveXyzDslDocument(objects: SpatialObject[]): {
         material: properties.material,
         // Resolved template descendants carry defaults. Reapply only fields
         // authored on the ref instance so those defaults cannot erase them.
-        physics: mergeXyzDslPhysicsSpecs(properties.physics, authoredInstance.physics),
+        physics: materializedPhysics(instancePhysics, targetNamespace, instanceNamespace),
         geometry: properties.geometry,
-        transform: properties.transform,
+        // The ref instance transform belongs to the component root. Descendant
+        // poses stay template/component-local and are composed with that root
+        // exactly once by createSpatialDocument.
+        transform: resolvedDescendant.transform,
         content: properties.content,
         reference: { diagnostics: [] },
         materializedFrom: object.reference.targetPath,

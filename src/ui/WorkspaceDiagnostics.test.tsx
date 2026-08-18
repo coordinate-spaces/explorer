@@ -131,7 +131,7 @@ describe('workspace articulation diagnostics', () => {
     const markup = diagnostics(documentedPendulum.replace('joint-parent: Pendulum/Anchor/', 'joint-parent: Pendulum/Missing/'));
     expect(markup).toContain('Installed joints <span>0</span>');
     expect(markup).toContain('Rod declares a revolute joint, but no constraint was installed in the active physics world.');
-    expect(markup).toContain('Joint parent &quot;Pendulum/Missing/&quot; was not found.');
+    expect(markup).toContain('Joint parent &quot;Pendulum/Missing/&quot; was not found in the same component instance and projection scope.');
   });
 
   it('does not count one compound constraint once for every declaring primitive', () => {
