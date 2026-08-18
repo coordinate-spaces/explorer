@@ -3,6 +3,7 @@ import type { SpatialNode } from '../model/SpatialNode';
 import type { ColliderDefinition, ColliderShape, JointDefinition, RigidBodyDefinition, Vector3Tuple } from './types';
 import { Euler, Quaternion, Vector3 } from 'three';
 import { authoredPhysicsEntityId, physicsOriginScope, scopedPhysicsNamespace } from './physicsIdentity';
+import { composeTransforms, identityTransform } from '../model/transform';
 
 export interface CompiledPhysicsScene { bodies: RigidBodyDefinition[]; joints: JointDefinition[] }
 
@@ -21,6 +22,9 @@ export function physicsEntityIdForNode(document: SpatialDocument, node: SpatialN
 function flatten(nodes: readonly SpatialNode[]): SpatialNode[] {
   return nodes.flatMap((node) => [node.renderable ? node : undefined, ...flatten(node.children ?? [])])
     .filter(Boolean) as SpatialNode[];
+}
+function flattenAll(nodes: readonly SpatialNode[]): SpatialNode[] {
+  return nodes.flatMap((node) => [node, ...flattenAll(node.children ?? [])]);
 }
 
 function colliderShape(node: SpatialNode): ColliderShape {
@@ -46,6 +50,28 @@ export function compileArticulatedPhysicsScene(document: SpatialDocument, revisi
   // All secondary primitives are compiled: ordinary cursors are zero-mass sensors,
   // while the explicit physical-body opt-in retains ordinary rigid-body semantics.
   const candidates = flatten(document.nodes);
+  const hierarchyNodes = flattenAll(document.nodes);
+  // Articulation is authored in the immutable coordinate system of the
+  // materialized top-level component.  Never use a published/render transform
+  // here: it may contain a pose supplied by PhysicsFrame.
+  const componentRoots = document.nodes;
+  const componentRootFor = (node: SpatialNode): SpatialNode | undefined => {
+    const component = node.namespacePath?.split('/').filter(Boolean)[0];
+    return componentRoots.find((root) => root.namespacePath?.split('/').filter(Boolean)[0] === component
+      && physicsOriginScope(root) === physicsOriginScope(node));
+  };
+  const componentPoseFor = (node: SpatialNode) => {
+    const root = componentRootFor(node);
+    if (!root) return node.localTransform ?? node.transform;
+    const chain: SpatialNode[] = [];
+    let current: SpatialNode | undefined = node;
+    while (current && current !== root) {
+      chain.unshift(current);
+      current = hierarchyNodes.find((candidate) => candidate.namespacePath === current?.parentNamespacePath
+        && physicsOriginScope(candidate) === physicsOriginScope(node));
+    }
+    return chain.reduce((pose, entry) => composeTransforms(pose, entry.localTransform ?? entry.transform), identityTransform());
+  };
   const physicsEntityId = (node: SpatialNode): string => physicsEntityIdForNode(document, node);
   const modeByEntity = new Map<string, NonNullable<RigidBodyDefinition['mode']>>();
   candidates.forEach((node) => {
@@ -134,11 +160,17 @@ export function compileArticulatedPhysicsScene(document: SpatialDocument, revisi
     if (seenChildEntities.has(childEntityId)) return;
     seenChildEntities.add(childEntityId);
     const parentPath = spec['joint-parent'];
-    const parentEntityId = parentPath && entityByNamespace.get(scopedPhysicsNamespace(node, parentPath));
+    const childComponent = node.namespacePath?.split('/').filter(Boolean)[0];
+    const parentComponent = parentPath?.split('/').filter(Boolean)[0];
+    const parentEntityId = parentPath && parentComponent === childComponent
+      ? entityByNamespace.get(scopedPhysicsNamespace(node, parentPath)) : undefined;
     const anchor = spec['joint-anchor'];
     const axis = spec['joint-axis'];
     if (!parentPath || !parentEntityId) {
-      diagnose({ line: Number(node.metadata?.lineNumber ?? 0), source: node.source, message: `Joint parent "${parentPath ?? ''}" was not found.` });
+      const message = parentPath && parentComponent !== childComponent
+        ? `Joint parent "${parentPath}" is outside the child component. Articulation properties are component-local; world-space joint anchors are unsupported.`
+        : `Joint parent "${parentPath ?? ''}" was not found in the same component instance and projection scope.`;
+      diagnose({ line: Number(node.metadata?.lineNumber ?? 0), source: node.source, message });
       return;
     }
     if (parentEntityId === childEntityId) {
@@ -152,27 +184,31 @@ export function compileArticulatedPhysicsScene(document: SpatialDocument, revisi
     }
     const parent = representativeByEntity.get(parentEntityId)!;
     const child = representativeByEntity.get(childEntityId)!;
-    const localPoint = (body: RigidBodyDefinition): Vector3Tuple => {
-      const q = new Quaternion(...(body.orientation ?? [0, 0, 0, 1])).invert();
-      const point = new Vector3(...anchor).sub(new Vector3(...body.position)).applyQuaternion(q);
+    const parentNode = candidates[bodies.indexOf(parent)];
+    const childNode = candidates[bodies.indexOf(child)];
+    const parentPose = componentPoseFor(parentNode);
+    const childPose = componentPoseFor(childNode);
+    const localPoint = (pose: ReturnType<typeof componentPoseFor>): Vector3Tuple => {
+      const q = new Quaternion().setFromEuler(new Euler(...pose.rotation, 'XYZ')).invert();
+      const point = new Vector3(...anchor).sub(new Vector3(...pose.position)).applyQuaternion(q);
       return [point.x, point.y, point.z];
     };
-    const worldAxis = new Vector3(...(axis ?? [1, 0, 0] as Vector3Tuple)).normalize();
-    const axisIn = (body: RigidBodyDefinition): Vector3Tuple => {
-      const local = worldAxis.clone().applyQuaternion(new Quaternion(...(body.orientation ?? [0, 0, 0, 1])).invert());
+    const componentAxis = new Vector3(...(axis ?? [1, 0, 0] as Vector3Tuple)).normalize();
+    const axisIn = (pose: ReturnType<typeof componentPoseFor>): Vector3Tuple => {
+      const local = componentAxis.clone().applyQuaternion(new Quaternion().setFromEuler(new Euler(...pose.rotation, 'XYZ')).invert()).normalize();
       return [local.x, local.y, local.z];
     };
     const base = {
       id: `joint:${childEntityId}`,
       parentEntityId, childEntityId,
-      parentAnchor: localPoint(parent), childAnchor: localPoint(child),
+      parentAnchor: localPoint(parentPose), childAnchor: localPoint(childPose),
       collideConnected: spec['collide-connected'] ?? false,
     };
     if (spec.joint === 'fixed') joints.push({ ...base, kind: 'fixed',
-      parentFrame: quaternionTuple(new Quaternion(...(parent.orientation ?? [0, 0, 0, 1])).invert()),
-      childFrame: quaternionTuple(new Quaternion(...(child.orientation ?? [0, 0, 0, 1])).invert()) });
+      parentFrame: quaternionTuple(new Quaternion().setFromEuler(new Euler(...parentPose.rotation, 'XYZ')).invert()),
+      childFrame: quaternionTuple(new Quaternion().setFromEuler(new Euler(...childPose.rotation, 'XYZ')).invert()) });
     else if (spec.joint === 'spherical') joints.push({ ...base, kind: 'spherical' });
-    else joints.push({ ...base, kind: spec.joint, parentAxis: axisIn(parent), childAxis: axisIn(child),
+    else joints.push({ ...base, kind: spec.joint, parentAxis: axisIn(parentPose), childAxis: axisIn(childPose),
       limits: spec['joint-limits']?.map((value) => spec.joint === 'revolute' ? value * Math.PI / 180 : value) as [number, number] | undefined,
       damping: spec['joint-damping'] });
   });

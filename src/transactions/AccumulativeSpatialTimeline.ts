@@ -160,11 +160,9 @@ export class AccumulativeSpatialTimeline {
     effective: SpatialDocument;
     facts: InteractionFact[];
   } {
-    const retainedFrame = this.simulation.world.frame();
     const retainedSnapshot = this.simulation.world.snapshot();
     const authored = createSpatialDocument(source, {
       originsByLine,
-      physicsFrame: retainedFrame,
       applyConditionalVariants: false,
       interactionFacts: [],
     });
@@ -175,7 +173,6 @@ export class AccumulativeSpatialTimeline {
     const facts = this.interactionFacts(authored);
     const conditional = createSpatialDocument(source, {
       originsByLine,
-      physicsFrame: this.simulation.world.frame(),
       accumulativePhysics: true,
       interactionFacts: facts,
     });

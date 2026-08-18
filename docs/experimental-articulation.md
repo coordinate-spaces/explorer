@@ -18,7 +18,7 @@ The ceiling is authored touching `Pendulum/Anchor/` and assigned to the same
 is illustrative rather than necessary: `physics-mode: static` fixes a body in
 world space without requiring a floor, wall, ceiling, or other physical support.
 The rod starts 10 degrees from vertical, with its box position adjusted so its
-transformed top remains at the intended world-space pivot `(0.5, 8, 0.5)`.
+transformed top remains at the intended component-local pivot `(0.5, 8, 0.5)`.
 Gravity therefore starts observable swinging without an impulse. An application
 can instead author the rod vertically and enqueue an `impulse` input for the rod
 on the first simulation tick.
@@ -42,15 +42,16 @@ only `revolute`.
 | --- | --- |
 | `body` | Identifier for a rigid component boundary. |
 | `joint` | Joint kind; currently exactly `revolute`. |
-| `joint-parent` | Parent primitive namespace, with an optional trailing slash. |
-| `joint-anchor` | World-space pivot as three finite project-unit numbers. |
-| `joint-axis` | Non-zero world-space axis as three finite numbers. |
+| `joint-parent` | Component-local parent primitive namespace; it must resolve in the same materialized instance and projection scope. |
+| `joint-anchor` | Component-local pivot as three finite project-unit numbers. |
+| `joint-axis` | Non-zero component-local direction as three finite numbers. |
 | `joint-limits` | Optional ordered minimum/maximum angles in degrees. |
 | `joint-damping` | Optional non-negative passive angular damping coefficient in N·m·s/rad. |
 | `collide-connected` | Whether directly connected colliders contact; defaults to `false`. |
 
-The compiler normalizes the axis and resolves the pivot and axis into both body
-local frames. The engine adapter receives only local coordinates. Physics uses
+Articulation declarations are portable with their component. Translation and rotation move the whole graph without changing `joint-anchor`, `joint-axis`, `joint-limits`, or `joint-damping`. The compiler maintains three distinct spaces: immutable component-local authored values; immutable parent- and child-body-local engine frames; and mutable runtime world poses. The component world transform places the graph and may rotate an axis for world diagnostics (translation never affects a direction), but neither it nor a `PhysicsFrame` participates in local-frame compilation.
+
+For a component-local pivot `pC`, body rotation `R` and translation `t`, the engine anchor is `inverse(R) × (pC - t)` and its axis is `normalize(inverse(R) × axisC)`. The compiler resolves these independently for both endpoints. Physics uses
 fixed ticks; joint limits are converted to radians at the compiler boundary.
 
 `joint-damping` is physical viscous damping, not a dimensionless motor strength.
@@ -64,8 +65,7 @@ motor. Prismatic definitions use the analogous
 
 ## Validation and scope
 
-Missing parents, endpoints that resolve to one rigid body, missing anchors, and
-zero axes are rejected with source diagnostics. Joint identity is derived from
+Parents outside the component instance or projection scope, missing parents, endpoints that resolve to one rigid body, missing anchors, and zero axes are rejected with source diagnostics. Joint identity is derived from
 the stable child-body identity. Release A is intentionally limited to passive
 tree articulation: it does not define motors, cursor targets, inverse kinematics,
 breakable joints, soft constraints, or closed-loop mechanisms.
@@ -90,3 +90,8 @@ Articulations are identified by stable joint IDs and reconciled after their endp
 Validation rejects missing or self-linked endpoints, duplicate IDs, multiple parent joints, non-finite frames, zero axes, reversed limits, and cycles before backend mutation. Dynamic-only trees and connected masses differing by more than 100:1 produce warnings. Diagnostics retain the declaration line whenever available.
 
 Closed loops, motors, spherical cone/twist limits, and cursor articulation remain unsupported. Spherical joints are unrestricted ball-and-socket pivots. Debug inspection exposes stable IDs, endpoints, kind, scalar coordinate/limits where applicable, and pivot error without exposing Rapier handles.
+
+
+## Portable instances
+
+The source above can be placed at its original transform, translated to `X = 15`, or instantiated repeatedly at arbitrary translated and rotated component transforms. Every instance retains exactly the same `joint-anchor: 0.5 8 0.5`, `joint-axis: 0 0 1`, `joint-limits: -170 170`, and `joint-damping: 0.05`; only its initial world body poses differ. World-space articulation declarations and cross-component links are rejected rather than treated as compatibility input. Snapshots persist the compiled body-local frames and reconstruct constraints before restoring mutable body poses.

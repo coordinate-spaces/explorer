@@ -205,3 +205,10 @@ physical units are standardized.
 Passive fixed, revolute, prismatic, and spherical constraints participate in the same stable-ID lifecycle as rigid bodies and colliders. No-op reconciliation retains the existing constraint graph and sleeping solver islands. Snapshots deep-copy authored body and joint definitions; restoration reconstructs constraints before applying poses, velocities, sleep flags, and the saved simulation tick. Identical fixed-timestep replay is expected to reproduce articulated chains within ordinary floating-point solver tolerance.
 
 Angular engine-boundary values are radians; linear anchors and slider limits are project units. DSL revolute limits are authored in degrees and converted during compilation. Tree graphs only are supported: duplicate IDs, missing/self endpoints, multiple parents, invalid axes/frames/limits, and cycles are rejected. Closed loops, active motors, cursor joints, and spherical cone/twist limits are not supported.
+
+
+## Articulation coordinate and timeline contract
+
+Joint parents resolve only within the same authored component instance and baseline/secondary projection scope. Anchors and axes are immutable component-local definitions; limits and damping are scalar joint-coordinate properties. Compilation converts them directly from immutable component-relative body poses into parent/child body-local Rapier frames. Component world transforms only place the complete graph. Runtime world poses and published `PhysicsFrame` documents never feed definition compilation.
+
+The timeline therefore keeps an unpositioned authored-definition document for body, collider, and joint compilation, and creates a separate physics-positioned publication document for rendering and interaction output. Conditional variants that alter definitions are evaluated on the authored flow. No-op reconciliation retains joint identity and frames; snapshot restoration rebuilds those saved local frames before applying body poses. A component translation, rotation, pause/resume, or ordinary simulation tick changes no articulation value.

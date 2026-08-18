@@ -3,6 +3,10 @@ import { createSpatialDocument } from '../model/createSpatialDocument';
 import { compileArticulatedPhysicsScene, compilePhysicsScene } from './compilePhysicsScene';
 
 describe('compilePhysicsScene', () => {
+  const portablePendulum = (component = '+0+1/+0+1/+0+1', rotation = '') => `"Pendulum/${component}" : "${rotation}"
+"Pendulum/Anchor/+45c+10c/+8+1/+45c+10c" : "body: Anchor; physics-mode: static"
+"Pendulum/Rod/+45c+10c/+3+5/+45c+10c" : "body: Rod; joint: revolute; joint-parent: Pendulum/Anchor/; joint-anchor: 0.5 8 0.5; joint-axis: 0 0 1"`;
+
   it('splits explicit bodies and resolves a revolute pivot into local frames', () => {
     const document = createSpatialDocument(`"Pendulum/+0+1/+0+1/+0+1" : ""
 "Pendulum/Anchor/+45c+10c/+8+1/+45c+10c" : "body: Anchor; physics-mode: static"
@@ -29,6 +33,25 @@ describe('compilePhysicsScene', () => {
       parentEntityId: 'component:Pendulum/body:Anchor',
       childEntityId: 'component:Pendulum/body:Rod',
     });
+  });
+  it('keeps body-local frames identical under component translation and rotation', () => {
+    const base = compileArticulatedPhysicsScene(createSpatialDocument(portablePendulum()));
+    const translated = compileArticulatedPhysicsScene(createSpatialDocument(portablePendulum('+15+1/+2+1/+4+1')));
+    const rotated = compileArticulatedPhysicsScene(createSpatialDocument(portablePendulum('+15+1/+2+1/+4+1', 'rotation: 20,35,-10')));
+    expect(translated.joints).toEqual(base.joints);
+    expect(rotated.joints).toEqual(base.joints);
+    expect(translated.bodies.map(({ position }) => position)).not.toEqual(base.bodies.map(({ position }) => position));
+    expect(rotated.bodies.map(({ orientation }) => orientation)).not.toEqual(translated.bodies.map(({ orientation }) => orientation));
+  });
+
+  it('rejects a parent outside the authored component', () => {
+    const document = createSpatialDocument(`"Outside/+0+1/+8+1/+0+1" : "body: Anchor; physics-mode: static"
+"Pendulum/+0+1/+0+1/+0+1" : ""
+"Pendulum/Rod/+0+1/+3+5/+0+1" : "body: Rod; joint: revolute; joint-parent: Outside/; joint-anchor: 0 8 0; joint-axis: 0 0 1"`);
+    expect(compileArticulatedPhysicsScene(document).joints).toEqual([]);
+    expect(document.diagnostics.map(({ message }) => message)).toEqual(expect.arrayContaining([
+      expect.stringContaining('Articulation properties are component-local'),
+    ]));
   });
   it('compiles body, collider, locks, groups, and no transaction-derived mass', () => {
     const origins = new Map([[1, { sourceKind: 'baseline' as const, transactionAmount: 999 }]]);

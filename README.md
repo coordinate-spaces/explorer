@@ -106,7 +106,7 @@ and compilation details.
 ### Experimental passive articulation
 
 Release A supports explicit rigid-body boundaries connected by passive revolute
-joints. A joint is authored on its child body with a world-space pivot and axis:
+joints. A joint is authored on its child body with a component-local pivot and axis:
 
 ```txt
 "Pendulum/+0+1/+0+1/+0+1" : ""
@@ -118,7 +118,7 @@ joints. A joint is authored on its child body with a world-space pivot and axis:
 The authored ceiling makes the fixed anchor visible, but it is not what supports
 the body: `physics-mode: static` fixes the entire `Anchor` body in world space
 without requiring physical support. The rod's box and 10-degree rotation place
-its top at the unchanged world-space `joint-anchor`; that small angular
+its top at the unchanged component-local `joint-anchor`; that small angular
 displacement lets gravity produce visible pendulum motion immediately.
 
 `RapierPhysicsWorld.addGround()` separately supplies an implicit collision plane
@@ -128,7 +128,7 @@ authored ceiling above.
 
 Unjointed components retain their existing top-level compound-body behavior.
 The experimental release supports passive revolute motion, optional degree-based
-`joint-limits`, damping, and connected-body collision control. Motors, cursor
+`joint-limits`, damping, and connected-body collision control. The same declaration can be translated (for example to X = 15), rotated, or instantiated multiple times without changing its anchor, axis, limits, or damping. Authored component-local values compile once to immutable body-local engine frames; runtime world poses are used only for simulation and rendering. Motors, cursor
 joint targeting, other joint kinds, and closed loops are intentionally deferred.
 See [the experimental articulation contract](docs/experimental-articulation.md).
 
