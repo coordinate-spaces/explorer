@@ -54,7 +54,7 @@ export function compileArticulatedPhysicsScene(document: SpatialDocument, revisi
   });
   indexHierarchy(document.nodes);
   // Articulation is authored in the immutable coordinate system of the
-  // materialized top-level component.  Never use a published/render transform
+  // materialized top-level component. Never use a published world-space render pose
   // here: it may contain a pose supplied by PhysicsFrame.
   const componentRoots = document.nodes;
   const componentRootFor = (node: SpatialNode): SpatialNode | undefined => {
@@ -73,7 +73,7 @@ export function compileArticulatedPhysicsScene(document: SpatialDocument, revisi
     }
     // A materialized ref-scale is part of the instance's authored coordinate
     // mapping. Keep its scale while deliberately excluding root translation and
-    // rotation, which only place the complete articulation in world space.
+    // rotation, which only place the complete articulation in world simulation space.
     const pose = identityTransform();
     pose.scale = [...(root.localTransform?.scale ?? [1, 1, 1])];
     return chain.reduce((result, entry) => composeTransforms(result, entry.localTransform ?? entry.transform), pose);

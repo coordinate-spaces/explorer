@@ -23,11 +23,13 @@ export interface SpatialNode {
   content?: XyzDslContentSpec;
   geometry: SpatialGeometry;
   transform: SpatialTransform;
+  /** Authored/materialized component-local pose before scene publication. */
   localTransform?: SpatialTransform;
+  /** Resolved world-space pose before a completed render document is published. */
   worldTransform?: SpatialTransform;
-  /** Authoritative world pose for a node published in the flattened render list. */
+  /** Authoritative published world-space pose for a node in the flattened render list. */
   renderTransform?: SpatialTransform;
-  /** World transform before periodic secondary-cursor wrapping. */
+  /** Resolved world-space pose before periodic secondary-cursor wrapping. */
   unwrappedTransform?: SpatialTransform;
   namespacePath?: string;
   parentNamespacePath?: string;

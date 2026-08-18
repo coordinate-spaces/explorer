@@ -9,12 +9,14 @@ interface JointDefinitionBase {
   id: string;
   parentEntityId: string;
   childEntityId: string;
+  /** Immutable parent-body-local physics-space anchor. */
   parentAnchor: Vector3Tuple;
+  /** Immutable child-body-local physics-space anchor. */
   childAnchor: Vector3Tuple;
   collideConnected?: boolean;
 }
 
-/** Engine-neutral hinge. Anchors and axes are body-local; angular limits are radians. */
+/** Engine-neutral hinge. Anchors and axes are body-local physics-space values; angular limits are radians. */
 export interface RevoluteJointDefinition extends JointDefinitionBase {
   kind: 'revolute'; parentAxis: Vector3Tuple; childAxis: Vector3Tuple;
   /** Viscous angular damping coefficient in N*m*s/rad. */
@@ -41,7 +43,9 @@ export interface ArticulationInspection {
   hasActiveHandle: boolean;
   parentMode?: RigidBodyMode;
   childMode?: RigidBodyMode;
+  /** Derived runtime world-simulation-space parent anchor; never authored input. */
   parentAnchorWorld?: Vector3Tuple;
+  /** Derived runtime world-simulation-space child anchor; never authored input. */
   childAnchorWorld?: Vector3Tuple;
   /** Radians for revolute, project units for prismatic. */
   coordinate?: number; limits?: [number, number]; pivotError?: number;

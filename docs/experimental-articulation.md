@@ -1,5 +1,159 @@
 # Experimental passive articulation (Release A)
 
+## Canonical articulation coordinate-space contract
+
+This section is the canonical coordinate-space contract for articulation. The
+requirement words **MUST**, **MUST NOT**, **SHOULD**, and **MAY** are used in the
+RFC sense: correctness invariants use **MUST**, prohibited world-pose feedback
+or cross-space substitution uses **MUST NOT**, recommended naming and
+diagnostics use **SHOULD**, and **MAY** is reserved for optional presentation or
+debug tooling.
+
+### Current behavior, including the historical world-space ambiguity
+
+Historically, implementation and documentation used “local,” “world,”
+“anchor,” “transform,” and “frame” without consistently naming the reference
+coordinate system. In particular, a `joint-anchor` that looks visually related
+to geometry inside a component was historically interpreted as an absolute
+world-simulation-space point.
+
+```xyzdsl
+"Pendulum/+0+1/+0+1/+0+1" : ""
+"Pendulum/Rod/..." : "joint-anchor: 0.5 8 0.5"
+```
+
+Under those absolute world-space semantics, changing the component declaration
+to
+
+```xyzdsl
+"Pendulum/+15+1/+0+1/+0+1" : ""
+```
+
+moves the visible bodies but leaves the pivot at world X = 0.5. The compiler
+can nevertheless derive mathematically valid body-local anchors reaching back
+to that old world pivot. Rapier then reports an active constraint and near-zero
+backend pivot error although the visible geometry is detached. If mutable
+runtime world poses are fed back into compilation, the derived body-local
+anchor can drift while still reconstructing the same world pivot. A diagnostic
+that reports only backend pivot error can therefore incorrectly suggest that
+the visible articulation is healthy.
+
+The repository now implements the required contract below. This history is a
+migration warning for old documents, diagnostics, and integrations; it is not a
+supported alternate interpretation of `joint-anchor`.
+
+### Required contract (normative and implemented)
+
+Under the component-local contract, the same authored anchor moves with the
+component and resolves to world X = 15.5 in the translated example.
+
+| Term | Definition | Mutability |
+| --- | --- | --- |
+| Component-local authored space | Coordinate system owned by one authored/materialized component instance. XYZDSL articulation positions and directions are expressed here. | Changes only through authoring or explicit component reconstruction. |
+| Body-local physics space | Coordinate system fixed to one rigid body. The compiler converts component-local articulation frames into parent- and child-body-local frames for Rapier. | Immutable for an unchanged authored revision. |
+| World simulation space | Shared runtime space containing current rigid-body poses and derived joint anchor positions. | Changes every physics tick. |
+| Published render space | World-space pose included in the immutable document/frame sent to the renderer. | Changes when a completed simulation frame is published. |
+| Mounted scene space | World transform of the actual Three.js object after scene-graph composition. | Observed from the mounted object; it MUST match published render space for flattened primitives. |
+| Joint local frame | The immutable parent- or child-body-local anchor, axis, and orientation used by the physics backend. | Immutable unless the authored articulation definition changes. |
+| Derived world anchor | A diagnostic world-space point calculated from a joint local frame and a current runtime body pose. | Changes with body motion; never becomes authored input. |
+| Geometry endpoint | A point on visible collider/render geometry, such as the pendulum rod’s top-face center. | Derived from geometry and the mounted mesh transform. It is not automatically equivalent to a joint anchor. |
+
+#### Language rules
+
+Documentation, code comments, diagnostics, type names, and test descriptions
+**MUST** name the reference space explicitly. They **MUST NOT** use ambiguous
+phrases such as “the anchor position,” “local transform,” “world transform”
+without identifying which world or publication layer, “rendered anchor” for a
+value reconstructed from a physics body, “mesh pivot error” when the mounted
+mesh was not inspected, or “the joint remains attached” based only on backend
+pivot error.
+
+Preferred phrases include “component-local authored joint anchor,”
+“parent-body-local Rapier anchor,” “child-body-local Rapier axis,” “runtime
+world-space parent anchor,” “published world-space node pose,” “mounted Three.js
+geometry endpoint,” and “distance from mounted rod-top endpoint to runtime
+parent anchor.” Diagnostics **SHOULD** use these explicit forms; optional debug
+tooling **MAY** abbreviate them only when the full term is available nearby.
+
+#### Permitted conversion graph
+
+```text
+component-local authored definition
+        |
+        | compile once for an authored revision
+        v
+parent-body-local / child-body-local joint frames
+        |
+        | combine with current body poses
+        v
+derived runtime world anchors
+        |
+        | publish completed physics frame
+        v
+published render pose
+        |
+        | mount as a flattened Three.js object
+        v
+mounted scene geometry endpoint
+
+runtime world pose       --X--> authored component-local definition
+published render pose    --X--> body-local joint recompilation
+mounted scene transform  --X--> persisted articulation definition
+```
+
+Runtime, published, and mounted world-space observations **MUST NOT** be fed
+back into component-local articulation compilation. For an unchanged authored
+revision, body-local joint frames **MUST** remain invariant regardless of
+simulation movement.
+
+#### Component-instance boundaries
+
+Articulation is defined only inside one component instance. `joint-parent`
+**MUST** resolve in the child's component instance and projection scope. A joint
+**MUST NOT** connect separate component instances or connect baseline and
+secondary projections. Materialized instances **MUST** receive independent body
+and joint identities. Translating or rotating a component instance **MUST**
+transform its complete articulation as a unit, while its authored articulation
+properties remain unchanged. These boundaries remove any need for implicit
+world-space articulation properties.
+
+#### Spatial, scalar, and behavioral properties
+
+“Every property is local” is not a useful shorthand because not every property
+transforms spatially:
+
+* **Component-local spatial properties:** `joint-anchor`, `joint-axis`,
+  fixed-joint authored orientation/frame properties, and prismatic linear
+  directions and component-local linear coordinates.
+* **Joint-coordinate scalar properties:** revolute angular limits, prismatic
+  scalar limits, damping, and motor targets if introduced later.
+* **Referential or behavioral properties:** `joint-parent`, joint kind, and
+  `collide-connected`.
+
+Scalar and behavioral properties do not transform spatially, but persist as
+part of the same component-local articulation definition.
+
+#### Invariants and diagnostic interpretation
+
+For an unchanged authored revision:
+
+- [ ] component-local authored values remain unchanged;
+- [ ] parent- and child-body-local joint frames remain unchanged;
+- [ ] joint identity remains unchanged;
+- [ ] runtime body poses may change;
+- [ ] derived runtime world anchors may move;
+- [ ] backend runtime pivot error **SHOULD** remain within solver tolerance; and
+- [ ] mounted geometry endpoint error **SHOULD** remain within the intended
+      modeling tolerance.
+
+Zero backend runtime pivot error proves only that Rapier's two body-local
+anchors coincide in runtime world simulation space. It does not prove that a
+body-local anchor still corresponds to the intended geometry endpoint, that the
+published mesh is at the correct pose, or that the mounted Three.js mesh matches
+the published pose. Diagnostics **SHOULD** report body-local frame drift,
+backend runtime pivot error, published-pose anchor error, mounted geometry
+endpoint error, active physics tick, and authored revision as separate values.
+
 Release A introduces passive revolute joints without exposing Rapier handles to
 XYZDSL, rendering, or transaction code. Articulations are rooted forests of
 stable rigid-body identities connected by engine-neutral joint definitions.
