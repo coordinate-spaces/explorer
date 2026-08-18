@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useRef, type ReactNode } from 'react';
 import type { SpatialDocument } from '../model/SpatialDocument';
 import { UNIT_SCALE_DESCRIPTION } from '../model/units';
 import type { RejectedTransaction, SecondaryProjection, TransactionRange } from '../transactions/types';
@@ -123,6 +123,7 @@ interface XyzDslDrawerProps {
   onLoadSecondaryHistory: (publicKey: string) => void;
   selectedNodeId?: string;
   onSelectNode?: (id: string) => void;
+  onSelectLine: (line: number) => void;
   inspector?: ReactNode;
 }
 
@@ -164,12 +165,27 @@ export function XyzDslDrawer({
   onLoadSecondaryHistory,
   selectedNodeId,
   onSelectNode,
+  onSelectLine,
   inspector,
 }: XyzDslDrawerProps) {
   const isEditorMode = appMode === 'editor';
   const [activeView, setActiveView] = usePersistentState<'explorer' | 'source'>('xyzdsl-drawer-view-v1', 'explorer');
   const [auxiliaryView, setAuxiliaryView] = usePersistentState<AuxiliaryView>('xyzdsl-auxiliary-view-v1', 'connections');
   const diagnosticCount = document.diagnostics.length + rejectedTransactions.length;
+  const primaryRef = useRef<HTMLDivElement>(null);
+  const auxiliaryRef = useRef<HTMLElement>(null);
+
+  function showDiagnostics() {
+    setAuxiliaryView('diagnostics');
+    requestAnimationFrame(() => auxiliaryRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+  }
+
+  function selectDiagnosticLine(line: number) {
+    onSelectLine(line);
+    setActiveView('source');
+    requestAnimationFrame(() => primaryRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+  }
+
   return (
     <aside className={`xyzdsl-drawer xyzdsl-drawer--${appMode} ${isOpen ? 'is-open' : ''}`}>
       <div className="mode-controls" aria-label="Application mode">
@@ -215,9 +231,9 @@ export function XyzDslDrawer({
           </div>
 
           <div className="workspace-body">
-          <div className="workspace-primary" role="tabpanel">
+          <div ref={primaryRef} className="workspace-primary" role="tabpanel">
             {activeView === 'explorer' ? (
-              <XyzDslTreeView document={document} selectedNodeId={selectedNodeId} onSelectNode={onSelectNode} onShowDiagnostics={() => setAuxiliaryView('diagnostics')} />
+              <XyzDslTreeView document={document} selectedNodeId={selectedNodeId} onSelectNode={onSelectNode} onShowDiagnostics={showDiagnostics} />
             ) : (
               <XyzDslEditor
                 actions={
@@ -236,7 +252,7 @@ export function XyzDslDrawer({
 
           {inspector ? <div className="workspace-properties">{inspector}</div> : null}
 
-          <section className="workspace-auxiliary" aria-label="Workspace tools">
+          <section ref={auxiliaryRef} className="workspace-auxiliary" aria-label="Workspace tools">
             <nav className="workspace-subtabs" aria-label="Workspace tool sections">
               {([
                 ['connections', 'Connections'],
@@ -292,7 +308,7 @@ export function XyzDslDrawer({
           />
           ) : null}
 
-          {auxiliaryView === 'diagnostics' ? <WorkspaceDiagnostics declarationDiagnostics={document.diagnostics} rejectedTransactions={rejectedTransactions} /> : null}
+          {auxiliaryView === 'diagnostics' ? <WorkspaceDiagnostics declarationDiagnostics={document.diagnostics} rejectedTransactions={rejectedTransactions} onSelectLine={selectDiagnosticLine} /> : null}
             </div>
           </section>
           </div>

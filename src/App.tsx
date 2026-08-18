@@ -944,6 +944,13 @@ export default function App() {
     setSelectedLineNumber(lineNumberForNode(targetNode));
   }, [document.nodes]);
 
+  const handleSelectDiagnosticLine = useCallback((line: number) => {
+    setSelectedNodeId(undefined);
+    setSelectedLeafNodeId(undefined);
+    setSelectedSceneHighlightNodeId(undefined);
+    setSelectedLineNumber(line);
+  }, []);
+
   const editSelectedDeclaration = useCallback((edit: (source: string, lineNumber: number) => string) => {
     if (selectedNodeLineNumber === undefined) {
       return;
@@ -1105,6 +1112,7 @@ export default function App() {
         onLoadSecondaryHistory={handleLoadSecondaryHistory}
         selectedNodeId={selectedNode?.id}
         onSelectNode={handleSelectExactNode}
+        onSelectLine={handleSelectDiagnosticLine}
         inspector={appMode === 'editor' && selectedNode ? (
           <SelectedNodeInspector
             canEdit={selectedNodeCanEdit}

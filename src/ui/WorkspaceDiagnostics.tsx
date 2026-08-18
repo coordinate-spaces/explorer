@@ -4,7 +4,7 @@ import type { RejectedTransaction } from '../transactions/types';
 interface WorkspaceDiagnosticsProps {
   declarationDiagnostics: readonly ParseDiagnostic[];
   rejectedTransactions: readonly RejectedTransaction[];
-  onSelectLine?: (line: number) => void;
+  onSelectLine: (line: number) => void;
 }
 
 export function WorkspaceDiagnostics({ declarationDiagnostics, rejectedTransactions, onSelectLine }: WorkspaceDiagnosticsProps) {
@@ -28,7 +28,7 @@ export function WorkspaceDiagnostics({ declarationDiagnostics, rejectedTransacti
           <ul>
             {declarationDiagnostics.map((diagnostic, index) => (
               <li key={`${diagnostic.line}-${index}`}>
-                <button type="button" onClick={() => onSelectLine?.(diagnostic.line)}>
+                <button type="button" onClick={() => onSelectLine(diagnostic.line)}>
                   <span>Line {diagnostic.line}</span>
                   <strong>{diagnostic.message}</strong>
                 </button>
