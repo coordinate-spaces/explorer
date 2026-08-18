@@ -9,8 +9,25 @@ stable rigid-body identities connected by engine-neutral joint definitions.
 ```xyzdsl
 "Pendulum/+0+1/+0+1/+0+1" : ""
 "Pendulum/Anchor/+45c+10c/+8+1/+45c+10c" : "body: Anchor; physics-mode: static"
-"Pendulum/Rod/+45c+10c/+3+5/+45c+10c" : "body: Rod; mass: 1; joint: revolute; joint-parent: Pendulum/Anchor/; joint-anchor: 0.5 8 0.5; joint-axis: 0 0 1; joint-limits: -170 170; joint-damping: 0.05"
+"Pendulum/Ceiling/+0+4/+8+1/+0+1" : "body: Anchor; physics-mode: static"
+"Pendulum/Rod/+83c+20c/+304c+5/+45c+10c" : "body: Rod; mass: 1; rotation: 0,0,10; joint: revolute; joint-parent: Pendulum/Anchor/; joint-anchor: 0.5 8 0.5; joint-axis: 0 0 1; joint-limits: -170 170; joint-damping: 0.05"
 ```
+
+The ceiling is authored touching `Pendulum/Anchor/` and assigned to the same
+`Anchor` body, so the fixed pivot has visible supporting geometry. Its contact
+is illustrative rather than necessary: `physics-mode: static` fixes a body in
+world space without requiring a floor, wall, ceiling, or other physical support.
+The rod starts 10 degrees from vertical, with its box position adjusted so its
+transformed top remains at the intended world-space pivot `(0.5, 8, 0.5)`.
+Gravity therefore starts observable swinging without an impulse. An application
+can instead author the rod vertically and enqueue an `impulse` input for the rod
+on the first simulation tick.
+
+Ground and floor are separate infrastructure. `RapierPhysicsWorld.addGround()`
+adds an implicit collider whose contact surface is at `y = 0`.
+`src/scene/XyzCoordinateSpace.tsx` renders the visible floor, walls, and grids;
+it offsets grid lines from those surfaces by `GRID_OFFSET` to prevent z-fighting.
+Neither supplies the authored ceiling in this example.
 
 `body` starts an explicit rigid component. Primitives resolving to the same body
 name within a top-level component remain one compound rigid body. Components
