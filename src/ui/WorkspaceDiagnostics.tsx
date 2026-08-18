@@ -9,9 +9,13 @@ interface WorkspaceDiagnosticsProps {
   onSelectLine: (line: number) => void;
 }
 
+export function physicsJointErrorCount(physicsJoints: readonly PhysicsJointDiagnostic[] = []): number {
+  return physicsJoints.filter(({ articulation }) => !articulation || articulation.error).length;
+}
+
 export function WorkspaceDiagnostics({ declarationDiagnostics, rejectedTransactions, physicsJoints = [], onSelectLine }: WorkspaceDiagnosticsProps) {
   const installedJoints = physicsJoints.flatMap(({ articulation }) => articulation ? [articulation] : []);
-  const articulationErrors = physicsJoints.filter(({ articulation }) => !articulation || articulation.error).length;
+  const articulationErrors = physicsJointErrorCount(physicsJoints);
   const total = declarationDiagnostics.length + rejectedTransactions.length + articulationErrors;
   const number = (value: number | undefined) => value === undefined ? 'n/a' : Number.isFinite(value) ? value.toFixed(8) : String(value);
   const position = (value: readonly number[] | undefined) => value ? `[${value.map((component) => number(component)).join(', ')}]` : 'n/a';

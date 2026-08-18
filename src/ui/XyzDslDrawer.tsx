@@ -8,7 +8,7 @@ import { XyzDslTransactionControls } from './XyzDslTransactionControls';
 import { SecondaryProjectionPanel } from './SecondaryProjectionPanel';
 import { XyzDslTreeView } from './XyzDslTreeView';
 import { usePersistentState } from './usePersistentState';
-import { WorkspaceDiagnostics } from './WorkspaceDiagnostics';
+import { physicsJointErrorCount, WorkspaceDiagnostics } from './WorkspaceDiagnostics';
 
 type AuxiliaryView = 'connections' | 'baseline' | 'projections' | 'diagnostics';
 
@@ -172,7 +172,7 @@ export function XyzDslDrawer({
   const [activeView, setActiveView] = usePersistentState<'explorer' | 'source'>('xyzdsl-drawer-view-v1', 'explorer');
   const [auxiliaryView, setAuxiliaryView] = usePersistentState<AuxiliaryView>('xyzdsl-auxiliary-view-v1', 'connections');
   const diagnosticCount = document.diagnostics.length + rejectedTransactions.length
-    + (document.physicsJoints?.filter(({ articulation }) => !articulation).length ?? 0);
+    + physicsJointErrorCount(document.physicsJoints);
   const primaryRef = useRef<HTMLDivElement>(null);
   const auxiliaryRef = useRef<HTMLElement>(null);
 

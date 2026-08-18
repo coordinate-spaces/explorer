@@ -370,8 +370,15 @@ export class RapierPhysicsWorld implements RigidBodyWorld {
   }
   snapshot(): PhysicsSnapshot { return structuredClone({ schemaVersion: 1 as const, backend: 'rapier-0.20', tick: this.currentTick, states: [...this.frame().states.values()], definitions: [...this.definitions.values()], joints: [...this.jointDefinitions.values()] }); }
   restore(snapshot: PhysicsSnapshot): void {
+    // Timeline reconciliation temporarily rebuilds the retained snapshot before
+    // every step. Keep same-tick diagnostic history across that rebuild so a
+    // violation observed on consecutive published ticks can become persistent.
+    // A seek to another tick starts a new observation sequence.
+    const retainedPivotSamples = snapshot.tick === this.currentTick
+      ? new Map(this.excessivePivotSamples) : new Map<string, { tick: number; count: number }>();
     this.definitions.clear();
     this.reconcileDefinitions(snapshot.definitions, snapshot.joints ?? []);
+    this.excessivePivotSamples = retainedPivotSamples;
     const states = new Map(snapshot.states.map((state) => [state.id, state]));
     const restoredEntities = new Set<string>();
     snapshot.definitions.forEach((definition) => {

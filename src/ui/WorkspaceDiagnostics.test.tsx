@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { SpatialSimulationSession } from '../simulation/SpatialSimulationSession';
-import { WorkspaceDiagnostics } from './WorkspaceDiagnostics';
+import { physicsJointErrorCount, WorkspaceDiagnostics } from './WorkspaceDiagnostics';
 
 const documentedPendulum = [
   '"Pendulum/+0+1/+0+1/+0+1" : ""',
@@ -24,6 +24,20 @@ function diagnostics(source: string): string {
 }
 
 describe('workspace articulation diagnostics', () => {
+  it('counts both missing and unhealthy active articulations', () => {
+    expect(physicsJointErrorCount([
+      { nodeId: 'missing', nodeName: 'Missing', kind: 'revolute' },
+      { nodeId: 'bad', nodeName: 'Bad', kind: 'revolute', articulation: {
+        id: 'bad-joint', parentEntityId: 'parent', childEntityId: 'child', kind: 'revolute',
+        tick: 3, hasActiveHandle: false, error: 'missing-handle',
+      } },
+      { nodeId: 'healthy', nodeName: 'Healthy', kind: 'revolute', articulation: {
+        id: 'healthy-joint', parentEntityId: 'parent', childEntityId: 'child', kind: 'revolute',
+        tick: 3, hasActiveHandle: true,
+      } },
+    ])).toBe(2);
+  });
+
   it('reports the documented pendulum constraint installed in the active session', () => {
     const markup = diagnostics(documentedPendulum);
     expect(markup).toContain('Installed joints <span>1</span>');

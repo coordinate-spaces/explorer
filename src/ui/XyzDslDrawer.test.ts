@@ -32,6 +32,7 @@ describe('workspace information architecture', () => {
     expect(drawerSource).toContain("auxiliaryRef.current?.scrollIntoView");
     expect(drawerSource).toContain("['connections', 'Connections']");
     expect(drawerSource).toContain("['diagnostics', `Diagnostics · ${diagnosticCount}`]");
+    expect(drawerSource).toContain('physicsJointErrorCount(document.physicsJoints)');
     expect(drawerSource).not.toContain('aria-label="Spatial declaration diagnostics"');
     expect(drawerSource).not.toContain('aria-label="Spatial transaction diagnostics"');
   });
