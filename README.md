@@ -111,8 +111,20 @@ joints. A joint is authored on its child body with a world-space pivot and axis:
 ```txt
 "Pendulum/+0+1/+0+1/+0+1" : ""
 "Pendulum/Anchor/+45c+10c/+8+1/+45c+10c" : "body: Anchor; physics-mode: static"
-"Pendulum/Rod/+45c+10c/+3+5/+45c+10c" : "body: Rod; mass: 1; joint: revolute; joint-parent: Pendulum/Anchor/; joint-anchor: 0.5 8 0.5; joint-axis: 0 0 1; joint-damping: 0.05"
+"Pendulum/Ceiling/+0+4/+8+1/+0+1" : "body: Anchor; physics-mode: static"
+"Pendulum/Rod/+83c+20c/+304c+5/+45c+10c" : "body: Rod; mass: 1; rotation: 0,0,10; joint: revolute; joint-parent: Pendulum/Anchor/; joint-anchor: 0.5 8 0.5; joint-axis: 0 0 1; joint-damping: 0.05"
 ```
+
+The authored ceiling makes the fixed anchor visible, but it is not what supports
+the body: `physics-mode: static` fixes the entire `Anchor` body in world space
+without requiring physical support. The rod's box and 10-degree rotation place
+its top at the unchanged world-space `joint-anchor`; that small angular
+displacement lets gravity produce visible pendulum motion immediately.
+
+`RapierPhysicsWorld.addGround()` separately supplies an implicit collision plane
+at `y = 0`. The visible floor is rendered by `src/scene/XyzCoordinateSpace.tsx`,
+whose grid is raised by `GRID_OFFSET` to avoid visual overlap; neither is the
+authored ceiling above.
 
 Unjointed components retain their existing top-level compound-body behavior.
 The experimental release supports passive revolute motion, optional degree-based

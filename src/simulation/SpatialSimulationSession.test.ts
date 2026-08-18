@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { Quaternion, Vector3 } from 'three';
 import { spatialBaselineRevision } from '../transactions/AccumulativeSpatialTimeline';
 import { SpatialSimulationSession } from './SpatialSimulationSession';
 import type { XyzDslDeclarationOrigin } from '../xyzdsl/types';
@@ -15,7 +16,39 @@ const contactOrigins = () => new Map<number, XyzDslDeclarationOrigin>([
   [2, { sourceKind: 'secondary', streamId: 'local-cursor' }],
 ]);
 
+const documentedPendulum = [
+  '"Pendulum/+0+1/+0+1/+0+1" : ""',
+  '"Pendulum/Anchor/+45c+10c/+8+1/+45c+10c" : "body: Anchor; physics-mode: static"',
+  '"Pendulum/Ceiling/+0+4/+8+1/+0+1" : "body: Anchor; physics-mode: static"',
+  '"Pendulum/Rod/+83c+20c/+304c+5/+45c+10c" : "body: Rod; mass: 1; rotation: 0,0,10; joint: revolute; joint-parent: Pendulum/Anchor/; joint-anchor: 0.5 8 0.5; joint-axis: 0 0 1; joint-limits: -170 170; joint-damping: 0.05"',
+].join('\n');
+
 describe('application spatial simulation session', () => {
+  it('compiles and advances the documented pendulum while retaining its revolute pivot', () => {
+    const session = new SpatialSimulationSession(documentedPendulum);
+    const snapshot = session.timeline.simulation.world.snapshot();
+    const rod = snapshot.definitions.find(({ entityId }) => entityId?.endsWith('body:Rod'))!;
+    const initialX = session.timeline.simulation.world.frame().states.get(rod.id)!.position[0];
+
+    expect(snapshot.joints).toEqual([
+      expect.objectContaining({ kind: 'revolute', childEntityId: rod.entityId }),
+    ]);
+
+    session.start();
+    for (let tick = 0; tick < 45; tick += 1) session.advance(1 / 60);
+
+    const state = session.timeline.simulation.world.frame().states.get(rod.id)!;
+    const transformedTop = new Vector3(0, 2.5, 0)
+      .applyQuaternion(new Quaternion(...state.orientation))
+      .add(new Vector3(...state.position));
+    expect(transformedTop.distanceTo(new Vector3(0.5, 8, 0.5))).toBeLessThan(0.02);
+    expect(Math.abs(state.position[0] - initialX)).toBeGreaterThan(0.05);
+    expect(session.timeline.simulation.world.snapshot().joints).toEqual([
+      expect.objectContaining({ kind: 'revolute', childEntityId: rod.entityId }),
+    ]);
+    session.dispose();
+  });
+
   it('advances gravity while authored input is idle', () => {
     const session = new SpatialSimulationSession(fallingBody); const initial = bodyY(session);
     session.start(); session.advance(1 / 60); session.advance(1 / 60);
