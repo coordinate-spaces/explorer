@@ -125,6 +125,7 @@ interface XyzDslDrawerProps {
   onSelectNode?: (id: string) => void;
   onSelectLine: (line: number) => void;
   inspector?: ReactNode;
+  diagnosticsSessionIdentifier?: string;
 }
 
 export function XyzDslDrawer({
@@ -167,6 +168,7 @@ export function XyzDslDrawer({
   onSelectNode,
   onSelectLine,
   inspector,
+  diagnosticsSessionIdentifier,
 }: XyzDslDrawerProps) {
   const isEditorMode = appMode === 'editor';
   const [activeView, setActiveView] = usePersistentState<'explorer' | 'source'>('xyzdsl-drawer-view-v1', 'explorer');
@@ -309,11 +311,25 @@ export function XyzDslDrawer({
           />
           ) : null}
 
-          {auxiliaryView === 'diagnostics' ? <WorkspaceDiagnostics declarationDiagnostics={document.diagnostics} rejectedTransactions={rejectedTransactions} physicsJoints={document.physicsJoints} onSelectLine={selectDiagnosticLine} /> : null}
+          {auxiliaryView === 'diagnostics' ? <WorkspaceDiagnostics declarationDiagnostics={document.diagnostics} rejectedTransactions={rejectedTransactions} physicsJoints={document.physicsJoints} physicsTick={document.physicsTick} sessionIdentifier={diagnosticsSessionIdentifier} onSelectLine={selectDiagnosticLine} /> : null}
             </div>
           </section>
           </div>
         </div>
+      ) : null}
+      {!authoringAvailable ? (
+        <details className="runtime-diagnostics-panel">
+          <summary>Live diagnostics</summary>
+          <WorkspaceDiagnostics
+            declarationDiagnostics={document.diagnostics}
+            rejectedTransactions={rejectedTransactions}
+            physicsJoints={document.physicsJoints}
+            physicsTick={document.physicsTick}
+            sessionIdentifier={diagnosticsSessionIdentifier}
+            onSelectLine={() => undefined}
+            readOnly
+          />
+        </details>
       ) : null}
       {!authoringAvailable && secondaryProjections.length > 0 ? (
         <details className="runtime-playback-controls">

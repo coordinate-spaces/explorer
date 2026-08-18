@@ -1,7 +1,8 @@
 import RAPIER from '@dimforge/rapier3d-compat';
 import type { RigidBodyWorld } from './RigidBodyWorld';
 import type { ArticulationInspection, ColliderDefinition, InteractionQueryOptions, InteractionQueryResult, JointDefinition, PhysicsFrame, PhysicsInput, PhysicsSnapshot, RigidBodyDefinition, RigidBodyState, Vector3Tuple } from './types';
-import { Quaternion, Vector3 } from 'three';
+import { Euler, Quaternion, Vector3 } from 'three';
+import type { SpatialNode } from '../model/SpatialNode';
 
 await RAPIER.init();
 
@@ -376,6 +377,24 @@ export class RapierPhysicsWorld implements RigidBodyWorld {
         childMode: modeFor(definition.childEntityId), parentAnchorWorld, childAnchorWorld,
         coordinate, limits: 'limits' in definition ? definition.limits : undefined, pivotError, error };
     });
+  }
+
+  /** Resolve a body-local anchor through a node pose in the published render document. */
+  publishedAnchorWorld(entityId: string, anchor: Vector3Tuple, nodes: readonly SpatialNode[]): Vector3Tuple | undefined {
+    const definition = [...this.definitions.values()].find((candidate) =>
+      (candidate.entityId ?? candidate.id) === entityId && nodes.some(({ id }) => id === candidate.id));
+    if (!definition) return undefined;
+    const node = nodes.find(({ id }) => id === definition.id);
+    const localPose = this.memberLocalPoses.get(definition.id);
+    if (!node || !localPose) return undefined;
+    const transform = node.worldTransform ?? node.transform;
+    const publishedMemberOrientation = new Quaternion().setFromEuler(new Euler(...transform.rotation, 'XYZ'));
+    const bodyOrientation = publishedMemberOrientation
+      .multiply(quaternion(localPose.orientation).invert())
+      .normalize();
+    const bodyPosition = new Vector3(...transform.position)
+      .sub(new Vector3(...localPose.position).applyQuaternion(bodyOrientation));
+    return tuple(new Vector3(...anchor).applyQuaternion(bodyOrientation).add(bodyPosition));
   }
   snapshot(): PhysicsSnapshot { return structuredClone({ schemaVersion: 1 as const, backend: 'rapier-0.20', tick: this.currentTick, states: [...this.frame().states.values()], definitions: [...this.definitions.values()], joints: [...this.jointDefinitions.values()] }); }
   restore(snapshot: PhysicsSnapshot): void {

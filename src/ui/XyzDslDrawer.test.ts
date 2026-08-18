@@ -16,6 +16,14 @@ describe('transactionSummary', () => {
 });
 
 describe('runtime secondary controls', () => {
+  it('exposes read-only live diagnostics independently of authoring', () => {
+    expect(drawerSource).toContain('!authoringAvailable ? (');
+    expect(drawerSource).toContain('className="runtime-diagnostics-panel"');
+    expect(drawerSource).toContain('<summary>Live diagnostics</summary>');
+    expect(drawerSource).toContain('physicsTick={document.physicsTick}');
+    expect(drawerSource).toContain('readOnly');
+  });
+
   it('keeps cursor playback controls available when authoring is unavailable', () => {
     expect(drawerSource).toContain('!authoringAvailable && secondaryProjections.length > 0');
     expect(drawerSource).toContain('className="runtime-playback-controls"');

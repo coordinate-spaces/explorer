@@ -180,6 +180,39 @@ button {
   backdrop-filter: blur(16px);
 }
 
+.runtime-diagnostics-panel {
+  pointer-events: auto;
+  position: fixed;
+  top: 1rem;
+  left: 1rem;
+  z-index: 19;
+  width: min(34rem, calc(100vw - 2rem));
+  max-height: calc(100vh - 6rem);
+  overflow: auto;
+  border: 1px solid rgb(34 211 238 / 35%);
+  border-radius: 1rem;
+  padding: 0.75rem;
+  background: rgb(8 19 29 / 92%);
+  color: #dbeafe;
+  box-shadow: 0 20px 60px rgb(0 0 0 / 32%);
+  backdrop-filter: blur(16px);
+}
+
+.runtime-diagnostics-panel > summary { cursor: pointer; font-weight: 700; }
+.runtime-diagnostics-panel[open] > summary { margin-bottom: 0.75rem; }
+
+@media (max-width: 66rem) {
+  .runtime-diagnostics-panel {
+    max-height: calc(50vh - 1.5rem);
+  }
+
+  .runtime-playback-controls {
+    top: auto;
+    bottom: 5rem;
+    max-height: calc(50vh - 4.5rem);
+  }
+}
+
 .runtime-playback-controls > summary {
   cursor: pointer;
   font-weight: 700;

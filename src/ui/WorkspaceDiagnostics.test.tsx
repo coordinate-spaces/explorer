@@ -1,6 +1,7 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { SpatialSimulationSession } from '../simulation/SpatialSimulationSession';
+import { RapierPhysicsWorld } from '../physics/RapierPhysicsWorld';
 import { physicsJointErrorCount, WorkspaceDiagnostics } from './WorkspaceDiagnostics';
 
 const documentedPendulum = [
@@ -24,6 +25,56 @@ function diagnostics(source: string): string {
 }
 
 describe('workspace articulation diagnostics', () => {
+  it('publishes live application diagnostics while running and keeps the paused frame readable', () => {
+    const session = new SpatialSimulationSession(documentedPendulum, undefined, 'pendulum-revision');
+    const render = () => {
+      const { document } = session.frame();
+      return renderToStaticMarkup(<WorkspaceDiagnostics
+        declarationDiagnostics={document.diagnostics}
+        rejectedTransactions={[]}
+        physicsJoints={document.physicsJoints}
+        physicsTick={document.physicsTick}
+        sessionIdentifier="pendulum-revision"
+        onSelectLine={() => undefined}
+        readOnly
+      />);
+    };
+
+    session.start();
+    const initial = render();
+    session.advance(1 / 60);
+    session.advance(1 / 60);
+    const running = render();
+    expect(initial).toContain('Physics tick: <output>0</output>');
+    expect(running).toContain('Physics tick: <output>2</output>');
+    expect(running).toContain('Session/revision: <code>pendulum-revision</code>');
+    expect(running).toContain('Rendered-anchor error:');
+
+    session.pause();
+    session.advance(1);
+    expect(render()).toContain('Physics tick: <output>2</output>');
+    session.dispose();
+  });
+
+  it('measures rendered-anchor error from published node transforms rather than backend anchors', () => {
+    const session = new SpatialSimulationSession(documentedPendulum);
+    const world = session.timeline.simulation.world as RapierPhysicsWorld;
+    const snapshot = world.snapshot();
+    const joint = snapshot.joints![0];
+    const childDefinition = snapshot.definitions.find(({ entityId, id }) => (entityId ?? id) === joint.childEntityId)!;
+    const published = session.frame().document.renderNodes.map((node) => node.id === childDefinition.id ? {
+      ...node,
+      transform: { ...node.transform, position: [node.transform.position[0] + 1, ...node.transform.position.slice(1)] as [number, number, number] },
+      worldTransform: node.worldTransform && { ...node.worldTransform, position: [node.worldTransform.position[0] + 1, ...node.worldTransform.position.slice(1)] as [number, number, number] },
+    } : node);
+    const parent = world.publishedAnchorWorld(joint.parentEntityId, joint.parentAnchor, published)!;
+    const child = world.publishedAnchorWorld(joint.childEntityId, joint.childAnchor, published)!;
+
+    expect(Math.hypot(...parent.map((value, index) => value - child[index])))
+      .toBeGreaterThan((world.inspectArticulations!()[0].pivotError ?? 0) + 0.5);
+    session.dispose();
+  });
+
   it('counts both missing and unhealthy active articulations', () => {
     expect(physicsJointErrorCount([
       { nodeId: 'missing', nodeName: 'Missing', kind: 'revolute' },
