@@ -17,11 +17,13 @@ interface JointDefinitionBase {
 /** Engine-neutral hinge. Anchors and axes are body-local; angular limits are radians. */
 export interface RevoluteJointDefinition extends JointDefinitionBase {
   kind: 'revolute'; parentAxis: Vector3Tuple; childAxis: Vector3Tuple;
+  /** Viscous angular damping coefficient in N*m*s/rad. */
   limits?: [number, number]; damping?: number;
 }
 /** Engine-neutral slider. Anchors/axes are body-local; limits are project units. */
 export interface PrismaticJointDefinition extends JointDefinitionBase {
   kind: 'prismatic'; parentAxis: Vector3Tuple; childAxis: Vector3Tuple;
+  /** Viscous translational damping coefficient in N*s/project-unit. */
   limits?: [number, number]; damping?: number;
 }
 /** A weld whose independent frames are expressed in each body's local coordinates. */

@@ -173,11 +173,20 @@ export class RapierPhysicsWorld implements RigidBodyWorld {
       if (definition.kind === 'revolute') {
         const revolute = joint as RAPIER.RevoluteImpulseJoint;
         if (definition.limits) revolute.setLimits(...definition.limits);
-        if (definition.damping && definition.damping > 0) revolute.configureMotorVelocity(0, definition.damping);
+        if (definition.damping && definition.damping > 0) {
+          // ForceBased makes the velocity gain a physical viscous coefficient:
+          // torque = damping * (0 - relativeAngularVelocity), in N*m*s/rad.
+          revolute.configureMotorModel(RAPIER.MotorModel.ForceBased);
+          revolute.configureMotorVelocity(0, definition.damping);
+        }
       } else if (definition.kind === 'prismatic') {
         const prismatic = joint as RAPIER.PrismaticImpulseJoint;
         if (definition.limits) prismatic.setLimits(...definition.limits);
-        if (definition.damping && definition.damping > 0) prismatic.configureMotorVelocity(0, definition.damping);
+        if (definition.damping && definition.damping > 0) {
+          // force = damping * (0 - relativeVelocity), in N*s/project-unit.
+          prismatic.configureMotorModel(RAPIER.MotorModel.ForceBased);
+          prismatic.configureMotorVelocity(0, definition.damping);
+        }
       }
       this.jointById.set(definition.id, joint);
     });
