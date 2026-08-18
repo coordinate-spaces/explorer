@@ -7,6 +7,7 @@ interface XyzDslTreeViewProps {
   document: SpatialDocument;
   selectedNodeId?: string;
   onSelectNode?: (id: string) => void;
+  onShowDiagnostics?: () => void;
 }
 
 function displayName(node: SpatialNode): string {
@@ -126,7 +127,7 @@ function TreeItem({
   );
 }
 
-export function XyzDslTreeView({ document, selectedNodeId, onSelectNode }: XyzDslTreeViewProps) {
+export function XyzDslTreeView({ document, selectedNodeId, onSelectNode, onShowDiagnostics }: XyzDslTreeViewProps) {
   const [storedCollapsedIds, setStoredCollapsedIds] = usePersistentState<string[]>('xyzdsl-tree-collapsed-v1', []);
   const collapsedIds = useMemo(() => new Set(storedCollapsedIds), [storedCollapsedIds]);
   const nodeIds = useMemo(() => sortedTreeIds(document.nodes), [document.nodes]);
@@ -176,11 +177,17 @@ export function XyzDslTreeView({ document, selectedNodeId, onSelectNode }: XyzDs
         ) : null}
       </div>
 
+      {document.diagnostics.length > 0 ? (
+        <button className="workspace-diagnostic-summary" type="button" onClick={onShowDiagnostics}>
+          <span>{document.diagnostics.length} declaration issue{document.diagnostics.length === 1 ? '' : 's'}</span>
+          <strong>Review diagnostics →</strong>
+        </button>
+      ) : null}
+
       {document.nodes.length === 0 ? (
         <p>No valid definitions yet.</p>
       ) : (
         <>
-          {document.diagnostics.length > 0 ? <div className="xyzdsl-csg-summary" aria-label="Definition diagnostics"><h3>Diagnostics</h3><ul>{document.diagnostics.map((diagnostic, index) => <li key={`${diagnostic.line}-${index}`}>line {diagnostic.line}: {diagnostic.message}</li>)}</ul></div> : null}
           {document.csgExpressions.length > 0 ? (
             <div className="xyzdsl-csg-summary" aria-label="Boolean composition summary">
               <h3>Boolean composition expressions</h3>
