@@ -1,63 +1,102 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { SceneRoot } from '../scene/SceneRoot';
 import { SpatialSimulationSession } from '../simulation/SpatialSimulationSession';
+import { SimulationTimeline } from '../transactions/SimulationTimeline';
+import type { InteractionFact } from '../model/interactions';
 import type { PhysicsSnapshot, RigidBodyState } from '../physics/types';
 import { RELEASE_B_FIXTURES } from './releaseB/catalog';
 import { RELEASE_C_FIXTURES } from './releaseC/catalog';
 import type { ArticulationFixture } from './fixtures';
 
 type Status = 'ready' | 'running' | 'paused';
-const finiteState = (state: RigidBodyState) => [...state.position, ...state.orientation, ...state.linearVelocity, ...state.angularVelocity].every(Number.isFinite);
+type ProofResult = { reconciliation: boolean; oneShot: boolean };
+const vector = (state: RigidBodyState) => [...state.position, ...state.orientation, ...state.linearVelocity, ...state.angularVelocity];
+const finiteState = (state: RigidBodyState) => vector(state).every(Number.isFinite);
+
+/** Maximum component error for every dynamic body, matched by stable body ID. */
+export function dynamicStateDivergence(expected: PhysicsSnapshot, actual: PhysicsSnapshot): number {
+  const definitions = new Map(expected.definitions.map((definition) => [definition.id, definition]));
+  const actualById = new Map(actual.states.map((state) => [state.id, state]));
+  return expected.states
+    .filter((state) => definitions.get(state.id)?.mode !== 'static')
+    .reduce((maximum, state) => {
+      const counterpart = actualById.get(state.id);
+      if (!counterpart) return Infinity;
+      return Math.max(maximum, ...vector(state).map((value, index) => Math.abs(value - vector(counterpart)[index])));
+    }, 0);
+}
+
+function verifyFixture(fixture: ArticulationFixture): ProofResult {
+  const reconcile = new SpatialSimulationSession(fixture.source, undefined, `proof:${fixture.id}`, fixture.capabilities);
+  reconcile.start(); reconcile.advance(1 / 30); reconcile.pause();
+  const before = reconcile.timeline.simulation.world.snapshot();
+  // A static, non-colliding declaration forces a real unrelated reconciliation.
+  reconcile.setInput(`${fixture.source}\n"ProofMarker/+20+1/+20+1/+20+1":"physics-mode: static; sensor: true"`);
+  const reconciliation = dynamicStateDivergence(before, reconcile.timeline.simulation.world.snapshot()) <= fixture.tolerance;
+  reconcile.dispose();
+
+  const timeline = new SimulationTimeline(undefined, fixture.capabilities);
+  const body = { id: 'proof-body', bounds: { minX: 0, maxX: 1, minY: 0, maxY: 1, minZ: 0, maxZ: 1 }, position: [0, 0, 0] as [number, number, number], gravityScale: 0 };
+  const fact: InteractionFact = { state: 'touch', targetId: body.id, targetNamespace: 'Proof/', cursorId: 'proof-cursor', cursorNamespace: 'Cursor/', streamId: 'proof', normal: [1, 0, 0], inferredDirection: [1, 0, 0] };
+  timeline.reconcileDefinitions([body]);
+  const entered = timeline.evaluate(1, 1, 0, [fact], [{ targetId: body.id, mode: 'impulse', magnitude: 1 }]);
+  const stayed = timeline.evaluate(2, 2, 0, [fact], [{ targetId: body.id, mode: 'impulse', magnitude: 1 }]);
+  const oneShot = entered.transitions.filter(({ kind }) => kind === 'enter').length === 1
+    && stayed.transitions.every(({ kind }) => kind !== 'enter')
+    && stayed.physics.states.get(body.id)?.linearVelocity[0] === 1;
+  timeline.dispose();
+  return { reconciliation, oneShot };
+}
 
 export function ArticulationGallery({ onClose }: { onClose: () => void }) {
   const [release, setRelease] = useState<'B' | 'C'>('B');
   const fixture: ArticulationFixture = (release === 'B' ? RELEASE_B_FIXTURES : RELEASE_C_FIXTURES)[0];
-  const sessionRef = useRef<SpatialSimulationSession | undefined>(undefined);
+  const [session, setSession] = useState<SpatialSimulationSession>();
   const snapshotRef = useRef<PhysicsSnapshot | undefined>(undefined);
-  const replayTargetRef = useRef<PhysicsSnapshot | undefined>(undefined);
   const [status, setStatus] = useState<Status>('ready');
-  const [revision, setRevision] = useState(0);
+  const [, setRevision] = useState(0);
   const [motorTarget, setMotorTarget] = useState(fixture.motor?.initial ?? 0);
   const [log, setLog] = useState<string[]>(['catalog opened']);
   const [replayError, setReplayError] = useState(0);
-
-  const createSession = useCallback(() => new SpatialSimulationSession(fixture.source, undefined, `example:${fixture.id}`, fixture.capabilities), [fixture]);
-  if (!sessionRef.current) sessionRef.current = createSession();
-  const session = sessionRef.current;
+  const [proof, setProof] = useState<ProofResult>({ reconciliation: false, oneShot: false });
   const refresh = () => setRevision((value) => value + 1);
-  const record = (value: string) => setLog((entries) => [...entries.slice(-7), `${session.frame().tick.toString().padStart(4, '0')} · ${value}`]);
 
   useEffect(() => {
-    // React development StrictMode replays effects; do not dispose a WASM world
-    // in the replay cleanup and then attempt to free the same handles again.
-    sessionRef.current = createSession(); snapshotRef.current = undefined;
-    setStatus('ready'); setMotorTarget(fixture.motor?.initial ?? 0); setLog([`0000 · loaded ${fixture.capabilities.id}`]); refresh();
-  }, [createSession, fixture.capabilities.id, fixture.motor?.initial]);
+    const next = new SpatialSimulationSession(fixture.source, undefined, `example:${fixture.id}`, fixture.capabilities);
+    setSession(next); snapshotRef.current = undefined; setStatus('ready'); setReplayError(0);
+    setMotorTarget(fixture.motor?.initial ?? 0); setLog([`0000 · loaded ${fixture.capabilities.id}`]);
+    setProof(verifyFixture(fixture));
+    return () => next.dispose();
+  }, [fixture]);
 
   useEffect(() => {
-    if (status !== 'running') return;
+    if (status !== 'running' || !session) return;
     let previous = performance.now(); let request = 0;
-    const animate = (now: number) => { sessionRef.current?.advance(Math.min((now - previous) / 1000, 0.05)); previous = now; refresh(); request = requestAnimationFrame(animate); };
+    const animate = (now: number) => { session.advance(Math.min((now - previous) / 1000, 0.05)); previous = now; refresh(); request = requestAnimationFrame(animate); };
     request = requestAnimationFrame(animate); return () => cancelAnimationFrame(request);
-  }, [status]);
+  }, [session, status]);
 
+  const record = useCallback((value: string) => setLog((entries) => [...entries.slice(-7), `${session?.frame().tick.toString().padStart(4, '0') ?? '0000'} · ${value}`]), [session]);
+  if (!session) return <main className="example-gallery"><p>Initializing production articulation runtime…</p></main>;
   const step = () => { session.resume(); session.advance(1 / 60); session.pause(); setStatus('paused'); record('fixed step'); refresh(); };
-  const reset = () => { session.dispose(); sessionRef.current = createSession(); snapshotRef.current = undefined; setStatus('ready'); record('reset'); refresh(); };
-  const joint = sessionRef.current.timeline.simulation.world.inspectArticulations?.()[0];
-  const snap = sessionRef.current.timeline.simulation.world.snapshot();
-  const child = snap.states.find(({ id }) => snap.definitions.find((body) => body.id === id)?.entityId === joint?.childEntityId);
-  const anchor = snap.states.find(({ id }) => snap.definitions.find((body) => body.id === id)?.entityId === joint?.parentEntityId);
+  const restoreAndPublish = (snapshot: PhysicsSnapshot) => { session.timeline.simulation.world.restore(snapshot); session.setInput(fixture.source, new Map()); };
+  const reset = () => { session.reconstruct(fixture.source); snapshotRef.current = undefined; setStatus('ready'); setReplayError(0); record('reset'); refresh(); };
+  const joint = session.timeline.simulation.world.inspectArticulations?.()[0];
+  const snap = session.timeline.simulation.world.snapshot();
+  const definitionById = new Map(snap.definitions.map((body) => [body.id, body]));
+  const child = snap.states.find(({ id }) => definitionById.get(id)?.entityId === joint?.childEntityId);
+  const anchor = snap.states.find(({ id }) => definitionById.get(id)?.entityId === joint?.parentEntityId);
   const coordinate = joint?.coordinate ?? 0; const limits = joint?.limits ?? [-Infinity, Infinity];
   const assertions = [
     ['Anchor remains static', anchor ? Math.hypot(...anchor.linearVelocity) < 1e-8 : false],
     ['Pivot error below tolerance', (joint?.pivotError ?? Infinity) <= fixture.tolerance],
     ['Joint coordinate within limits', coordinate >= limits[0] - fixture.tolerance && coordinate <= limits[1] + fixture.tolerance],
     ['No NaN or infinity', snap.states.every(finiteState)],
-    ['Unrelated reconcile preserves pose + velocity', true],
+    ['Unrelated reconcile preserves pose + velocity', proof.reconciliation],
     ['Replay divergence below tolerance', replayError <= fixture.tolerance],
     ['Motor speed + effort bounded', !fixture.motor || Math.abs(child?.angularVelocity[2] ?? 0) <= Math.PI / 2 + .1],
     ['Obstructed motors do not teleport', !fixture.motor || Math.hypot(...(child?.linearVelocity ?? [0, 0, 0])) < 20],
-    ['One-shot reactions exactly once per entry', true],
+    ['One-shot reactions exactly once per entry', proof.oneShot],
   ] as const;
   const pivotError = joint?.pivotError ?? 0;
 
@@ -70,7 +109,7 @@ export function ArticulationGallery({ onClose }: { onClose: () => void }) {
       </article>
       <aside className="example-panel"><span className="eyebrow">FIXTURE 01 / {release === 'B' ? 'PASSIVE' : 'ACTIVE'}</span><h2>{fixture.title}</h2><p>{fixture.description}</p>
         <div className="transport"><button onClick={() => { session.start(); setStatus('running'); record('start'); }}>Start</button><button onClick={() => { session.pause(); setStatus('paused'); record('pause'); }}>Pause</button><button onClick={step}>Step</button><button onClick={() => { session.resume(); setStatus('running'); record('resume'); }}>Resume</button><button onClick={reset}>Reset</button></div>
-        <div className="transport secondary"><button onClick={() => { if (!child) return; session.timeline.simulation.enqueueInputs([{ kind: 'impulse', bodyId: child.id, tick: snap.tick + 1, vector: [...fixture.impulse] }]); record('impulse +2.5X'); }}>Apply impulse</button><button onClick={() => { snapshotRef.current = snap; record('snapshot captured'); }}>Capture snapshot</button><button disabled={!snapshotRef.current} onClick={() => { session.timeline.simulation.world.restore(snapshotRef.current!); record('snapshot restored'); refresh(); }}>Restore</button><button disabled={!snapshotRef.current} onClick={() => { replayTargetRef.current = snap; session.timeline.simulation.world.restore(snapshotRef.current!); session.resume(); session.advance(Math.max(1, snap.tick - snapshotRef.current!.tick) / 60); session.pause(); const expected = replayTargetRef.current.states[0]?.position ?? [0,0,0]; const actual = session.timeline.simulation.world.snapshot().states[0]?.position ?? [0,0,0]; setReplayError(Math.hypot(...actual.map((v,i) => v-expected[i]))); record('deterministic replay'); refresh(); }}>Replay</button></div>
+        <div className="transport secondary"><button onClick={() => { if (!child) return; session.timeline.simulation.enqueueInputs([{ kind: 'impulse', bodyId: child.id, tick: snap.tick + 1, vector: [...fixture.impulse] }]); record('impulse +2.5X'); }}>Apply impulse</button><button onClick={() => { snapshotRef.current = snap; record('snapshot captured'); }}>Capture snapshot</button><button disabled={!snapshotRef.current} onClick={() => { restoreAndPublish(snapshotRef.current!); session.pause(); setStatus('paused'); record('snapshot restored'); refresh(); }}>Restore</button><button disabled={!snapshotRef.current} onClick={() => { const expected = snap; restoreAndPublish(snapshotRef.current!); session.resume(); while (session.timeline.simulation.world.tick < expected.tick) session.advance(1 / 60); session.pause(); setStatus('paused'); setReplayError(dynamicStateDivergence(expected, session.timeline.simulation.world.snapshot())); session.setInput(fixture.source, new Map()); record('deterministic replay'); refresh(); }}>Replay</button></div>
         {fixture.motor ? <label className="motor-control"><span>Controller target <b>{motorTarget}°</b></span><input type="range" min={fixture.motor.minimum} max={fixture.motor.maximum} value={motorTarget} onChange={(event) => { const value = Number(event.target.value); setMotorTarget(value); const id = snap.joints?.[0]?.id; if (id) session.timeline.simulation.enqueueInputs([{ kind: 'joint-position-target', jointId: id, tick: snap.tick + 1, value: value * Math.PI / 180 }]); record(`motor target ${value}°`); }}/><small>Position servo · 90°/s · 18 N·m maximum</small></label> : <div className="passive-note">Motor target controls intentionally unavailable</div>}
         <h3>Live proof</h3><ul className="assertions">{assertions.map(([label, pass]) => <li className={pass ? 'pass' : 'fail'} key={label}><span>{pass ? '✓' : '!'}</span>{label}</li>)}</ul>
         <details open><summary>Capability profile & emitted input log</summary><pre>{JSON.stringify(fixture.capabilities, null, 2)}</pre><ol>{log.map((entry, i) => <li key={`${i}-${entry}`}>{entry}</li>)}</ol></details>
