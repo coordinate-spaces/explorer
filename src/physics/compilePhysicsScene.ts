@@ -4,6 +4,7 @@ import type { ColliderDefinition, ColliderShape, JointDefinition, RigidBodyDefin
 import { Euler, Quaternion, Vector3 } from 'three';
 import { authoredPhysicsEntityId, physicsOriginScope, scopedPhysicsNamespace } from './physicsIdentity';
 import { composeTransforms, identityTransform } from '../model/transform';
+import { RELEASE_C_ACTIVE_CAPABILITIES, type ArticulationCapabilities } from './articulationCapabilities';
 
 export interface CompiledPhysicsScene { bodies: RigidBodyDefinition[]; joints: JointDefinition[] }
 
@@ -34,11 +35,11 @@ function colliderShape(node: SpatialNode): ColliderShape {
 }
 
 /** Converts renderer-neutral nodes into stable compound rigid-body definitions. */
-export function compilePhysicsScene(document: SpatialDocument, revision = 'baseline'): RigidBodyDefinition[] {
-  return compileArticulatedPhysicsScene(document, revision).bodies;
+export function compilePhysicsScene(document: SpatialDocument, revision = 'baseline', capabilities = RELEASE_C_ACTIVE_CAPABILITIES): RigidBodyDefinition[] {
+  return compileArticulatedPhysicsScene(document, revision, capabilities).bodies;
 }
 
-export function compileArticulatedPhysicsScene(document: SpatialDocument, revision = 'baseline'): CompiledPhysicsScene {
+export function compileArticulatedPhysicsScene(document: SpatialDocument, revision = 'baseline', capabilities: ArticulationCapabilities = RELEASE_C_ACTIVE_CAPABILITIES): CompiledPhysicsScene {
   const diagnose = (diagnostic: SpatialDocument['diagnostics'][number]) => {
     if (!document.diagnostics.some(({ line, source, message }) => line === diagnostic.line && source === diagnostic.source && message === diagnostic.message)) {
       document.diagnostics.push(diagnostic);
@@ -164,6 +165,12 @@ export function compileArticulatedPhysicsScene(document: SpatialDocument, revisi
   candidates.forEach((node, index) => {
     const spec = node.physics;
     if (!spec?.joint) return;
+    const motorProperties = ['motor-mode', 'motor-target', 'motor-velocity', 'motor-max-speed', 'motor-max-effort', 'motor-stiffness', 'motor-damping'] as const;
+    const requestsMotor = motorProperties.some((key) => spec[key] !== undefined);
+    if (requestsMotor && !capabilities.activeMotors) diagnose({
+      line: Number(node.metadata?.lineNumber ?? 0), source: node.source,
+      message: `${capabilities.label} rejects motor properties; the joint is compiled as passive.`,
+    });
     const childEntityId = bodies[index].entityId ?? bodies[index].id;
     if (seenChildEntities.has(childEntityId)) return;
     seenChildEntities.add(childEntityId);
@@ -222,7 +229,7 @@ export function compileArticulatedPhysicsScene(document: SpatialDocument, revisi
     else joints.push({ ...base, kind: spec.joint, parentAxis: axisIn(parentPose), childAxis: axisIn(childPose),
       limits: spec['joint-limits']?.map((value) => spec.joint === 'revolute' ? value * Math.PI / 180 : value) as [number, number] | undefined,
       damping: spec['joint-damping'],
-      ...(spec['motor-mode'] ? { motor: {
+      ...(capabilities.activeMotors && spec['motor-mode'] ? { motor: {
         mode: spec['motor-mode'],
         target: spec['motor-target'] === undefined ? undefined : (spec.joint === 'revolute' ? spec['motor-target'] * Math.PI / 180 : spec['motor-target']),
         velocity: spec['motor-velocity'] === undefined ? undefined : (spec.joint === 'revolute' ? spec['motor-velocity'] * Math.PI / 180 : spec['motor-velocity']),

@@ -27,9 +27,10 @@ export function resetLocalCoordinateIntent(intent: LocalCoordinateIntent, namesp
 }
 
 /** Primary declaration-only namespaces that own at least one concrete descendant. */
-export function localIntentDefinitions(source: string): string[] {
+export function localIntentDefinitions(source: string, includeJointTargets = true): string[] {
   const objects = parseXyzDslDocument(source).value ?? [];
   return objects.filter((object) => object.declarationOnly && object.namespace.length > 0)
+    .filter((definition) => includeJointTargets || definition.intentTarget?.kind !== 'joint')
     .filter((definition) => objects.some((candidate) => candidate.box && candidate.namespace.length > definition.namespace.length
       && definition.namespace.every((segment, index) => candidate.namespace[index] === segment)))
     .map((object) => canonicalNamespacePath(object.namespace))

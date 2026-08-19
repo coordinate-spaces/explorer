@@ -1,6 +1,7 @@
 import type { XyzDslDeclarationOrigin } from '../xyzdsl/types';
 import { AccumulativeSpatialTimeline, type AccumulativeSpatialFrame } from '../transactions/AccumulativeSpatialTimeline';
 import { FixedStepSimulationRunner } from './FixedStepSimulationRunner';
+import { RELEASE_C_ACTIVE_CAPABILITIES, type ArticulationCapabilities } from '../physics/articulationCapabilities';
 
 interface AuthoredInput {
   source: string;
@@ -16,10 +17,10 @@ export class SpatialSimulationSession {
   private published: AccumulativeSpatialFrame;
   private running = false;
 
-  constructor(source: string, originsByLine?: ReadonlyMap<number, XyzDslDeclarationOrigin>, baselineRevision = 'baseline') {
+  constructor(source: string, originsByLine?: ReadonlyMap<number, XyzDslDeclarationOrigin>, baselineRevision = 'baseline', readonly capabilities: ArticulationCapabilities = RELEASE_C_ACTIVE_CAPABILITIES) {
     this.baselineRevision = baselineRevision;
     this.input = { source, originsByLine };
-    this.timeline = new AccumulativeSpatialTimeline(baselineRevision);
+    this.timeline = new AccumulativeSpatialTimeline(baselineRevision, capabilities);
     this.published = this.timeline.compile(source, originsByLine);
     this.runner = this.createRunner();
   }
@@ -52,7 +53,7 @@ export class SpatialSimulationSession {
   reconstruct(source: string, originsByLine?: ReadonlyMap<number, XyzDslDeclarationOrigin>): AccumulativeSpatialFrame {
     this.timeline.dispose();
     this.input = { source, originsByLine };
-    this.timeline = new AccumulativeSpatialTimeline(this.baselineRevision);
+    this.timeline = new AccumulativeSpatialTimeline(this.baselineRevision, this.capabilities);
     this.published = this.timeline.compile(source, originsByLine);
     this.runner = this.createRunner();
     return this.published;

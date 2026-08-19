@@ -29,6 +29,7 @@ import { usePersistentState } from './ui/usePersistentState';
 import { CoordinateIntentConsole } from './ui/CoordinateIntentConsole';
 import { advanceLocalCoordinateIntent, DEFAULT_LOCAL_COORDINATE_INTENT, LOCAL_CURSOR_STREAM_ID, localCoordinateIntentXyzDsl, localIntentDefinitions, resetLocalCoordinateIntent, type LocalCursorInput } from './simulation/localCursor';
 import type { MountedSceneDiagnostic } from './scene/mountedSceneDiagnostics';
+import { ARTICULATION_CAPABILITY_PROFILES, RELEASE_B_PASSIVE_CAPABILITIES, RELEASE_C_ACTIVE_CAPABILITIES } from './physics/articulationCapabilities';
 
 const INITIAL_XYZDSL = `"+2+4/+0+6/+1+3" : "geometry: cylinder; color: 0x333333; metalness: 0.8; roughness: 0.2"
 "+2+4/+7+6/+0+10c" : "geometry: cone; color: yellow; metalness: 0.2; roughness: 0.5"
@@ -189,6 +190,9 @@ export default function App() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [simulationMode, setSimulationMode] = useState<'stopped' | 'running' | 'paused'>('stopped');
   const [simulationSource, setSimulationSource] = useState<'remote' | 'local'>('remote');
+  const [articulationProfileId, setArticulationProfileId] = useState(RELEASE_C_ACTIVE_CAPABILITIES.id);
+  const articulationCapabilities = articulationProfileId === RELEASE_B_PASSIVE_CAPABILITIES.id
+    ? RELEASE_B_PASSIVE_CAPABILITIES : RELEASE_C_ACTIVE_CAPABILITIES;
   const [localCoordinateIntent, setLocalCoordinateIntent] = useState(DEFAULT_LOCAL_COORDINATE_INTENT);
   const [localCursorCaptured, setLocalCursorCaptured] = useState(false);
   const [secondaryCameraTarget, setSecondaryCameraTarget] = useState<SecondaryCameraTarget | undefined>();
@@ -571,7 +575,10 @@ export default function App() {
     () => originsForEditedSource(authoringSource, primaryRemoteBaselineSource, transactionXyzDsl.originsByLine),
     [authoringSource, primaryRemoteBaselineSource, transactionXyzDsl.originsByLine],
   );
-  const localDefinitionChoices = useMemo(() => localIntentDefinitions(authoringSource), [authoringSource]);
+  const localDefinitionChoices = useMemo(
+    () => localIntentDefinitions(authoringSource, articulationCapabilities.cursorJointControllers),
+    [articulationCapabilities.cursorJointControllers, authoringSource],
+  );
   const selectedLocalDefinition = localDefinitionChoices.includes(localCoordinateIntent.namespace)
     ? localCoordinateIntent.namespace : (localDefinitionChoices[0] ?? '');
   const localCursorStream = useMemo(() => ({
@@ -587,7 +594,7 @@ export default function App() {
       simulationMode === 'stopped' ? [] : simulationSource === 'local' ? [localCursorStream] : secondaryTransactionOverlayStreams,
       authoringOriginsByLine,
     ),
-    [authoringOriginsByLine, authoringSource, localCursorStream, secondaryTransactionOverlayStreams, simulationMode, simulationSource],
+    [articulationCapabilities, authoringOriginsByLine, authoringSource, localCursorStream, secondaryTransactionOverlayStreams, simulationMode, simulationSource],
   );
   const renderedSource = renderedBundle.source;
   const baselineRevision = useMemo(() => spatialBaselineRevision(authoringSource), [authoringSource]);
@@ -628,7 +635,7 @@ export default function App() {
       let diagnosticsSession = simulationSessionRef.current;
       if (!diagnosticsSession || sessionRevisionRef.current !== baselineRevision) {
         diagnosticsSession?.dispose();
-        diagnosticsSession = new SpatialSimulationSession(renderedBundle.source, renderedBundle.originsByLine, baselineRevision);
+        diagnosticsSession = new SpatialSimulationSession(renderedBundle.source, renderedBundle.originsByLine, baselineRevision, articulationCapabilities);
         simulationSessionRef.current = diagnosticsSession;
         sessionRevisionRef.current = baselineRevision;
       }
@@ -644,14 +651,14 @@ export default function App() {
       setDocument(createSpatialDocument(renderedBundle.source, { originsByLine: renderedBundle.originsByLine }));
       return;
     }
-    simulationSessionRef.current ??= new SpatialSimulationSession(renderedBundle.source, renderedBundle.originsByLine, baselineRevision);
+    simulationSessionRef.current ??= new SpatialSimulationSession(renderedBundle.source, renderedBundle.originsByLine, baselineRevision, articulationCapabilities);
     const reconstruct = appliedSimulationReconstructionRef.current !== simulationReconstruction;
     const frame = reconstruct
       ? simulationSessionRef.current.reconstruct(renderedBundle.source, renderedBundle.originsByLine)
       : simulationSessionRef.current.setInput(renderedBundle.source, renderedBundle.originsByLine);
     appliedSimulationReconstructionRef.current = simulationReconstruction;
     setDocument(frame.document);
-  }, [baselineRevision, renderedBundle, simulationMode, simulationReconstruction]);
+  }, [articulationCapabilities, baselineRevision, renderedBundle, simulationMode, simulationReconstruction]);
 
   useEffect(() => {
     const session = simulationSessionRef.current;
@@ -676,7 +683,7 @@ export default function App() {
 
   const startSimulation = useCallback(() => {
     simulationSessionRef.current?.dispose();
-    simulationSessionRef.current = new SpatialSimulationSession(renderedBundle.source, renderedBundle.originsByLine, baselineRevision);
+    simulationSessionRef.current = new SpatialSimulationSession(renderedBundle.source, renderedBundle.originsByLine, baselineRevision, articulationCapabilities);
     sessionRevisionRef.current = baselineRevision;
     simulationSessionRef.current.start();
     simulationBaselineRevisionRef.current = baselineRevision;
@@ -685,7 +692,7 @@ export default function App() {
     setAppMode('viewer');
     setDrawerOpen(false);
     setSimulationMode('running');
-  }, [baselineRevision, renderedBundle, selectedLocalDefinition, simulationSource]);
+  }, [articulationCapabilities, baselineRevision, renderedBundle, selectedLocalDefinition, simulationSource]);
 
   const stopSimulation = useCallback(() => {
     simulationSessionRef.current?.dispose();
@@ -1035,6 +1042,19 @@ export default function App() {
       />
       <div className="simulation-controls" aria-label="Simulation controls">
         <span>Simulation: {simulationMode}</span>
+        {simulationMode === 'stopped' ? <label className="simulation-camera-control">Articulation
+          <select aria-label="Articulation capability profile" value={articulationProfileId} onChange={(event) => {
+            simulationSessionRef.current?.dispose();
+            simulationSessionRef.current = undefined;
+            sessionRevisionRef.current = undefined;
+            setLocalCursorCaptured(false);
+            const nextProfile = event.target.value as typeof articulationProfileId;
+            setArticulationProfileId(nextProfile);
+            setSimulationReconstruction((revision) => revision + 1);
+          }}>
+            {ARTICULATION_CAPABILITY_PROFILES.map((profile) => <option key={profile.id} value={profile.id}>{profile.label}</option>)}
+          </select>
+        </label> : null}
         {simulationMode === 'stopped' ? (
           <>
             <label className="simulation-camera-control">Source

@@ -61,6 +61,7 @@ export function parseXyzDslDeclaration(line: string, lineNumber = 1, origin?: Xy
         lineNumber,
         conditional: path.conditional,
         intent: properties.intent && intentPath ? { mode: properties.intent, coordinate: intentPath.coordinate, target: properties.intentTarget } : undefined,
+        intentTarget: properties.intentTarget,
         origin,
       },
       diagnostics: properties.diagnostics.map((message) => ({ line: lineNumber, source: line, message })),
