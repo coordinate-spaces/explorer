@@ -195,7 +195,7 @@ export class RapierPhysicsWorld implements RigidBodyWorld {
       if (definition.motor && definition.motor.mode !== 'passive') {
         const value = definition.motor.mode === 'position' ? definition.motor.target
           : definition.motor.mode === 'velocity' ? definition.motor.velocity : 0;
-        if (value !== undefined) this.jointMotors.set(definition.id, { mode: definition.motor.mode, value, ...(definition.motor.mode === 'position' ? { appliedTarget: this.clampJointCoordinate(definition, value) } : {}) });
+        if (value !== undefined) this.jointMotors.set(definition.id, { mode: definition.motor.mode, value });
       }
     });
   }
@@ -217,6 +217,29 @@ export class RapierPhysicsWorld implements RigidBodyWorld {
     return value;
   }
 
+  private currentJointCoordinate(definition: JointDefinition): number {
+    const parent = this.bodyByEntity.get(definition.parentEntityId);
+    const child = this.bodyByEntity.get(definition.childEntityId);
+    if (!parent || !child || (definition.kind !== 'revolute' && definition.kind !== 'prismatic')) return 0;
+    if (definition.kind === 'prismatic') {
+      const parentRotation = quaternionTupleToThree(parent.rotation());
+      const axis = new Vector3(...definition.parentAxis).applyQuaternion(parentRotation).normalize();
+      const pa = new Vector3(...definition.parentAnchor).applyQuaternion(parentRotation).add(new Vector3(...tuple(parent.translation())));
+      const pb = new Vector3(...definition.childAnchor).applyQuaternion(quaternionTupleToThree(child.rotation())).add(new Vector3(...tuple(child.translation())));
+      return pb.sub(pa).dot(axis);
+    }
+    const relative = quaternionTupleToThree(parent.rotation()).invert().multiply(quaternionTupleToThree(child.rotation())).normalize();
+    return 2 * Math.atan2(new Vector3(relative.x, relative.y, relative.z).dot(new Vector3(...definition.parentAxis).normalize()), relative.w);
+  }
+
+  private disableJointMotor(jointId: string): void {
+    const joint = this.jointById.get(jointId);
+    if (!joint) return;
+    const unit = joint as RAPIER.RevoluteImpulseJoint | RAPIER.PrismaticImpulseJoint;
+    unit.setMotorMaxForce(0);
+    unit.configureMotorVelocity(0, 0);
+  }
+
   private applyJointMotor(jointId: string): void {
     const definition = this.jointDefinitions.get(jointId);
     const joint = this.jointById.get(jointId);
@@ -229,7 +252,7 @@ export class RapierPhysicsWorld implements RigidBodyWorld {
     unit.setMotorMaxForce(authored.maxEffort);
     if (state.mode === 'position') {
       const goal = this.clampJointCoordinate(definition, state.value);
-      const from = state.appliedTarget ?? goal;
+      const from = state.appliedTarget ?? this.currentJointCoordinate(definition);
       const delta = Math.max(-authored.maxSpeed / this.ticksPerSecond, Math.min(authored.maxSpeed / this.ticksPerSecond, goal - from));
       state.appliedTarget = this.clampJointCoordinate(definition, from + delta);
       unit.configureMotorPosition(state.appliedTarget, authored.stiffness ?? 100, authored.damping ?? 10);
@@ -253,7 +276,7 @@ export class RapierPhysicsWorld implements RigidBodyWorld {
           if (!Number.isFinite(input.value) || !this.jointById.has(input.jointId)) return;
           const mode = input.kind === 'joint-position-target' ? 'position' : input.kind === 'joint-velocity-target' ? 'velocity' : 'effort';
           const previous = this.jointMotors.get(input.jointId);
-          this.jointMotors.set(input.jointId, { mode, value: input.value, ...(mode === 'position' ? { appliedTarget: previous?.appliedTarget } : {}) });
+          this.jointMotors.set(input.jointId, { mode, value: input.value, ...(mode === 'position' && previous?.mode === 'position' ? { appliedTarget: previous.appliedTarget } : {}) });
           if (!previous || previous.mode !== mode || previous.value !== input.value) {
             const definition = this.jointDefinitions.get(input.jointId);
             if (definition) { this.bodyByEntity.get(definition.parentEntityId)?.wakeUp(); this.bodyByEntity.get(definition.childEntityId)?.wakeUp(); }
@@ -457,6 +480,7 @@ export class RapierPhysicsWorld implements RigidBodyWorld {
     // A seek to another tick starts a new observation sequence.
     const retainedPivotSamples = snapshot.tick === this.currentTick
       ? new Map(this.excessivePivotSamples) : new Map<string, { tick: number; count: number }>();
+    const previouslyActiveMotorIds = new Set(this.jointMotors.keys());
     this.definitions.clear();
     this.reconcileDefinitions(snapshot.definitions, snapshot.joints ?? []);
     this.excessivePivotSamples = retainedPivotSamples;
@@ -479,6 +503,7 @@ export class RapierPhysicsWorld implements RigidBodyWorld {
     });
     this.currentTick = snapshot.tick;
     this.jointMotors = new Map((snapshot.jointMotors ?? []).map(({ jointId, ...state }) => [jointId, state]));
+    previouslyActiveMotorIds.forEach((jointId) => { if (!this.jointMotors.has(jointId)) this.disableJointMotor(jointId); });
     [...this.jointMotors.keys()].sort().forEach((jointId) => this.applyJointMotor(jointId));
     this.queuedInputs.clear();
   }

@@ -10,7 +10,7 @@ import { resolveXyzDslDocument } from '../xyzdsl/resolveDocument';
 import type { XyzDslDeclarationOrigin } from '../xyzdsl/types';
 import { SimulationTimeline } from './SimulationTimeline';
 import type { PhysicsDirectiveBinding } from './SimulationTimeline';
-import { CoordinateIntentReducer, coordinateIntentInputs, jointCoordinateIntentInput } from '../simulation/coordinateIntent';
+import { CoordinateIntentReducer, coordinateIntentInputs, jointCoordinateIntentInput, releasedJointIntentInput } from '../simulation/coordinateIntent';
 
 export interface AccumulativeSpatialFrame {
   document: SpatialDocument;
@@ -129,6 +129,7 @@ function withColliderStateById(nodes: readonly SpatialNode[], conditionalById: R
 export class AccumulativeSpatialTimeline {
   readonly simulation: SimulationTimeline;
   private readonly intents = new CoordinateIntentReducer();
+  private activeJointIntents = new Map<string, { jointId: string; release: 'hold' | 'brake' | 'passive' }>();
 
   constructor(readonly baselineRevision = 'baseline') {
     this.simulation = new SimulationTimeline(new RapierPhysicsWorld());
@@ -227,19 +228,33 @@ export class AccumulativeSpatialTimeline {
     });
     const tick = this.simulation.world.tick + 1;
     const states = this.simulation.world.frame().states;
+    const physicsDefinitions = this.simulation.world.snapshot().definitions;
+    const currentJointIntentIds = new Set(resolved.intents.filter((intent) => intent.target?.kind === 'joint').map((intent) => intent.id));
+    const releasedInputs = [...this.activeJointIntents].flatMap(([intentId, previous]) => {
+      if (currentJointIntentIds.has(intentId)) return [];
+      this.activeJointIntents.delete(intentId);
+      const input = releasedJointIntentInput(previous.jointId, tick, previous.release);
+      return input ? [input] : [];
+    });
     const controllerInputs = resolved.intents.flatMap((intent) => {
       const frameId = intent.origin.transactionId ?? `${intent.origin.transactionTime ?? tick}:${intent.origin.sourceOrder ?? intent.lineNumber}`;
       const pointer = this.intents.apply({ id: intent.id, mode: intent.mode, coordinate: intent.coordinate, frameId }).pointer;
-      if (intent.target?.kind === 'joint') return [jointCoordinateIntentInput(intent.target.id, pointer[0], intent.target.command ?? 'position', tick, intent.origin.sourceOrder ?? intent.lineNumber)];
+      if (intent.target?.kind === 'joint') {
+        this.activeJointIntents.set(intent.id, { jointId: intent.target.id, release: intent.target.release ?? 'hold' });
+        return [jointCoordinateIntentInput(intent.target.id, pointer[0], intent.target.command ?? 'position', tick, intent.origin.sourceOrder ?? intent.lineNumber)];
+      }
       const node = renderable(authored.nodes).find((candidate) => candidate.metadata?.intentId === intent.id);
-      const state = node ? states.get(node.id) : undefined;
-      if (!node || !state) return [];
+      const requestedBodyId = intent.target?.kind === 'body' && intent.target.id ? intent.target.id : node?.id;
+      const bodyId = requestedBodyId && (states.has(requestedBodyId) ? requestedBodyId
+        : physicsDefinitions.find((definition) => (definition.entityId ?? definition.id) === requestedBodyId)?.id);
+      const state = bodyId ? states.get(bodyId) : undefined;
+      if (!bodyId || !state) return [];
       const grounded = Math.abs(state.linearVelocity[1]) < 1e-3;
-      return coordinateIntentInputs(node.id, state, pointer, intent.definition.physics, tick, grounded).inputs;
+      return coordinateIntentInputs(bodyId, state, pointer, intent.definition.physics, tick, grounded).inputs;
     });
     // Reuse the retained-pose facts that selected the reconciled conditional
     // state; collider changes must not retroactively change that selection.
-    const frame = this.simulation.evaluate(tick, tick, 0, facts, bindings, controllerInputs);
+    const frame = this.simulation.evaluate(tick, tick, 0, facts, bindings, [...releasedInputs, ...controllerInputs]);
     return {
       tick,
       document: withActivePhysicsJoints(withCompilerDiagnostics(createSpatialDocument(source, {
