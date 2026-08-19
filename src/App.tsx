@@ -214,6 +214,12 @@ export default function App() {
   const [activeSecondaryTransactions, setActiveSecondaryTransactions] = usePersistentState<Record<string, ActiveSecondaryTransactions>>('xyzdsl-active-secondary-transaction-streams-v2', {});
   const [secondaryTransactionError, setSecondaryTransactionError] = useState<string | undefined>();
 
+  useEffect(() => {
+    const synchronizeExamplesRoute = () => setShowExamples(window.location.hash === '#articulation-examples');
+    window.addEventListener('hashchange', synchronizeExamplesRoute);
+    return () => window.removeEventListener('hashchange', synchronizeExamplesRoute);
+  }, []);
+
 
   useEffect(() => {
     setActiveSecondaryTransactions((streams) => {
