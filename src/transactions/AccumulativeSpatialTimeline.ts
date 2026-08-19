@@ -229,9 +229,9 @@ export class AccumulativeSpatialTimeline {
     const tick = this.simulation.world.tick + 1;
     const states = this.simulation.world.frame().states;
     const physicsDefinitions = this.simulation.world.snapshot().definitions;
-    const currentJointIntentIds = new Set(resolved.intents.filter((intent) => intent.target?.kind === 'joint').map((intent) => intent.id));
+    const currentJointTargets = new Map(resolved.intents.flatMap((intent) => intent.target?.kind === 'joint' ? [[intent.id, intent.target.id] as const] : []));
     const releasedInputs = [...this.activeJointIntents].flatMap(([intentId, previous]) => {
-      if (currentJointIntentIds.has(intentId)) return [];
+      if (currentJointTargets.get(intentId) === previous.jointId) return [];
       this.activeJointIntents.delete(intentId);
       const input = releasedJointIntentInput(previous.jointId, tick, previous.release);
       return input ? [input] : [];

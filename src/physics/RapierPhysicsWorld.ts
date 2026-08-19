@@ -83,6 +83,8 @@ export class RapierPhysicsWorld implements RigidBodyWorld {
     }
     const previous = this.frame().states;
     const previousDefinitions = this.definitions;
+    const previousJointDefinitions = this.jointDefinitions;
+    const previousJointMotors = new Map(this.jointMotors);
     const modes = new Map<string, Set<string>>();
     next.forEach((definition) => {
       const id = definition.entityId ?? definition.id;
@@ -192,7 +194,13 @@ export class RapierPhysicsWorld implements RigidBodyWorld {
         }
       }
       this.jointById.set(definition.id, joint);
-      if (definition.motor && definition.motor.mode !== 'passive') {
+      const previousMotor = previousJointMotors.get(definition.id);
+      const previousJoint = previousJointDefinitions.get(definition.id);
+      const compatibleRuntimeMotor = previousMotor && previousJoint && previousJoint.kind === definition.kind &&
+        previousJoint.parentEntityId === definition.parentEntityId && previousJoint.childEntityId === definition.childEntityId && definition.motor;
+      if (compatibleRuntimeMotor) {
+        this.jointMotors.set(definition.id, { ...previousMotor });
+      } else if (definition.motor && definition.motor.mode !== 'passive') {
         const value = definition.motor.mode === 'position' ? definition.motor.target
           : definition.motor.mode === 'velocity' ? definition.motor.velocity : 0;
         if (value !== undefined) this.jointMotors.set(definition.id, { mode: definition.motor.mode, value });
@@ -236,11 +244,14 @@ export class RapierPhysicsWorld implements RigidBodyWorld {
     const joint = this.jointById.get(jointId);
     if (!joint) return;
     const unit = joint as RAPIER.RevoluteImpulseJoint | RAPIER.PrismaticImpulseJoint;
-    unit.setMotorMaxForce(0);
-    unit.configureMotorVelocity(0, 0);
+    const definition = this.jointDefinitions.get(jointId);
+    const passiveDamping = definition && (definition.kind === 'revolute' || definition.kind === 'prismatic') ? definition.damping ?? 0 : 0;
+    unit.configureMotorModel(RAPIER.MotorModel.ForceBased);
+    unit.setMotorMaxForce(passiveDamping > 0 ? Number.MAX_VALUE : 0);
+    unit.configureMotorVelocity(0, passiveDamping);
   }
 
-  private applyJointMotor(jointId: string): void {
+  private applyJointMotor(jointId: string, advanceTarget = true): void {
     const definition = this.jointDefinitions.get(jointId);
     const joint = this.jointById.get(jointId);
     const state = this.jointMotors.get(jointId);
@@ -253,7 +264,7 @@ export class RapierPhysicsWorld implements RigidBodyWorld {
     if (state.mode === 'position') {
       const goal = this.clampJointCoordinate(definition, state.value);
       const from = state.appliedTarget ?? this.currentJointCoordinate(definition);
-      const delta = Math.max(-authored.maxSpeed / this.ticksPerSecond, Math.min(authored.maxSpeed / this.ticksPerSecond, goal - from));
+      const delta = advanceTarget ? Math.max(-authored.maxSpeed / this.ticksPerSecond, Math.min(authored.maxSpeed / this.ticksPerSecond, goal - from)) : 0;
       state.appliedTarget = this.clampJointCoordinate(definition, from + delta);
       unit.configureMotorPosition(state.appliedTarget, authored.stiffness ?? 100, authored.damping ?? 10);
     } else if (state.mode === 'velocity') {
@@ -504,7 +515,7 @@ export class RapierPhysicsWorld implements RigidBodyWorld {
     this.currentTick = snapshot.tick;
     this.jointMotors = new Map((snapshot.jointMotors ?? []).map(({ jointId, ...state }) => [jointId, state]));
     previouslyActiveMotorIds.forEach((jointId) => { if (!this.jointMotors.has(jointId)) this.disableJointMotor(jointId); });
-    [...this.jointMotors.keys()].sort().forEach((jointId) => this.applyJointMotor(jointId));
+    [...this.jointMotors.keys()].sort().forEach((jointId) => this.applyJointMotor(jointId, false));
     this.queuedInputs.clear();
   }
   dispose(): void { this.world.free(); this.definitions.clear(); this.bodyByEntity.clear(); this.entityByBodyHandle.clear();

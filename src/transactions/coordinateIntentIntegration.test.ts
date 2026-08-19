@@ -20,8 +20,14 @@ describe('coordinate intent production integration', () => {
     const enqueue = vi.spyOn(timeline.simulation.world, 'enqueueInputs');
     timeline.evaluate(active, activeOrigins);
     expect(enqueue.mock.calls.at(-1)?.[0]).toContainEqual(expect.objectContaining({ kind: 'joint-position-target', jointId: 'finger', value: 1 }));
+    const retargeted = active.replace('joint:finger', 'joint:thumb');
+    timeline.evaluate(retargeted, new Map([[2, { sourceKind: 'secondary' as const, streamId: 'hand', transactionId: 'retarget' }]]));
+    expect(enqueue.mock.calls.at(-1)?.[0]).toEqual(expect.arrayContaining([
+      expect.objectContaining({ kind: 'joint-velocity-target', jointId: 'finger', value: 0 }),
+      expect.objectContaining({ kind: 'joint-position-target', jointId: 'thumb', value: 1 }),
+    ]));
     timeline.evaluate(baseline);
-    expect(enqueue.mock.calls.at(-1)?.[0]).toContainEqual(expect.objectContaining({ kind: 'joint-velocity-target', jointId: 'finger', value: 0 }));
+    expect(enqueue.mock.calls.at(-1)?.[0]).toContainEqual(expect.objectContaining({ kind: 'joint-velocity-target', jointId: 'thumb', value: 0 }));
     timeline.dispose();
   });
   it('materializes a definition runtime body and feeds its intent into fixed-step physics', () => {
