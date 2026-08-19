@@ -4,7 +4,7 @@ import type { RigidBodyWorld } from '../physics/RigidBodyWorld';
 import type { JointDefinition, PhysicsFrame, PhysicsInput, PhysicsSnapshot, RigidBodyDefinition, Vector3Tuple } from '../physics/types';
 import { interactionTransitions } from './interactionTimeline';
 import type { InteractionTransition } from './interactionTimeline';
-import { RELEASE_C_ACTIVE_CAPABILITIES, validatePhysicsInputs, type ArticulationCapabilities } from '../physics/articulationCapabilities';
+import { RELEASE_C_ACTIVE_CAPABILITIES, validateJointDefinitions, validatePhysicsInputs, type ArticulationCapabilities } from '../physics/articulationCapabilities';
 
 export interface PhysicsDirectiveBinding {
   targetId: string;
@@ -107,6 +107,7 @@ export class SimulationTimeline {
   }
 
   reconcileDefinitions(definitions: readonly RigidBodyDefinition[], joints: readonly JointDefinition[] = []): void {
+    validateJointDefinitions(this.capabilities, joints);
     this.world.reconcileDefinitions(definitions, joints);
     this.invalidateSnapshotsAfter(this.world.tick);
     this.snapshots.set(this.world.tick, {

@@ -1,4 +1,4 @@
-import type { PhysicsInput } from './types';
+import type { JointDefinition, PhysicsInput } from './types';
 
 /** Release-neutral feature boundary for articulation. Keep this outside the UI. */
 export interface ArticulationCapabilities {
@@ -27,5 +27,11 @@ export const ARTICULATION_CAPABILITY_PROFILES = [
 export function validatePhysicsInputs(capabilities: ArticulationCapabilities, inputs: readonly PhysicsInput[]): void {
   if (!capabilities.jointMotorInputs && inputs.some(({ kind }) => kind.startsWith('joint-'))) {
     throw new Error(`${capabilities.label} rejects joint-addressed motor inputs.`);
+  }
+}
+
+export function validateJointDefinitions(capabilities: ArticulationCapabilities, joints: readonly JointDefinition[]): void {
+  if (!capabilities.activeMotors && joints.some(({ motor }) => motor !== undefined)) {
+    throw new Error(`${capabilities.label} rejects motor-bearing joint definitions.`);
   }
 }

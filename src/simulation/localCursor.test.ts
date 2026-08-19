@@ -10,6 +10,14 @@ describe('local cursor simulation', () => {
   it('lists only definition namespaces with concrete descendants', () => {
     expect(localIntentDefinitions('"Character/" : ""\n"Character/Body/+0+1/+0+2/+0+1" : ""\n"Empty/" : ""')).toEqual(['Character/']);
   });
+  it('keeps body cursor definitions while filtering joint controllers for passive profiles', () => {
+    const source = [
+      '"Character/" : "intent-target: body"', '"Character/Body/+0+1/+0+2/+0+1" : ""',
+      '"Hand/" : "intent-target: joint:finger"', '"Hand/Finger/+0+1/+0+1/+0+1" : ""',
+    ].join('\n');
+    expect(localIntentDefinitions(source, false)).toEqual(['Character/']);
+    expect(localIntentDefinitions(source, true)).toEqual(['Character/', 'Hand/']);
+  });
   it('authors an intent pointer without emitting character pose or size', () => {
     const intent = advanceLocalCoordinateIntent(DEFAULT_LOCAL_COORDINATE_INTENT, { forward: 1, right: 0, up: 0, yawDelta: 0, pitchDelta: 0, deltaSeconds: 0.1 });
     expect(intent.pointer).toEqual([6, 0, 3.6]);

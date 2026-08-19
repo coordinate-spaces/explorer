@@ -42,6 +42,13 @@ describe('articulation capability profiles', () => {
       .toThrow(/rejects joint-addressed motor inputs/);
   });
 
+  it('rejects motor definitions through lower-level reconciliation in Release B', () => {
+    const compiled = compileArticulatedPhysicsScene(createSpatialDocument(motor), 'motor', RELEASE_C_ACTIVE_CAPABILITIES);
+    const timeline = new SimulationTimeline(new PhysicsWorld(), RELEASE_B_PASSIVE_CAPABILITIES);
+    expect(() => timeline.reconcileDefinitions(compiled.bodies, compiled.joints))
+      .toThrow(/rejects motor-bearing joint definitions/);
+  });
+
   it('reconstructing with another UI profile cannot retain active motor state', () => {
     const active = new SpatialSimulationSession(motor, undefined, 'selection', RELEASE_C_ACTIVE_CAPABILITIES);
     active.timeline.simulation.enqueueInputs([{ kind: 'joint-effort', jointId: 'joint:component:Machine/body:Arm', tick: 1, value: 2 }]);

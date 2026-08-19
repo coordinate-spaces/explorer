@@ -197,6 +197,8 @@ export interface SpatialObject {
   origin?: XyzDslDeclarationOrigin;
   conditional?: XyzDslConditionalSpec;
   intent?: XyzDslIntentSpec;
+  /** Controller target metadata is retained on declaration-only definitions too. */
+  intentTarget?: XyzDslIntentSpec['target'];
   unionGroupId?: string;
 }
 

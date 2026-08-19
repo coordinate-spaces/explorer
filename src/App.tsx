@@ -575,7 +575,10 @@ export default function App() {
     () => originsForEditedSource(authoringSource, primaryRemoteBaselineSource, transactionXyzDsl.originsByLine),
     [authoringSource, primaryRemoteBaselineSource, transactionXyzDsl.originsByLine],
   );
-  const localDefinitionChoices = useMemo(() => localIntentDefinitions(authoringSource), [authoringSource]);
+  const localDefinitionChoices = useMemo(
+    () => localIntentDefinitions(authoringSource, articulationCapabilities.cursorJointControllers),
+    [articulationCapabilities.cursorJointControllers, authoringSource],
+  );
   const selectedLocalDefinition = localDefinitionChoices.includes(localCoordinateIntent.namespace)
     ? localCoordinateIntent.namespace : (localDefinitionChoices[0] ?? '');
   const localCursorStream = useMemo(() => ({
@@ -588,7 +591,7 @@ export default function App() {
   const renderedBundle = useMemo(
     () => composeSpatialEditorSourceBundle(
       authoringSource,
-      simulationMode === 'stopped' ? [] : simulationSource === 'local' && articulationCapabilities.cursorJointControllers ? [localCursorStream] : secondaryTransactionOverlayStreams,
+      simulationMode === 'stopped' ? [] : simulationSource === 'local' ? [localCursorStream] : secondaryTransactionOverlayStreams,
       authoringOriginsByLine,
     ),
     [articulationCapabilities, authoringOriginsByLine, authoringSource, localCursorStream, secondaryTransactionOverlayStreams, simulationMode, simulationSource],
@@ -1030,7 +1033,7 @@ export default function App() {
         onSelectNode={handleSelectNode}
         onMountedDiagnostics={setMountedSceneDiagnostics}
         secondaryCameraTarget={simulationMode === 'stopped' ? undefined : secondaryCameraTarget}
-        localCursorControl={simulationMode !== 'stopped' && simulationSource === 'local' && articulationCapabilities.cursorJointControllers ? {
+        localCursorControl={simulationMode !== 'stopped' && simulationSource === 'local' ? {
           enabled: simulationMode === 'running',
           captured: localCursorCaptured,
           onCaptureChange: setLocalCursorCaptured,
@@ -1046,7 +1049,6 @@ export default function App() {
             sessionRevisionRef.current = undefined;
             setLocalCursorCaptured(false);
             const nextProfile = event.target.value as typeof articulationProfileId;
-            if (nextProfile === RELEASE_B_PASSIVE_CAPABILITIES.id) setSimulationSource('remote');
             setArticulationProfileId(nextProfile);
             setSimulationReconstruction((revision) => revision + 1);
           }}>
@@ -1058,7 +1060,7 @@ export default function App() {
             <label className="simulation-camera-control">Source
               <select aria-label="Simulation source" value={simulationSource} onChange={(event) => setSimulationSource(event.target.value as 'remote' | 'local')}>
                 <option value="remote">Remote overlays</option>
-                <option value="local" disabled={!articulationCapabilities.cursorJointControllers}>Local cursor (Release C)</option>
+                <option value="local">Local cursor</option>
               </select>
             </label>
             {simulationSource === 'local' ? <label className="simulation-camera-control">Definition
