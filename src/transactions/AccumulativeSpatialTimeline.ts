@@ -10,6 +10,7 @@ import { resolveXyzDslDocument } from '../xyzdsl/resolveDocument';
 import type { XyzDslDeclarationOrigin } from '../xyzdsl/types';
 import { SimulationTimeline } from './SimulationTimeline';
 import type { PhysicsDirectiveBinding } from './SimulationTimeline';
+import { RELEASE_C_ACTIVE_CAPABILITIES, type ArticulationCapabilities } from '../physics/articulationCapabilities';
 import { CoordinateIntentReducer, coordinateIntentInputs, jointCoordinateIntentInput, releasedJointIntentInput } from '../simulation/coordinateIntent';
 
 export interface AccumulativeSpatialFrame {
@@ -131,8 +132,8 @@ export class AccumulativeSpatialTimeline {
   private readonly intents = new CoordinateIntentReducer();
   private activeJointIntents = new Map<string, { jointId: string; release: 'hold' | 'brake' | 'passive' }>();
 
-  constructor(readonly baselineRevision = 'baseline') {
-    this.simulation = new SimulationTimeline(new RapierPhysicsWorld());
+  constructor(readonly baselineRevision = 'baseline', readonly capabilities: ArticulationCapabilities = RELEASE_C_ACTIVE_CAPABILITIES) {
+    this.simulation = new SimulationTimeline(new RapierPhysicsWorld(), capabilities);
   }
 
   dispose(): void { this.simulation.dispose(); }
@@ -169,7 +170,7 @@ export class AccumulativeSpatialTimeline {
     });
     // Reconcile and query the authored pre-variant scene. A variant selected by
     // these facts can alter only the scene used by the next transaction tick.
-    const authoredScene = compileArticulatedPhysicsScene(authored, this.baselineRevision);
+    const authoredScene = compileArticulatedPhysicsScene(authored, this.baselineRevision, this.capabilities);
     this.simulation.reconcileDefinitions(authoredScene.bodies, authoredScene.joints);
     const facts = this.interactionFacts(authored);
     const conditional = createSpatialDocument(source, {
@@ -185,7 +186,7 @@ export class AccumulativeSpatialTimeline {
     // not let its temporary poses become the "previous" state preserved while
     // installing effective conditional definitions.
     this.simulation.world.restore(retainedSnapshot);
-    const definitions = compileArticulatedPhysicsScene(effective, this.baselineRevision);
+    const definitions = compileArticulatedPhysicsScene(effective, this.baselineRevision, this.capabilities);
     this.simulation.reconcileDefinitions(definitions.bodies, definitions.joints);
     return { authored, effective, facts };
   }
@@ -240,6 +241,7 @@ export class AccumulativeSpatialTimeline {
       const frameId = intent.origin.transactionId ?? `${intent.origin.transactionTime ?? tick}:${intent.origin.sourceOrder ?? intent.lineNumber}`;
       const pointer = this.intents.apply({ id: intent.id, mode: intent.mode, coordinate: intent.coordinate, frameId }).pointer;
       if (intent.target?.kind === 'joint') {
+        if (!this.capabilities.cursorJointControllers) throw new Error(`${this.capabilities.label} rejects cursor joint controllers.`);
         this.activeJointIntents.set(intent.id, { jointId: intent.target.id, release: intent.target.release ?? 'hold' });
         return [jointCoordinateIntentInput(intent.target.id, pointer[0], intent.target.command ?? 'position', tick, intent.origin.sourceOrder ?? intent.lineNumber)];
       }

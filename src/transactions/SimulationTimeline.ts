@@ -4,6 +4,7 @@ import type { RigidBodyWorld } from '../physics/RigidBodyWorld';
 import type { JointDefinition, PhysicsFrame, PhysicsInput, PhysicsSnapshot, RigidBodyDefinition, Vector3Tuple } from '../physics/types';
 import { interactionTransitions } from './interactionTimeline';
 import type { InteractionTransition } from './interactionTimeline';
+import { RELEASE_C_ACTIVE_CAPABILITIES, validatePhysicsInputs, type ArticulationCapabilities } from '../physics/articulationCapabilities';
 
 export interface PhysicsDirectiveBinding {
   targetId: string;
@@ -87,8 +88,14 @@ export class SimulationTimeline {
     bindings: PhysicsDirectiveBinding[];
   }>();
 
-  constructor(readonly world: RigidBodyWorld = new PhysicsWorld()) {
+  constructor(readonly world: RigidBodyWorld = new PhysicsWorld(), readonly capabilities: ArticulationCapabilities = RELEASE_C_ACTIVE_CAPABILITIES) {
     this.snapshots.set(0, { physics: world.snapshot(), facts: [], bindings: [] });
+  }
+
+  /** Capability-enforced lower-level input path used by playback and headless callers. */
+  enqueueInputs(inputs: readonly PhysicsInput[]): void {
+    validatePhysicsInputs(this.capabilities, inputs);
+    this.world.enqueueInputs(inputs);
   }
 
   dispose(): void { this.world.dispose(); }
@@ -120,6 +127,9 @@ export class SimulationTimeline {
     if (tick <= this.world.tick) throw new Error('Simulation frames must advance; use seek before replaying a prior tick.');
     this.invalidateSnapshotsAfter(this.world.tick);
     const transitions = interactionTransitions(this.previousFacts, facts);
+    if (!this.capabilities.interactionMotorActuation && bindings.some(({ mode }) => mode.startsWith('joint-'))) {
+      throw new Error(`${this.capabilities.label} rejects touch/breach motor actuation bindings.`);
+    }
     const inputs: PhysicsInput[] = [...additionalInputs];
     const addForces = (
       inputTick: number,
@@ -170,7 +180,7 @@ export class SimulationTimeline {
         inputs.push({ kind: 'impulse', bodyId: binding.targetId, tick, stableSourceOrder, vector: direction(fact).map((value) => value * (binding.magnitude ?? 0)) as Vector3Tuple });
       });
     });
-    this.world.enqueueInputs(resolveJointControllerInputs(inputs));
+    this.enqueueInputs(resolveJointControllerInputs(inputs));
     const physics = this.world.step(tick);
     this.previousFacts = [...facts];
     this.previousBindings = [...bindings];
