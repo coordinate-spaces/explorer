@@ -20,6 +20,10 @@ export const RELEASE_C_ACTIVE_CAPABILITIES: ArticulationCapabilities = Object.fr
   jointMotorInputs: true, interactionMotorActuation: true, cursorJointControllers: true,
 });
 
+/** Catalog-facing names make the release boundary unambiguous in examples. */
+export const RELEASE_B_CAPABILITIES = RELEASE_B_PASSIVE_CAPABILITIES;
+export const RELEASE_C_CAPABILITIES = RELEASE_C_ACTIVE_CAPABILITIES;
+
 export const ARTICULATION_CAPABILITY_PROFILES = [
   RELEASE_B_PASSIVE_CAPABILITIES, RELEASE_C_ACTIVE_CAPABILITIES,
 ] as const;
