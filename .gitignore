@@ -16,8 +16,6 @@
 /build
 /dist
 
-# Browser proof captures are generated locally and attached to PRs rather than
-# committed because the patch transport does not support binary files.
 /artifacts/*.png
 /artifacts/*.webm
 
