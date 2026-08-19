@@ -30,6 +30,7 @@ import { CoordinateIntentConsole } from './ui/CoordinateIntentConsole';
 import { advanceLocalCoordinateIntent, DEFAULT_LOCAL_COORDINATE_INTENT, LOCAL_CURSOR_STREAM_ID, localCoordinateIntentXyzDsl, localIntentDefinitions, resetLocalCoordinateIntent, type LocalCursorInput } from './simulation/localCursor';
 import type { MountedSceneDiagnostic } from './scene/mountedSceneDiagnostics';
 import { ARTICULATION_CAPABILITY_PROFILES, RELEASE_B_PASSIVE_CAPABILITIES, RELEASE_C_ACTIVE_CAPABILITIES } from './physics/articulationCapabilities';
+import { ArticulationGallery } from './examples/ArticulationGallery';
 
 const INITIAL_XYZDSL = `"+2+4/+0+6/+1+3" : "geometry: cylinder; color: 0x333333; metalness: 0.8; roughness: 0.2"
 "+2+4/+7+6/+0+10c" : "geometry: cone; color: yellow; metalness: 0.2; roughness: 0.5"
@@ -183,6 +184,7 @@ function SecondaryRealtimeSubscription({
 }
 
 export default function App() {
+  const [showExamples, setShowExamples] = useState(() => window.location.hash === '#articulation-examples');
   const [authoringSource, setAuthoringSource] = useState(INITIAL_XYZDSL);
   const [remoteBaselineAppliedToEditor, setRemoteBaselineAppliedToEditor] = useState('');
   const latestRemoteBaselineRef = useRef('');
@@ -1016,6 +1018,8 @@ export default function App() {
     setRemoteBaselineAppliedToEditor(remoteBaselineSource);
   }, [hasAuthoringEdits, hasRemoteBaseline, remoteBaselineSource]);
 
+  if (showExamples) return <ArticulationGallery onClose={() => { window.location.hash = ''; setShowExamples(false); }} />;
+
   return (
     <main className={`app-shell app-shell--${appMode}`}>
       {simulationMode !== 'stopped' && simulationSource === 'remote' ? validSecondaryKeyReferences.map((reference) => (
@@ -1041,6 +1045,7 @@ export default function App() {
         } : undefined}
       />
       <div className="simulation-controls" aria-label="Simulation controls">
+        <button type="button" onClick={() => { window.location.hash = 'articulation-examples'; setShowExamples(true); }}>Articulation examples</button>
         <span>Simulation: {simulationMode}</span>
         {simulationMode === 'stopped' ? <label className="simulation-camera-control">Articulation
           <select aria-label="Articulation capability profile" value={articulationProfileId} onChange={(event) => {

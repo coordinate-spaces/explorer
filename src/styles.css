@@ -34,6 +34,33 @@ body {
   overflow: hidden;
 }
 
+.example-gallery { min-height: 100vh; overflow: auto; padding: 2.2rem clamp(1rem, 4vw, 4rem); background: radial-gradient(circle at 25% 5%, #182c42, transparent 34%), #080d13; color: #eaf2f8; }
+.example-gallery header { max-width: 90rem; margin: auto; display: flex; align-items: start; justify-content: space-between; gap: 2rem; }
+.example-gallery h1 { margin: .35rem 0; font: 600 clamp(2rem, 4vw, 4rem)/1.05 Georgia, serif; letter-spacing: -.04em; }
+.example-gallery header p { max-width: 48rem; color: #93a8b8; }
+.example-gallery button { border: 1px solid #355169; border-radius: .35rem; padding: .6rem .85rem; background: #101d28; color: #ddecf6; }
+.example-gallery button:hover, .example-gallery button.active { border-color: #eebf58; background: #eebf58; color: #111820; }
+.example-gallery button:disabled { opacity: .35; cursor: not-allowed; }
+.eyebrow { color: #eebf58; font: 700 .67rem/1.2 ui-monospace, monospace; letter-spacing: .16em; }
+.example-gallery nav { max-width: 90rem; margin: 1.8rem auto .8rem; display: flex; gap: .55rem; border-bottom: 1px solid #223443; padding-bottom: .8rem; }
+.example-layout { max-width: 90rem; margin: auto; display: grid; grid-template-columns: minmax(30rem, 1.6fr) minmax(22rem, .8fr); border: 1px solid #263a49; background: #0d151d; min-height: 650px; }
+.example-stage { position: relative; min-height: 650px; overflow: hidden; border-right: 1px solid #263a49; }
+.example-canvas { position: absolute; inset: 0; }
+.example-canvas .scene-canvas { width: 100%; height: 100%; }
+.stage-label { position: absolute; z-index: 4; inset: 1rem 1rem auto; display: flex; justify-content: space-between; color: #9fb1bf; font-size: .76rem; text-transform: uppercase; letter-spacing: .1em; }
+.joint-overlay { position: absolute; z-index: 3; inset: 8% 3%; width: 94%; height: 84%; pointer-events: none; }
+.joint-overlay path, .joint-overlay line { fill: none; stroke: #68cfe4; stroke-width: 2; stroke-dasharray: 6 5; }
+.joint-overlay .parent { fill: #eebf58; }.joint-overlay .child { fill: #6de0f0; }.joint-overlay text { fill: #a9c4d2; font: 12px ui-monospace, monospace; }.joint-overlay .error { stroke: #ff5252; stroke-width: 5; }
+.example-panel { padding: 1.5rem; overflow: auto; max-height: 650px; }
+.example-panel h2 { font: 600 1.65rem Georgia, serif; margin: .45rem 0; }.example-panel > p { color: #93a8b8; line-height: 1.5; }
+.transport { display: flex; flex-wrap: wrap; gap: .4rem; margin: 1rem 0 .4rem; }.transport.secondary { margin-top: 0; }
+.motor-control { display: grid; gap: .5rem; margin: 1.2rem 0; padding: 1rem; border-left: 2px solid #eebf58; background: #111e29; }.motor-control span { display: flex; justify-content: space-between; }.motor-control small { color: #8397a6; }
+.passive-note { margin: 1.2rem 0; padding: .8rem; border: 1px dashed #455766; color: #8fa2b0; font: .75rem ui-monospace, monospace; text-align: center; text-transform: uppercase; }
+.example-panel h3 { margin-bottom: .6rem; font-size: .8rem; text-transform: uppercase; letter-spacing: .12em; }
+.assertions { list-style: none; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: .35rem; }.assertions li { display: flex; gap: .45rem; align-items: center; padding: .5rem; background: #101c25; font-size: .72rem; }.assertions li span { display: grid; place-items: center; width: 1.1rem; height: 1.1rem; border-radius: 50%; }.assertions .pass span { background: #194b3b; color: #75e9b8; }.assertions .fail { color: #ff9e9e; }.assertions .fail span { background: #682c32; }
+.example-panel details { margin-top: 1rem; border-top: 1px solid #263a49; padding-top: .8rem; color: #a7bac8; font-size: .73rem; }.example-panel summary { cursor: pointer; color: #d9e6ee; }.example-panel pre { max-height: 10rem; overflow: auto; background: #080d13; padding: .7rem; color: #79d8e8; }.example-panel ol { padding-left: 1.4rem; font-family: ui-monospace, monospace; line-height: 1.7; }
+@media (max-width: 850px) { .example-layout { grid-template-columns: 1fr; }.example-stage { min-height: 460px; border-right: 0; border-bottom: 1px solid #263a49; }.example-gallery header { flex-direction: column; }.assertions { grid-template-columns: 1fr; } }
+
 button,
 textarea {
   font: inherit;
