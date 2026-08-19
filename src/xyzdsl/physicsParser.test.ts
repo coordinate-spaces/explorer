@@ -3,6 +3,10 @@ import { parseXyzDslDocument } from './parser';
 import { resolveXyzDslDocument } from './resolveDocument';
 
 describe('XYZDSL physics properties', () => {
+  it('parses bounded active motor properties separately from passive damping', () => {
+    const parsed = parseXyzDslDocument('"Door/+0+1/+0+2/+0+1" : "body: Door; joint: revolute; joint-parent: Frame/; joint-anchor: 0 0 0; joint-axis: 0 1 0; joint-damping: 0.2; motor-mode: position; motor-target: 45; motor-max-speed: 90; motor-max-effort: 12; motor-stiffness: 30; motor-damping: 4"');
+    expect(parsed.value?.[0].physics).toMatchObject({ 'joint-damping': 0.2, 'motor-mode': 'position', 'motor-target': 45, 'motor-max-speed': 90, 'motor-max-effort': 12, 'motor-stiffness': 30, 'motor-damping': 4 });
+  });
   it('parses experimental revolute articulation properties', () => {
     const parsed = parseXyzDslDocument('"Pendulum/Rod/+45c+10c/+3+5/+45c+10c" : "body: Rod; joint: revolute; joint-parent: Pendulum/Anchor/; joint-anchor: 0.5 8 0.5; joint-axis: 0 0 1; joint-limits: -170 170; joint-damping: 0.05"');
     expect(parsed.value?.[0].physics).toMatchObject({ body: 'Rod', joint: 'revolute', 'joint-parent': 'Pendulum/Anchor/', 'joint-anchor': [0.5, 8, 0.5], 'joint-axis': [0, 0, 1], 'joint-limits': [-170, 170], 'joint-damping': 0.05 });

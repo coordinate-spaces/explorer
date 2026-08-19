@@ -133,7 +133,8 @@ export class PhysicsWorld implements RigidBodyWorld {
   private stepOnce(): void {
     const tick = this.currentTick + 1;
     const dt = 1 / this.ticksPerSecond;
-    const inputs = [...(this.queuedInputs.get(tick) ?? [])].sort((a, b) =>
+    // The compatibility body solver intentionally ignores stable-ID joint inputs.
+    const inputs = [...(this.queuedInputs.get(tick) ?? [])].filter((input): input is Exclude<PhysicsInput, { jointId: string }> => !('jointId' in input)).sort((a, b) =>
       (a.stableSourceOrder ?? 0) - (b.stableSourceOrder ?? 0) || a.bodyId.localeCompare(b.bodyId) || a.kind.localeCompare(b.kind));
     const entities = this.bodyIdsByEntity();
     const skipVerticalSettling = new Set<string>();

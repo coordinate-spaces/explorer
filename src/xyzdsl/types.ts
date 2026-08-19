@@ -64,6 +64,7 @@ export type XyzDslIntentMode = 'absolute' | 'relative';
 export interface XyzDslIntentSpec {
   mode: XyzDslIntentMode;
   coordinate: [number, number, number];
+  target?: { kind: 'body'; id?: string } | { kind: 'joint'; id: string; command?: 'position' | 'velocity' | 'effort'; release?: 'hold' | 'brake' | 'passive' };
 }
 
 export type XyzDslGeometryKind = 'box' | 'cylinder' | 'cone' | 'sphere';
@@ -125,6 +126,13 @@ export interface XyzDslPhysicsSpec {
   /** Revolute limits in degrees; prismatic limits in project units. */
   'joint-limits'?: [number, number];
   'joint-damping'?: number;
+  'motor-mode'?: 'position' | 'velocity' | 'effort' | 'passive';
+  'motor-target'?: number;
+  'motor-velocity'?: number;
+  'motor-max-speed'?: number;
+  'motor-max-effort'?: number;
+  'motor-stiffness'?: number;
+  'motor-damping'?: number;
   'collide-connected'?: boolean;
   'physics-mode'?: XyzDslPhysicsMode;
   /** Explicit rigid-body mass in kilograms. */

@@ -14,6 +14,21 @@ interface JointDefinitionBase {
   /** Immutable child-body-local physics-space anchor. */
   childAnchor: Vector3Tuple;
   collideConnected?: boolean;
+  /** Active drive limits. Values use this joint's documented coordinate units. */
+  motor?: JointMotorDefinition;
+}
+
+export type JointMotorMode = 'position' | 'velocity' | 'effort' | 'passive';
+export interface JointMotorDefinition {
+  mode: JointMotorMode;
+  target?: number;
+  velocity?: number;
+  /** Finite coordinate-units/s (rad/s for revolute). Required for target drives. */
+  maxSpeed: number;
+  /** Finite N*m for revolute and N for prismatic. Required for active drives. */
+  maxEffort: number;
+  stiffness?: number;
+  damping?: number;
 }
 
 /** Engine-neutral hinge. Anchors and axes are body-local physics-space values; angular limits are radians. */
@@ -143,18 +158,20 @@ export interface RigidBodyState {
   tick: number;
 }
 
-interface TimedInput {
+interface TimedBodyInput {
   bodyId: string;
   tick: number;
   stableSourceOrder?: number;
 }
 
 export type PhysicsInput =
-  | (TimedInput & { kind: 'force' | 'impulse'; vector: Vector3Tuple })
-  | (TimedInput & { kind: 'translation'; vector: Vector3Tuple })
-  | (TimedInput & { kind: 'orientation'; orientation: QuaternionTuple })
-  | (TimedInput & { kind: 'kinematic-target'; position: Vector3Tuple })
-  | (TimedInput & { kind: 'teleport'; position: Vector3Tuple; clearVelocity?: boolean });
+  | (TimedBodyInput & { kind: 'force' | 'impulse'; vector: Vector3Tuple })
+  | (TimedBodyInput & { kind: 'translation'; vector: Vector3Tuple })
+  | (TimedBodyInput & { kind: 'orientation'; orientation: QuaternionTuple })
+  | (TimedBodyInput & { kind: 'kinematic-target'; position: Vector3Tuple })
+  | (TimedBodyInput & { kind: 'teleport'; position: Vector3Tuple; clearVelocity?: boolean })
+  | { kind: 'joint-position-target' | 'joint-velocity-target' | 'joint-effort'; jointId: string; tick: number; stableSourceOrder?: number; value: number;
+      controllerPriority?: number; blendWeight?: number; exclusive?: boolean };
 
 export interface PhysicsFrame {
   tick: number;
@@ -168,4 +185,6 @@ export interface PhysicsSnapshot {
   states: RigidBodyState[];
   definitions: RigidBodyDefinition[];
   joints?: JointDefinition[];
+  /** Active stable-ID motor commands required to continue an exact replay. */
+  jointMotors?: Array<{ jointId: string; mode: 'position' | 'velocity' | 'effort'; value: number; appliedTarget?: number }>;
 }

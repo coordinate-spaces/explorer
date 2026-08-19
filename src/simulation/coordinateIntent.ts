@@ -44,6 +44,22 @@ export interface CharacterControllerResult {
   jump: boolean;
 }
 
+/** Direct one-DOF cursor control. Release is explicit and never writes a child pose. */
+export function jointCoordinateIntentInput(
+  jointId: string,
+  value: number,
+  command: 'position' | 'velocity' | 'effort',
+  tick: number,
+  stableSourceOrder = 0,
+): PhysicsInput {
+  return { kind: command === 'position' ? 'joint-position-target' : command === 'velocity' ? 'joint-velocity-target' : 'joint-effort', jointId, value, tick, stableSourceOrder };
+}
+
+export function releasedJointIntentInput(jointId: string, tick: number, behavior: 'hold' | 'brake' | 'passive'): PhysicsInput | undefined {
+  if (behavior === 'hold') return undefined;
+  return { kind: behavior === 'brake' ? 'joint-velocity-target' : 'joint-effort', jointId, value: 0, tick };
+}
+
 const clamp = (value: number, limit: number) => Math.max(-limit, Math.min(limit, value));
 const radiansToDegrees = (value: number) => value * 180 / Math.PI;
 const degreesToRadians = (value: number) => value * Math.PI / 180;

@@ -13,6 +13,7 @@ import type {
   XyzDslTransformSpec,
   XyzDslPhysicsSpec,
   XyzDslIntentMode,
+  XyzDslIntentSpec,
 } from './types';
 
 const SUPPORTED_OBJECT_PROPERTIES = new Set([
@@ -32,6 +33,7 @@ const SUPPORTED_OBJECT_PROPERTIES = new Set([
   'content-url',
   'content-url-uri',
   'intent',
+  'intent-target', 'intent-command', 'intent-release',
 ]);
 
 export interface XyzDslObjectPropertiesSpec {
@@ -43,6 +45,7 @@ export interface XyzDslObjectPropertiesSpec {
   content: XyzDslContentSpec;
   diagnostics: string[];
   intent?: XyzDslIntentMode;
+  intentTarget?: XyzDslIntentSpec['target'];
 }
 
 export function parseObjectProperties(source: string): XyzDslObjectPropertiesSpec {
@@ -63,6 +66,24 @@ export function parseObjectProperties(source: string): XyzDslObjectPropertiesSpe
   const intentDiagnostics = intentValue !== undefined && !intent
     ? [`Invalid intent "${intentValue}"; expected absolute or relative.`]
     : [];
+  const targetValue = declarations.filter(({ property }) => property === 'intent-target').at(-1)?.value;
+  const commandValue = declarations.filter(({ property }) => property === 'intent-command').at(-1)?.value;
+  const releaseValue = declarations.filter(({ property }) => property === 'intent-release').at(-1)?.value;
+  let intentTarget: XyzDslIntentSpec['target'];
+  if (targetValue === undefined) intentTarget = undefined;
+  else if (targetValue === 'body') intentTarget = { kind: 'body' };
+  else if (targetValue.startsWith('body:') && targetValue.slice(5)) intentTarget = { kind: 'body', id: targetValue.slice(5) };
+  else if (targetValue.startsWith('joint:') && targetValue.slice(6)) intentTarget = {
+    kind: 'joint', id: targetValue.slice(6),
+    ...(commandValue && ['position', 'velocity', 'effort'].includes(commandValue) ? { command: commandValue as 'position' | 'velocity' | 'effort' } : {}),
+    ...(releaseValue && ['hold', 'brake', 'passive'].includes(releaseValue) ? { release: releaseValue as 'hold' | 'brake' | 'passive' } : {}),
+  };
+  else intentTarget = undefined;
+  const targetDiagnostics = [
+    ...(targetValue !== undefined && !intentTarget ? [`Invalid intent-target "${targetValue}"; expected body, body:<stable-id>, or joint:<stable-id>.`] : []),
+    ...(commandValue !== undefined && !['position', 'velocity', 'effort'].includes(commandValue) ? [`Invalid intent-command "${commandValue}"; expected position, velocity, or effort.`] : []),
+    ...(releaseValue !== undefined && !['hold', 'brake', 'passive'].includes(releaseValue) ? [`Invalid intent-release "${releaseValue}"; expected hold, brake, or passive.`] : []),
+  ];
 
   return {
     material,
@@ -72,6 +93,7 @@ export function parseObjectProperties(source: string): XyzDslObjectPropertiesSpe
     reference,
     content,
     intent,
+    intentTarget,
     diagnostics: [
       ...diagnostics,
       ...material.diagnostics,
@@ -82,6 +104,7 @@ export function parseObjectProperties(source: string): XyzDslObjectPropertiesSpe
       ...content.diagnostics,
       ...unsupportedDiagnostics,
       ...intentDiagnostics,
+      ...targetDiagnostics,
     ],
   };
 }

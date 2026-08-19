@@ -8,6 +8,35 @@ const body: RigidBodyDefinition = {
 };
 
 describe('RapierPhysicsWorld', () => {
+  it('starts a new position target at the current coordinate and disables stale motors on restore', () => {
+    const anchor: RigidBodyDefinition = { ...body, id: 'motor-anchor', entityId: 'motor-anchor', mode: 'static', position: [0, 4, 0], colliders: [] };
+    const slider: RigidBodyDefinition = { ...body, id: 'motor-slider', entityId: 'motor-slider', position: [0, 4, 0], gravityScale: 0, canSleep: false, colliders: [] };
+    const joint: JointDefinition = { id: 'slider-drive', kind: 'prismatic', parentEntityId: 'motor-anchor', childEntityId: 'motor-slider',
+      parentAnchor: [0, 0, 0], childAnchor: [0, 0, 0], parentAxis: [1, 0, 0], childAxis: [1, 0, 0], limits: [0, 2],
+      damping: 0.5, motor: { mode: 'passive', maxSpeed: 0.6, maxEffort: 100, stiffness: 100, damping: 10 } };
+    const world = new RapierPhysicsWorld(60); world.reconcileDefinitions([anchor, slider], [joint]);
+    const passive = world.snapshot();
+    world.enqueueInputs([{ kind: 'joint-position-target', jointId: joint.id, tick: 1, value: 1 }]);
+    world.step();
+    expect(world.inspectArticulations()[0].coordinate).toBeLessThanOrEqual(0.02);
+    expect(world.snapshot().jointMotors).toMatchObject([{ jointId: joint.id, mode: 'position', value: 1 }]);
+    const driven = world.snapshot();
+    const uninterrupted = world.step().states.get(slider.id)!;
+    world.restore(driven);
+    expect(world.step().states.get(slider.id)).toMatchObject({ position: uninterrupted.position, linearVelocity: uninterrupted.linearVelocity });
+
+    const unrelated: RigidBodyDefinition = { ...body, id: 'unrelated', entityId: 'unrelated', mode: 'static', position: [10, 4, 0], colliders: [] };
+    const retainedTarget = world.snapshot().jointMotors;
+    world.reconcileDefinitions([anchor, slider, unrelated], [joint]);
+    expect(world.snapshot().jointMotors).toEqual(retainedTarget);
+
+    world.restore(passive);
+    expect(world.snapshot().jointMotors).toEqual([]);
+    const restored = world.inspectArticulations()[0].coordinate!;
+    world.step();
+    expect(world.inspectArticulations()[0].coordinate).toBeCloseTo(restored, 3);
+    world.dispose();
+  });
   it('refreshes authored kinematic poses during structurally identical reconciliation', () => {
     const kinematic: RigidBodyDefinition = { ...body, mode: 'kinematic' };
     const world = new RapierPhysicsWorld(); world.reconcileDefinitions([kinematic]);

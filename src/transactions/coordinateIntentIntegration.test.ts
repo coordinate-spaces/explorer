@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { AccumulativeSpatialTimeline } from './AccumulativeSpatialTimeline';
 import { compilePhysicsScene } from '../physics/compilePhysicsScene';
 
@@ -12,6 +12,24 @@ const origins = new Map([[3, {
 }]]);
 
 describe('coordinate intent production integration', () => {
+  it('emits the configured joint release when a cursor intent disappears', () => {
+    const baseline = '"Hand/" : ""';
+    const active = `${baseline}\n"Hand/+1/+0/+0" : "intent: absolute; intent-target: joint:finger; intent-command: position; intent-release: brake"`;
+    const activeOrigins = new Map([[2, { sourceKind: 'secondary' as const, streamId: 'hand', transactionId: 'press' }]]);
+    const timeline = new AccumulativeSpatialTimeline('joint-release-baseline');
+    const enqueue = vi.spyOn(timeline.simulation.world, 'enqueueInputs');
+    timeline.evaluate(active, activeOrigins);
+    expect(enqueue.mock.calls.at(-1)?.[0]).toContainEqual(expect.objectContaining({ kind: 'joint-position-target', jointId: 'finger', value: 1 }));
+    const retargeted = active.replace('joint:finger', 'joint:thumb');
+    timeline.evaluate(retargeted, new Map([[2, { sourceKind: 'secondary' as const, streamId: 'hand', transactionId: 'retarget' }]]));
+    expect(enqueue.mock.calls.at(-1)?.[0]).toEqual(expect.arrayContaining([
+      expect.objectContaining({ kind: 'joint-velocity-target', jointId: 'finger', value: 0 }),
+      expect.objectContaining({ kind: 'joint-position-target', jointId: 'thumb', value: 1 }),
+    ]));
+    timeline.evaluate(baseline);
+    expect(enqueue.mock.calls.at(-1)?.[0]).toContainEqual(expect.objectContaining({ kind: 'joint-velocity-target', jointId: 'thumb', value: 0 }));
+    timeline.dispose();
+  });
   it('materializes a definition runtime body and feeds its intent into fixed-step physics', () => {
     const timeline = new AccumulativeSpatialTimeline('intent-baseline');
     const compiled = timeline.compile(source, origins);

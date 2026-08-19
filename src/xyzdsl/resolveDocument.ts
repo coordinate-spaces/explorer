@@ -38,6 +38,7 @@ export interface ResolvedIntent {
   id: string;
   mode: 'absolute' | 'relative';
   coordinate: [number, number, number];
+  target?: NonNullable<SpatialObject['intent']>['target'];
   definitionNamespacePath: string;
   streamId: string;
   lineNumber: number;
@@ -525,6 +526,7 @@ export function resolveXyzDslDocument(objects: SpatialObject[]): {
       id: `${streamId}::${namespacePath}`,
       mode: object.intent!.mode,
       coordinate: object.intent!.coordinate,
+      target: object.intent!.target,
       definitionNamespacePath: namespacePath,
       streamId,
       lineNumber: object.lineNumber,

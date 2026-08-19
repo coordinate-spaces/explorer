@@ -7,7 +7,13 @@ import type { InteractionTransition } from './interactionTimeline';
 
 export interface PhysicsDirectiveBinding {
   targetId: string;
-  mode: 'force' | 'impulse' | 'translation' | 'weighted-translation';
+  mode: 'force' | 'impulse' | 'translation' | 'weighted-translation' | 'joint-position-target' | 'joint-velocity-target' | 'joint-effort';
+  jointId?: string;
+  value?: number;
+  /** enter is one-shot, stay is maintained, leave disables or returns to rest. */
+  phase?: 'enter' | 'stay' | 'leave';
+  leave?: 'passive' | 'hold' | 'rest';
+  restValue?: number;
   magnitude?: number;
   vector?: Vector3Tuple;
   targetWeight?: number;
@@ -16,6 +22,28 @@ export interface PhysicsDirectiveBinding {
     state: 'touch' | 'breach';
     scopeNamespace: string;
   }>;
+}
+
+/** Resolves controller ownership to exactly one command per joint degree of freedom. */
+export function resolveJointControllerInputs(inputs: readonly PhysicsInput[]): PhysicsInput[] {
+  const ordinary = inputs.filter((input) => !input.kind.startsWith('joint-'));
+  const groups = new Map<string, Extract<PhysicsInput, { jointId: string }>[]>();
+  inputs.forEach((input) => {
+    if (!input.kind.startsWith('joint-')) return;
+    const command = input as Extract<PhysicsInput, { jointId: string }>;
+    groups.set(command.jointId, [...(groups.get(command.jointId) ?? []), command]);
+  });
+  const resolved = [...groups.values()].map((commands) => {
+    const sorted = [...commands].sort((a, b) => (b.controllerPriority ?? 0) - (a.controllerPriority ?? 0) || (a.stableSourceOrder ?? 0) - (b.stableSourceOrder ?? 0));
+    const highestPriority = sorted[0].controllerPriority ?? 0;
+    const exclusive = sorted.find((command) => (command.controllerPriority ?? 0) === highestPriority && command.exclusive);
+    if (exclusive) return exclusive;
+    const priority = highestPriority;
+    const peers = sorted.filter((command) => (command.controllerPriority ?? 0) === priority && command.kind === sorted[0].kind);
+    const weight = peers.reduce((sum, command) => sum + Math.max(0, command.blendWeight ?? 1), 0);
+    return weight > 0 ? { ...peers[0], value: peers.reduce((sum, command) => sum + command.value * Math.max(0, command.blendWeight ?? 1), 0) / weight } : peers[0];
+  });
+  return [...ordinary, ...resolved];
 }
 
 export interface SimulationFrame {
@@ -108,6 +136,19 @@ export class SimulationTimeline {
       addForces(inputTick, this.previousFacts, this.previousBindings);
     }
     addForces(tick, facts, bindings);
+    bindings.filter((binding) => binding.mode.startsWith('joint-')).forEach((binding) => {
+      const active = selectInteractionFact(binding, facts);
+      const transition = transitions.find(({ fact }) => bindingMatchesFact(binding, fact));
+      const phase = binding.phase ?? 'stay';
+      if ((phase === 'stay' && active) || (phase === 'enter' && transition?.kind === 'enter')) {
+        if (binding.jointId && Number.isFinite(binding.value)) inputs.push({ kind: binding.mode as 'joint-position-target' | 'joint-velocity-target' | 'joint-effort', jointId: binding.jointId, tick, stableSourceOrder, value: binding.value! });
+      } else if (phase === 'leave' && transition?.kind === 'leave' && binding.jointId) {
+        // A zero effort is the engine-neutral passive/release command; rest emits
+        // an explicit bounded position target and hold retains the prior target.
+        if (binding.leave === 'rest' && Number.isFinite(binding.restValue)) inputs.push({ kind: 'joint-position-target', jointId: binding.jointId, tick, stableSourceOrder, value: binding.restValue! });
+        else if (binding.leave !== 'hold') inputs.push({ kind: 'joint-effort', jointId: binding.jointId, tick, stableSourceOrder, value: 0 });
+      }
+    });
     bindings.filter(({ mode }) => mode === 'translation' || mode === 'weighted-translation').forEach((binding) => {
       const fact = selectInteractionFact(binding, facts);
       if (!fact) return;
@@ -129,7 +170,7 @@ export class SimulationTimeline {
         inputs.push({ kind: 'impulse', bodyId: binding.targetId, tick, stableSourceOrder, vector: direction(fact).map((value) => value * (binding.magnitude ?? 0)) as Vector3Tuple });
       });
     });
-    this.world.enqueueInputs(inputs);
+    this.world.enqueueInputs(resolveJointControllerInputs(inputs));
     const physics = this.world.step(tick);
     this.previousFacts = [...facts];
     this.previousBindings = [...bindings];

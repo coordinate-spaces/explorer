@@ -5,6 +5,12 @@ import { resolveXyzDslDocument } from './resolveDocument';
 const secondary = new Map([[2, { sourceKind: 'secondary' as const, streamId: 'player-1', transactionId: 'tx-1' }]]);
 
 describe('XYZDSL coordinate intents', () => {
+  it('parses explicit stable body and joint targets with release behavior', () => {
+    const body = parseXyzDslDocument('"Character/+1/+0/+1" : "intent: absolute; intent-target: body:root-id"', secondary);
+    expect(body.value?.[0].intent?.target).toEqual({ kind: 'body', id: 'root-id' });
+    const joint = parseXyzDslDocument('"Hand/+1/+0/+0" : "intent: absolute; intent-target: joint:finger-joint; intent-command: velocity; intent-release: brake"', secondary);
+    expect(joint.value?.[0].intent?.target).toEqual({ kind: 'joint', id: 'finger-joint', command: 'velocity', release: 'brake' });
+  });
   it('parses signed absolute and relative coordinates without geometry', () => {
     const parsed = parseXyzDslDocument('"Character/" : "max-speed: 6"\n"Character/+10/-2/+50c" : "intent: relative"', secondary);
     expect(parsed.diagnostics).toEqual([]);

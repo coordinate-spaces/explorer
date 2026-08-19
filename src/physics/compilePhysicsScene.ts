@@ -221,7 +221,15 @@ export function compileArticulatedPhysicsScene(document: SpatialDocument, revisi
     else if (spec.joint === 'spherical') joints.push({ ...base, kind: 'spherical' });
     else joints.push({ ...base, kind: spec.joint, parentAxis: axisIn(parentPose), childAxis: axisIn(childPose),
       limits: spec['joint-limits']?.map((value) => spec.joint === 'revolute' ? value * Math.PI / 180 : value) as [number, number] | undefined,
-      damping: spec['joint-damping'] });
+      damping: spec['joint-damping'],
+      ...(spec['motor-mode'] ? { motor: {
+        mode: spec['motor-mode'],
+        target: spec['motor-target'] === undefined ? undefined : (spec.joint === 'revolute' ? spec['motor-target'] * Math.PI / 180 : spec['motor-target']),
+        velocity: spec['motor-velocity'] === undefined ? undefined : (spec.joint === 'revolute' ? spec['motor-velocity'] * Math.PI / 180 : spec['motor-velocity']),
+        maxSpeed: spec['motor-max-speed'] === undefined ? 0 : (spec.joint === 'revolute' ? spec['motor-max-speed'] * Math.PI / 180 : spec['motor-max-speed']),
+        maxEffort: spec['motor-max-effort'] ?? 0,
+        stiffness: spec['motor-stiffness'], damping: spec['motor-damping'],
+      } } : {}) });
   });
   const jointByChild = new Map(joints.map((joint) => [joint.childEntityId, joint]));
   const cyclicJointIds = new Set<string>();
