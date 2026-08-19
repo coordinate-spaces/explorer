@@ -25,6 +25,7 @@ export class RapierPhysicsWorld implements RigidBodyWorld {
   private memberLocalPoses = new Map<string, MemberLocalPose>();
   private jointDefinitions = new Map<string, JointDefinition>();
   private jointById = new Map<string, RAPIER.ImpulseJoint>();
+  private jointMotors = new Map<string, { mode: 'position' | 'velocity' | 'effort'; value: number; appliedTarget?: number }>();
   private excessivePivotSamples = new Map<string, { tick: number; count: number }>();
   private queuedInputs = new Map<number, PhysicsInput[]>();
   private currentTick = 0;
@@ -99,6 +100,7 @@ export class RapierPhysicsWorld implements RigidBodyWorld {
     this.colliderIdByHandle.clear(); this.memberByColliderId.clear(); this.memberLocalPoses.clear();
     this.jointDefinitions = new Map(joints.map((joint) => [joint.id, { ...joint }]));
     this.jointById.clear();
+    this.jointMotors.clear();
     this.excessivePivotSamples.clear();
 
     const groups = new Map<string, RigidBodyDefinition[]>();
@@ -190,6 +192,11 @@ export class RapierPhysicsWorld implements RigidBodyWorld {
         }
       }
       this.jointById.set(definition.id, joint);
+      if (definition.motor && definition.motor.mode !== 'passive') {
+        const value = definition.motor.mode === 'position' ? definition.motor.target
+          : definition.motor.mode === 'velocity' ? definition.motor.velocity : 0;
+        if (value !== undefined) this.jointMotors.set(definition.id, { mode: definition.motor.mode, value, ...(definition.motor.mode === 'position' ? { appliedTarget: this.clampJointCoordinate(definition, value) } : {}) });
+      }
     });
   }
 
@@ -205,11 +212,54 @@ export class RapierPhysicsWorld implements RigidBodyWorld {
     return definition && this.bodyByEntity.get(definition.entityId ?? definition.id);
   }
 
+  private clampJointCoordinate(definition: JointDefinition, value: number): number {
+    if ((definition.kind === 'revolute' || definition.kind === 'prismatic') && definition.limits) return Math.max(definition.limits[0], Math.min(definition.limits[1], value));
+    return value;
+  }
+
+  private applyJointMotor(jointId: string): void {
+    const definition = this.jointDefinitions.get(jointId);
+    const joint = this.jointById.get(jointId);
+    const state = this.jointMotors.get(jointId);
+    if (!definition || !joint || !state || (definition.kind !== 'revolute' && definition.kind !== 'prismatic')) return;
+    const authored = definition.motor;
+    if (!authored || !Number.isFinite(authored.maxSpeed) || authored.maxSpeed <= 0 || !Number.isFinite(authored.maxEffort) || authored.maxEffort <= 0) return;
+    const unit = joint as RAPIER.RevoluteImpulseJoint | RAPIER.PrismaticImpulseJoint;
+    unit.configureMotorModel(RAPIER.MotorModel.ForceBased);
+    unit.setMotorMaxForce(authored.maxEffort);
+    if (state.mode === 'position') {
+      const goal = this.clampJointCoordinate(definition, state.value);
+      const from = state.appliedTarget ?? goal;
+      const delta = Math.max(-authored.maxSpeed / this.ticksPerSecond, Math.min(authored.maxSpeed / this.ticksPerSecond, goal - from));
+      state.appliedTarget = this.clampJointCoordinate(definition, from + delta);
+      unit.configureMotorPosition(state.appliedTarget, authored.stiffness ?? 100, authored.damping ?? 10);
+    } else if (state.mode === 'velocity') {
+      const velocity = Math.max(-authored.maxSpeed, Math.min(authored.maxSpeed, state.value));
+      unit.configureMotorVelocity(velocity, authored.damping ?? 1);
+    } else {
+      // Rapier exposes effort through a force-limited velocity drive. The sign is
+      // authoritative and maxEffort bounds the generated torque/force.
+      unit.setMotorMaxForce(Math.min(authored.maxEffort, Math.abs(state.value)));
+      unit.configureMotorVelocity(Math.sign(state.value) * authored.maxSpeed, 1);
+    }
+  }
+
   step(targetTick = this.currentTick + 1): PhysicsFrame {
     if (!Number.isInteger(targetTick) || targetTick < this.currentTick) throw new Error('Physics cannot step backward; restore a snapshot before replaying.');
     while (this.currentTick < targetTick) {
       const tick = this.currentTick + 1;
       [...(this.queuedInputs.get(tick) ?? [])].sort((a, b) => (a.stableSourceOrder ?? 0) - (b.stableSourceOrder ?? 0)).forEach((input) => {
+        if ('jointId' in input) {
+          if (!Number.isFinite(input.value) || !this.jointById.has(input.jointId)) return;
+          const mode = input.kind === 'joint-position-target' ? 'position' : input.kind === 'joint-velocity-target' ? 'velocity' : 'effort';
+          const previous = this.jointMotors.get(input.jointId);
+          this.jointMotors.set(input.jointId, { mode, value: input.value, ...(mode === 'position' ? { appliedTarget: previous?.appliedTarget } : {}) });
+          if (!previous || previous.mode !== mode || previous.value !== input.value) {
+            const definition = this.jointDefinitions.get(input.jointId);
+            if (definition) { this.bodyByEntity.get(definition.parentEntityId)?.wakeUp(); this.bodyByEntity.get(definition.childEntityId)?.wakeUp(); }
+          }
+          return;
+        }
         const body = this.bodyFor(input.bodyId); if (!body) return;
         if (input.kind === 'force') body.addForce({ x: input.vector[0], y: input.vector[1], z: input.vector[2] }, true);
         else if (input.kind === 'impulse') body.applyImpulse({ x: input.vector[0], y: input.vector[1], z: input.vector[2] }, true);
@@ -223,6 +273,7 @@ export class RapierPhysicsWorld implements RigidBodyWorld {
           if (input.kind === 'teleport' && input.clearVelocity) { body.setLinvel({ x: 0, y: 0, z: 0 }, true); body.setAngvel({ x: 0, y: 0, z: 0 }, true); }
         }
       });
+      [...this.jointMotors.keys()].sort().forEach((jointId) => this.applyJointMotor(jointId));
       this.world.step(); this.queuedInputs.delete(tick); this.currentTick = tick;
     }
     return this.frame();
@@ -398,7 +449,7 @@ export class RapierPhysicsWorld implements RigidBodyWorld {
       .sub(new Vector3(...localPose.position).applyQuaternion(bodyOrientation));
     return tuple(new Vector3(...anchor).applyQuaternion(bodyOrientation).add(bodyPosition));
   }
-  snapshot(): PhysicsSnapshot { return structuredClone({ schemaVersion: 1 as const, backend: 'rapier-0.20', tick: this.currentTick, states: [...this.frame().states.values()], definitions: [...this.definitions.values()], joints: [...this.jointDefinitions.values()] }); }
+  snapshot(): PhysicsSnapshot { return structuredClone({ schemaVersion: 1 as const, backend: 'rapier-0.20', tick: this.currentTick, states: [...this.frame().states.values()], definitions: [...this.definitions.values()], joints: [...this.jointDefinitions.values()], jointMotors: [...this.jointMotors].map(([jointId, state]) => ({ jointId, ...state })) }); }
   restore(snapshot: PhysicsSnapshot): void {
     // Timeline reconciliation temporarily rebuilds the retained snapshot before
     // every step. Keep same-tick diagnostic history across that rebuild so a
@@ -427,10 +478,12 @@ export class RapierPhysicsWorld implements RigidBodyWorld {
       if (state.sleeping) body.sleep();
     });
     this.currentTick = snapshot.tick;
+    this.jointMotors = new Map((snapshot.jointMotors ?? []).map(({ jointId, ...state }) => [jointId, state]));
+    [...this.jointMotors.keys()].sort().forEach((jointId) => this.applyJointMotor(jointId));
     this.queuedInputs.clear();
   }
   dispose(): void { this.world.free(); this.definitions.clear(); this.bodyByEntity.clear(); this.entityByBodyHandle.clear();
-    this.colliderById.clear(); this.colliderIdByHandle.clear(); this.memberByColliderId.clear(); this.memberLocalPoses.clear(); this.jointDefinitions.clear(); this.jointById.clear(); this.excessivePivotSamples.clear(); this.queuedInputs.clear(); }
+    this.colliderById.clear(); this.colliderIdByHandle.clear(); this.memberByColliderId.clear(); this.memberLocalPoses.clear(); this.jointDefinitions.clear(); this.jointById.clear(); this.jointMotors.clear(); this.excessivePivotSamples.clear(); this.queuedInputs.clear(); }
 }
 
 function groupsCompatible(a = 0xffffffff, b = 0xffffffff): boolean {

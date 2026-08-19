@@ -243,9 +243,15 @@ Articulations are identified by stable joint IDs and reconciled after their endp
 
 Validation rejects missing or self-linked endpoints, duplicate IDs, multiple parent joints, non-finite frames, zero axes, reversed limits, and cycles before backend mutation. Dynamic-only trees and connected masses differing by more than 100:1 produce warnings. Diagnostics retain the declaration line whenever available.
 
-Closed loops, motors, spherical cone/twist limits, and cursor articulation remain unsupported. Spherical joints are unrestricted ball-and-socket pivots. Debug inspection exposes stable IDs, endpoints, kind, scalar coordinate/limits where applicable, and pivot error without exposing Rapier handles.
+Closed loops, spherical cone/twist limits, and multi-joint cursor articulation remain unsupported. Spherical joints are unrestricted ball-and-socket pivots. Debug inspection exposes stable IDs, endpoints, kind, scalar coordinate/limits where applicable, and pivot error without exposing Rapier handles.
 
 
 ## Portable instances
 
 The source above can be placed at its original transform, translated to `X = 15`, or instantiated repeatedly at arbitrary translated and rotated component transforms. Every instance retains exactly the same `joint-anchor: 0.5 8 0.5`, `joint-axis: 0 0 1`, `joint-limits: -170 170`, and `joint-damping: 0.05`; only its initial world body poses differ. World-space articulation declarations and cross-component links are rejected rather than treated as compatibility input. Snapshots persist the compiled body-local frames and reconstruct constraints before restoring mutable body poses.
+
+## Bounded joint actuation (Release C)
+
+Revolute joint coordinates and position targets are radians, velocities are radians/second, and effort is N·m. Prismatic coordinates use project units, velocities use project units/second, and effort is newtons. `motor-mode` is `position`, `velocity`, `effort`, or `passive`. Active motors require finite, positive `motor-max-speed` and `motor-max-effort`; there is deliberately no infinite-effort default. `motor-target` is authored in degrees for revolute DSL declarations and converted to radians at compilation, while engine-neutral inputs are always radians. `joint-damping` is passive viscous drag; `motor-damping` is an active drive gain.
+
+Commands (`joint-position-target`, `joint-velocity-target`, and `joint-effort`) name the stable joint ID and a fixed future tick. Position targets are clamped to authored limits, target progression is speed-limited, and solver effort is capped. They configure a constraint drive rather than a body transform, so contacts, mass, gravity, limits, and obstruction remain authoritative. Active command and progressed target state are included in snapshots. Multi-joint/end-effector IK remains deferred to Release D.

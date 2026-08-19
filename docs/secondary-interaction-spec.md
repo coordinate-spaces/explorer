@@ -302,3 +302,11 @@ Implementations SHOULD place the camera just beyond the corner by a small safety
 "Machine/Lever/+1+1/+2+4/+1+1": "geometry: cylinder"
 "Machine/+touch/Lever": "rotation: 0,0,30"
 ```
+
+## Physical interaction reactions and cursor targets
+
+`+touch` and `+breach` may resolve to forces, impulses, or stable-ID joint motor commands in addition to legacy translation reactions. Translation remains compatibility behavior and must not be used to pose an articulated child. `enter` is for a one-shot impulse or target transition; `stay` reapplies maintained forces or targets; `leave` explicitly selects hold, zero-velocity braking, passive/zero effort, or a bounded rest target.
+
+An intent has an explicit `intent-target`: `body`, `body:<stable-id>`, or `joint:<stable-id>`. Body targets retain the root-coordinate locomotion controller. Joint targets use `intent-command: position|velocity|effort`, with `intent-release: hold|brake|passive`; the cursor emits bounded joint inputs and never assigns the child transform.
+
+Controller commands carry a priority, optional non-negative blend weight, exclusive flag, and stable source order. Exclusive ownership wins at the highest sorted priority; otherwise equal-priority, equal-kind commands blend and source order breaks ties. Resolution emits one command per joint degree of freedom per tick.

@@ -10,7 +10,7 @@ import { resolveXyzDslDocument } from '../xyzdsl/resolveDocument';
 import type { XyzDslDeclarationOrigin } from '../xyzdsl/types';
 import { SimulationTimeline } from './SimulationTimeline';
 import type { PhysicsDirectiveBinding } from './SimulationTimeline';
-import { CoordinateIntentReducer, coordinateIntentInputs } from '../simulation/coordinateIntent';
+import { CoordinateIntentReducer, coordinateIntentInputs, jointCoordinateIntentInput } from '../simulation/coordinateIntent';
 
 export interface AccumulativeSpatialFrame {
   document: SpatialDocument;
@@ -230,6 +230,7 @@ export class AccumulativeSpatialTimeline {
     const controllerInputs = resolved.intents.flatMap((intent) => {
       const frameId = intent.origin.transactionId ?? `${intent.origin.transactionTime ?? tick}:${intent.origin.sourceOrder ?? intent.lineNumber}`;
       const pointer = this.intents.apply({ id: intent.id, mode: intent.mode, coordinate: intent.coordinate, frameId }).pointer;
+      if (intent.target?.kind === 'joint') return [jointCoordinateIntentInput(intent.target.id, pointer[0], intent.target.command ?? 'position', tick, intent.origin.sourceOrder ?? intent.lineNumber)];
       const node = renderable(authored.nodes).find((candidate) => candidate.metadata?.intentId === intent.id);
       const state = node ? states.get(node.id) : undefined;
       if (!node || !state) return [];

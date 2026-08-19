@@ -4,6 +4,8 @@ import type { XyzDslPhysicsMode, XyzDslPhysicsSpec } from './types';
 export const SUPPORTED_PHYSICS_KEYS = [
   'body', 'joint', 'joint-parent', 'joint-anchor', 'joint-axis', 'joint-limits',
   'joint-damping', 'collide-connected',
+  'motor-mode', 'motor-target', 'motor-velocity', 'motor-max-speed', 'motor-max-effort',
+  'motor-stiffness', 'motor-damping',
   'physics-mode', 'mass', 'density', 'friction', 'restitution', 'linear-damping',
   'gravity-scale', 'ccd', 'can-sleep', 'lock-translations', 'lock-rotations',
   'sensor', 'physical-body', 'collision-groups', 'solver-groups',
@@ -76,6 +78,14 @@ export function parsePhysicsDeclaration(declarations: XyzDslPropertyDeclaration[
     else result['joint-limits'] = values as [number, number];
   }
   number('joint-damping', { min: 0 });
+  const motorMode = latest.get('motor-mode');
+  if (motorMode !== undefined) {
+    if (['position', 'velocity', 'effort', 'passive'].includes(motorMode)) result['motor-mode'] = motorMode as NonNullable<XyzDslPhysicsSpec['motor-mode']>;
+    else result.diagnostics.push(`Invalid motor-mode "${motorMode}"; expected position, velocity, effort, or passive.`);
+  }
+  number('motor-target'); number('motor-velocity');
+  number('motor-max-speed', { min: 0 }); number('motor-max-effort', { min: 0 });
+  number('motor-stiffness', { min: 0 }); number('motor-damping', { min: 0 });
   const mode = latest.get('physics-mode');
   if (mode !== undefined) {
     if (MODES.has(mode as XyzDslPhysicsMode)) result['physics-mode'] = mode as XyzDslPhysicsMode;
@@ -122,6 +132,14 @@ export function validateResolvedJointPhysics(spec: XyzDslPhysicsSpec): string[] 
     if ((spec.joint === 'fixed' || spec.joint === 'spherical') && spec['joint-damping'] !== undefined) diagnostics.push(`Property joint-damping is invalid for ${spec.joint} joints.`);
     if ((spec.joint === 'revolute' || spec.joint === 'prismatic') && spec['joint-axis'] === undefined) diagnostics.push(`${spec.joint} joints require joint-axis.`);
     if (spec['joint-anchor'] === undefined) diagnostics.push(`${spec.joint} joints require joint-anchor.`);
+    const motorKeys = ['motor-mode', 'motor-target', 'motor-velocity', 'motor-max-speed', 'motor-max-effort', 'motor-stiffness', 'motor-damping'] as const;
+    if ((spec.joint === 'fixed' || spec.joint === 'spherical') && motorKeys.some((key) => spec[key] !== undefined)) diagnostics.push(`Motor properties are invalid for ${spec.joint} joints.`);
+    if (spec['motor-mode'] && spec['motor-mode'] !== 'passive') {
+      if (!(Number.isFinite(spec['motor-max-speed']) && spec['motor-max-speed']! > 0)) diagnostics.push('Active motors require finite motor-max-speed > 0.');
+      if (!(Number.isFinite(spec['motor-max-effort']) && spec['motor-max-effort']! > 0)) diagnostics.push('Active motors require finite motor-max-effort > 0; infinite effort is never implied.');
+      if (spec['motor-mode'] === 'position' && !Number.isFinite(spec['motor-target'])) diagnostics.push('Position motors require motor-target.');
+      if (spec['motor-mode'] === 'velocity' && !Number.isFinite(spec['motor-velocity'])) diagnostics.push('Velocity motors require motor-velocity.');
+    }
   }
   return diagnostics;
 }
