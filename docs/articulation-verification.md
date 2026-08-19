@@ -18,13 +18,19 @@ XYZDSL parser/types, and a new `jointController.test.ts`. None of those Release 
 changes is present at the selected Release B commit. Consequently no revert or
 reconstruction branch is needed.
 
-An annotated tag named `verification/release-b` points to
-`c2e908cb0879887bd35dddabf088ca8c5aa92374`. Verification was performed from a
-detached worktree at `/workspace/explorer-release-b`, so neither `main` nor the
-current development branch was rewritten. The tag target can be checked with:
+The verification artifact delivered by this repository is the immutable
+historical commit `c2e908cb0879887bd35dddabf088ca8c5aa92374`, not a tag. Tags
+are separate Git refs and are not transported by the commit that adds this
+document. In particular, this document does **not** claim that an upstream
+`verification/release-b` tag has been published.
+
+Verification was performed from a detached worktree at
+`/workspace/explorer-release-b`, so neither `main` nor the current development
+branch was rewritten. The boundary can be checked without relying on a tag:
 
 ```sh
-git rev-parse verification/release-b^{}
+test "$(git rev-parse c2e908cb0879887bd35dddabf088ca8c5aa92374^{commit})" = \
+  c2e908cb0879887bd35dddabf088ca8c5aa92374
 ```
 
 ## Reproduction and results
@@ -32,9 +38,10 @@ git rev-parse verification/release-b^{}
 The exact setup and verification commands were:
 
 ```sh
-git tag -a verification/release-b c2e908cb0879887bd35dddabf088ca8c5aa92374 \
-  -m 'Release B passive articulation verification boundary'
-git worktree add --detach /workspace/explorer-release-b verification/release-b
+test "$(git rev-parse c2e908cb0879887bd35dddabf088ca8c5aa92374^{commit})" = \
+  c2e908cb0879887bd35dddabf088ca8c5aa92374
+git worktree add --detach /workspace/explorer-release-b \
+  c2e908cb0879887bd35dddabf088ca8c5aa92374
 cd /workspace/explorer-release-b
 npm ci
 npm test
