@@ -46,6 +46,15 @@ export function compileArticulatedPhysicsScene(document: SpatialDocument, revisi
   // All secondary primitives are compiled: ordinary cursors are zero-mass sensors,
   // while the explicit physical-body opt-in retains ordinary rigid-body semantics.
   const candidates = flatten(document.nodes);
+  // Articulations cannot cross a top-level component boundary. Keep the
+  // component frame for every descendant so authored joint data is never
+  // interpreted as a project-world coordinate.
+  const componentTransformByNode = new Map<SpatialNode, NonNullable<SpatialNode['worldTransform']>>();
+  const rememberComponentFrame = (node: SpatialNode, component: SpatialNode): void => {
+    componentTransformByNode.set(node, component.worldTransform ?? component.transform);
+    node.children?.forEach((child) => rememberComponentFrame(child, component));
+  };
+  document.nodes.forEach((component) => rememberComponentFrame(component, component));
   const physicsEntityId = (node: SpatialNode): string => {
     const baseId = csgEntityByNodeId.get(node.id) ?? authoredPhysicsEntityId(node);
     if (node.origin?.sourceKind !== 'secondary') return baseId;
@@ -157,12 +166,20 @@ export function compileArticulatedPhysicsScene(document: SpatialDocument, revisi
     }
     const parent = representativeByEntity.get(parentEntityId)!;
     const child = representativeByEntity.get(childEntityId)!;
+    const componentTransform = componentTransformByNode.get(node)!;
+    const componentOrientation = new Quaternion().setFromEuler(new Euler(...componentTransform.rotation, 'XYZ'));
+    const worldAnchor = new Vector3(...anchor)
+      .multiply(new Vector3(...componentTransform.scale))
+      .applyQuaternion(componentOrientation)
+      .add(new Vector3(...componentTransform.position));
     const localPoint = (body: RigidBodyDefinition): Vector3Tuple => {
       const q = new Quaternion(...(body.orientation ?? [0, 0, 0, 1])).invert();
-      const point = new Vector3(...anchor).sub(new Vector3(...body.position)).applyQuaternion(q);
+      const point = worldAnchor.clone().sub(new Vector3(...body.position)).applyQuaternion(q);
       return [point.x, point.y, point.z];
     };
-    const worldAxis = new Vector3(...axis).normalize();
+    // Axes are directions: rotate them with the component, but never translate
+    // or non-uniformly scale them.
+    const worldAxis = new Vector3(...axis).applyQuaternion(componentOrientation).normalize();
     const axisIn = (body: RigidBodyDefinition): Vector3Tuple => {
       const local = worldAxis.clone().applyQuaternion(new Quaternion(...(body.orientation ?? [0, 0, 0, 1])).invert());
       return [local.x, local.y, local.z];
