@@ -11,7 +11,7 @@ of its articulation. The target remains a canonical authored namespace even
 when a secondary controller materializes a runtime instance:
 
 ```xyzdsl
-"Arm/" : "control-target: Arm/Hand/Index/Distal/; control-scope: chain; motor-stiffness: 24; motor-damping: 6; motor-max-torque: 30"
+"Arm/" : "control-target: Arm/Hand/Index/Distal/; control-scope: chain; motor-stiffness: 1200; motor-damping: 80; motor-max-torque: 500"
 ```
 
 `body` drives only the selected body's owning joint, `chain` drives every joint
@@ -22,6 +22,12 @@ has an immediate visible effect. Rapier's motor applies bounded torque, so
 contacts, gravity, damping, and joint limits remain authoritative. The mapping
 is deliberately an exploratory direct-joint controller rather than inverse
 kinematics. Stable joint IDs—not Rapier handles—cross the simulation boundary.
+
+Joint anchors and axes are compiled from the authored component rest pose, not
+from the latest retained simulation overlay. Reconciliation may preserve each
+body's current pose and velocity, but it must reinstall the same body-local
+constraint frames. Re-deriving those frames from simulated poses causes the
+pivot to move on every tick and makes a connected hierarchy fall apart.
 
 The default editor document contains an `Arm/Hand/Index` hierarchy plus a thumb.
 Choose the **Arm/** local controller, choose a **Target** and **Precision**, and

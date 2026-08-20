@@ -13,6 +13,7 @@ import type { PhysicsDirectiveBinding } from './SimulationTimeline';
 import { CoordinateIntentReducer, coordinateIntentInputs } from '../simulation/coordinateIntent';
 import { articulationPointerAngle, resolveArticulationTarget } from '../simulation/articulationTarget';
 import type { CompiledPhysicsScene } from '../physics/compilePhysicsScene';
+import type { JointDefinition } from '../physics/types';
 
 export interface AccumulativeSpatialFrame {
   document: SpatialDocument;
@@ -98,6 +99,7 @@ function withColliderStateById(nodes: readonly SpatialNode[], conditionalById: R
 export class AccumulativeSpatialTimeline {
   readonly simulation: SimulationTimeline;
   private readonly intents = new CoordinateIntentReducer();
+  private restJoints?: JointDefinition[];
 
   constructor(readonly baselineRevision = 'baseline') {
     this.simulation = new SimulationTimeline(new RapierPhysicsWorld());
@@ -141,7 +143,17 @@ export class AccumulativeSpatialTimeline {
     // Reconcile and query the authored pre-variant scene. A variant selected by
     // these facts can alter only the scene used by the next transaction tick.
     const authoredScene = compileArticulatedPhysicsScene(authored, this.baselineRevision);
-    this.simulation.reconcileDefinitions(authoredScene.bodies, authoredScene.joints);
+    // The first compilation occurs at the authored rest pose. Retain those
+    // body-local constraint frames instead of re-deriving them from the moving
+    // physics overlay during every subsequent reconciliation.
+    const currentTopology = authoredScene.joints.map(({ id }) => id).sort().join('\0');
+    const retainedTopology = (this.restJoints ?? []).map(({ id }) => id).sort().join('\0');
+    if (currentTopology && currentTopology !== retainedTopology) {
+      this.restJoints = authoredScene.joints.map((joint) => ({ ...joint }));
+    } else if (!currentTopology && retainedTopology) {
+      this.restJoints = undefined;
+    }
+    this.simulation.reconcileDefinitions(authoredScene.bodies, this.restJoints);
     const facts = this.interactionFacts(authored);
     const conditional = createSpatialDocument(source, {
       originsByLine,
@@ -158,8 +170,8 @@ export class AccumulativeSpatialTimeline {
     // installing effective conditional definitions.
     this.simulation.world.restore(retainedSnapshot);
     const definitions = compileArticulatedPhysicsScene(effective, this.baselineRevision);
-    this.simulation.reconcileDefinitions(definitions.bodies, definitions.joints);
-    return { authored, effective, facts, scene: definitions };
+    this.simulation.reconcileDefinitions(definitions.bodies, this.restJoints);
+    return { authored, effective, facts, scene: { bodies: definitions.bodies, joints: this.restJoints ?? [] } };
   }
 
   /** Recompile against retained state without advancing simulation time. */
@@ -202,9 +214,12 @@ export class AccumulativeSpatialTimeline {
     const states = this.simulation.world.frame().states;
     const controllerInputs = resolved.intents.flatMap((intent) => {
       const frameId = intent.origin.transactionId ?? `${intent.origin.transactionTime ?? tick}:${intent.origin.sourceOrder ?? intent.lineNumber}`;
-      const pointer = this.intents.apply({ id: intent.id, mode: intent.mode, coordinate: intent.coordinate, frameId }).pointer;
       const intentNodes = renderable(authored.nodes).filter((candidate) => candidate.metadata?.intentId === intent.id);
       const controlTarget = intent.definition.physics['control-target'];
+      const pointer = this.intents.apply(
+        { id: intent.id, mode: intent.mode, coordinate: intent.coordinate, frameId },
+        controlTarget ? [6, 0, 4] : [0, 0, 0],
+      ).pointer;
       const node = controlTarget
         ? intentNodes.find((candidate) => candidate.metadata?.intentAuthoredNamespacePath === controlTarget)
         : intentNodes[0];

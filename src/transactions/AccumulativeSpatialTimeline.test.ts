@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { XyzDslDeclarationOrigin } from '../xyzdsl/types';
 import { createSpatialDocument } from '../model/createSpatialDocument';
 import { AccumulativeSpatialTimeline, accumulativePhysicsFrameKey, spatialBaselineRevision } from './AccumulativeSpatialTimeline';
+import { Quaternion, Vector3 } from 'three';
 
 function origins(cursorAmount = 1_000_000) {
   return new Map<number, XyzDslDeclarationOrigin>([
@@ -34,6 +35,39 @@ function scopedOrigins() {
 }
 
 describe('AccumulativeSpatialTimeline', () => {
+  it('keeps rest-pose joint anchors connected while cursor motors advance retained simulation', () => {
+    const source = [
+      '"Arm/":"control-target: Arm/Hand/; control-scope: chain; motor-stiffness: 1200; motor-damping: 80; motor-max-torque: 500"',
+      '"Arm/Shoulder/+0+1/+6+1/+0+1":"body: Shoulder; physics-mode: static"',
+      '"Arm/Upper/+0+1/+4+2/+0+1":"body: Upper; joint: revolute; joint-parent: Arm/Shoulder/; joint-anchor: .5 6 .5; joint-axis: 0 0 1"',
+      '"Arm/Forearm/+0+1/+2+2/+0+1":"body: Forearm; joint: revolute; joint-parent: Arm/Upper/; joint-anchor: .5 4 .5; joint-axis: 0 0 1"',
+      '"Arm/Hand/+0+1/+1+1/+0+1":"body: Hand; joint: revolute; joint-parent: Arm/Forearm/; joint-anchor: .5 2 .5; joint-axis: 0 0 1"',
+      '"Arm/+50c/+0/+0":"intent: relative; control-target: Arm/Hand/; control-scope: chain"',
+    ].join('\n');
+    const origins = new Map<number, XyzDslDeclarationOrigin>([
+      [1, { sourceKind: 'baseline' }], [2, { sourceKind: 'baseline' }], [3, { sourceKind: 'baseline' }],
+      [4, { sourceKind: 'baseline' }], [5, { sourceKind: 'baseline' }],
+      [6, { sourceKind: 'secondary', streamId: 'local', transactionId: 'frame-1' }],
+    ]);
+    const timeline = new AccumulativeSpatialTimeline();
+    timeline.compile(source.split('\n').slice(0, -1).join('\n'), new Map([...origins].filter(([line]) => line < 6)));
+    for (let tick = 0; tick < 60; tick += 1) timeline.evaluate(source, origins);
+    const snapshot = timeline.simulation.world.snapshot();
+    const states = timeline.simulation.world.frame().states;
+    const representative = new Map<string, string>();
+    snapshot.definitions.forEach((definition) => {
+      if (!representative.has(definition.entityId ?? definition.id)) representative.set(definition.entityId ?? definition.id, definition.id);
+    });
+    const worldAnchor = (entityId: string, anchor: [number, number, number]) => {
+      const state = states.get(representative.get(entityId)!)!;
+      return new Vector3(...anchor).applyQuaternion(new Quaternion(...state.orientation)).add(new Vector3(...state.position));
+    };
+    snapshot.joints?.forEach((joint) => {
+      expect(worldAnchor(joint.parentEntityId, joint.parentAnchor).distanceTo(worldAnchor(joint.childEntityId, joint.childAnchor))).toBeLessThan(0.05);
+    });
+    expect([...states.values()].every((state) => [...state.position, ...state.orientation].every(Number.isFinite))).toBe(true);
+    expect(Math.abs(states.get(representative.get(snapshot.joints![0].childEntityId)!)!.orientation[2])).toBeGreaterThan(0.01);
+  });
   it('reconciles active conditional physics and returns compiler diagnostics', () => {
     const source = [
       '"Target/+0+1/+0+1/+0+1":""',

@@ -44,7 +44,7 @@ const INITIAL_XYZDSL = `"+2+4/+0+6/+1+3" : "geometry: cylinder; color: 0x333333;
 "Character/" : "physics-mode: dynamic; max-speed: 4; max-acceleration: 12; max-deceleration: 16; max-turn-rate: 360; arrival-radius: 10c"
 "Character/Body/+0+6c/+0+18c/+0+6c" : "geometry: cylinder; mass: 1; lock-rotations: x,z"
 
-"Arm/" : "control-target: Arm/Hand/Index/Distal/; control-scope: chain; motor-stiffness: 24; motor-damping: 6; motor-max-torque: 30"
+"Arm/" : "control-target: Arm/Hand/Index/Distal/; control-scope: chain; motor-stiffness: 1200; motor-damping: 80; motor-max-torque: 500"
 "Arm/Shoulder/+10+60c/+11+60c/+4+60c" : "body: Shoulder; physics-mode: static; color: 0x334155"
 "Arm/Upper/+10+60c/+8+3/+4+60c" : "body: Upper; mass: 2; color: 0x64748b; joint: revolute; joint-parent: Arm/Shoulder/; joint-anchor: 10.3 11 4.3; joint-axis: 0 0 1; joint-limits: -120 120"
 "Arm/Forearm/+10+55c/+550c+250c/+4+55c" : "body: Forearm; mass: 1.4; color: 0x94a3b8; joint: revolute; joint-parent: Arm/Upper/; joint-anchor: 10.3 8 4.3; joint-axis: 0 0 1; joint-limits: -145 20"
