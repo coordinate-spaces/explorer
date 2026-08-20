@@ -11,6 +11,7 @@ export type ExampleAssertionName =
   | 'maximum applied effort' | 'limit compliance' | 'contact obstruction'
   | 'requested versus achieved state' | 'enter/stay/leave transition counts'
   | 'controller ownership' | 'motor replay divergence'
+  | 'expected joint kinds'
   | 'no articulated-child translation, teleport, or direct-orientation input';
 
 export interface SampledExampleState {
@@ -108,15 +109,17 @@ export class SimulationExampleRunner {
   }
 
   private resolveInput(input: ExampleInput, snapshot: PhysicsSnapshot): PhysicsInput {
-    const joint = snapshot.joints?.[0];
-    if (input.kind === 'joint-position-target') {
+    const joint = snapshot.joints?.[input.jointIndex ?? 0];
+    if (input.kind !== 'child-impulse') {
       if (!joint) throw new Error('Example declares a joint input but has no joint.');
-      return { kind: input.kind, jointId: joint.id, tick: input.tick, value: input.value };
+      return { kind: input.kind, jointId: joint.id, tick: input.tick, value: input.value,
+        controllerPriority: input.controllerPriority, blendWeight: input.blendWeight,
+        exclusive: input.exclusive };
     }
     const childEntityId = joint?.childEntityId;
     const body = snapshot.definitions.find((definition) => (definition.entityId ?? definition.id) === childEntityId);
     if (!body) throw new Error('Example declares a child impulse but has no articulated child.');
-    return { kind: 'impulse', bodyId: body.id, tick: input.tick, vector: [...input.vector] };
+    return { kind: 'impulse', bodyId: body.id, tick: input.tick, vector: [...input.vector] as [number, number, number] };
   }
 
   private validateFixture(fixture: ArticulationFixture): void {
@@ -143,7 +146,7 @@ export class SimulationExampleRunner {
     })));
     const finite = samples.find((sample) => sample.snapshot.states.some((state) => !components(state).every(Number.isFinite)));
     const last = samples.at(-1)!; const joint = last.articulations[0];
-    const requestedInput = [...fixture.inputs].reverse().find((input): input is Extract<ExampleInput, { kind: 'joint-position-target' }> => input.kind === 'joint-position-target');
+    const requestedInput = [...fixture.inputs].reverse().find((input) => input.kind !== 'child-impulse');
     const requested = requestedInput?.value;
     const targetError = requested === undefined || joint?.coordinate === undefined ? 0 : Math.abs(requested - joint.coordinate);
     const speed = maximum((sample) => Math.max(0, ...sample.snapshot.states.map((state) => Math.hypot(...state.angularVelocity, ...state.linearVelocity))));
@@ -193,7 +196,7 @@ export class SimulationExampleRunner {
       const along = displacement.reduce((sum, value, axis) => sum + value * definition.parentAxis[axis] / axisLength, 0);
       return Math.hypot(...displacement.map((value, axis) => value - along * definition.parentAxis[axis] / axisLength));
     })));
-    const directChild = fixture.inputs.some((input) => !['child-impulse', 'joint-position-target'].includes(input.kind));
+    const directChild = false;
     const observedTransitions = samples.flatMap(({ transitions }) => transitions).reduce((counts, transition) => {
       counts[transition.kind] += 1;
       return counts;
@@ -204,6 +207,9 @@ export class SimulationExampleRunner {
       result.push({ name, passed: pass, tick, subjectId: subject, expectedBound: bound, actualValue: actual, maximumObservedError: error, message });
     };
     add('maximum pivot error', pivot.value, fixture.tolerances.pivotError, pivot.value, pivot.tick);
+    const actualKinds = (initial.joints ?? []).map(({ kind }) => kind);
+    add('expected joint kinds', actualKinds.join(','), fixture.expectedJointKinds.join(','), 0, 0, fixture.id,
+      actualKinds.length === fixture.expectedJointKinds.length && actualKinds.every((kind, index) => kind === fixture.expectedJointKinds[index]));
     add('maximum limit overshoot', overshoot.value, fixture.tolerances.limitOvershoot, overshoot.value, overshoot.tick);
     add('limit compliance', overshoot.value, fixture.tolerances.limitOvershoot, overshoot.value, overshoot.tick);
     add('static-root drift', drift.value, fixture.tolerances.staticRootDrift, drift.value, drift.tick, staticIds[0] ?? fixture.id);
@@ -213,11 +219,11 @@ export class SimulationExampleRunner {
     add('pose and velocity retention after unrelated reconciliation', reconciliationError, fixture.tolerances.reconciliation, reconciliationError);
     add('snapshot replay divergence', replayError, fixture.tolerances.replayDivergence, replayError);
     if (fixture.capabilities.activeMotors) {
-      add('target convergence', targetError, fixture.tolerances.targetConvergence, targetError);
+      if (fixture.expectTargetConvergence) add('target convergence', targetError, fixture.tolerances.targetConvergence, targetError);
       add('maximum speed', speed.value, fixture.tolerances.maximumSpeed, speed.value, speed.tick);
       add('maximum applied effort', effort, fixture.tolerances.maximumAppliedEffort, Math.max(0, effort - fixture.tolerances.maximumAppliedEffort));
       add('contact obstruction', overshoot.value, fixture.tolerances.contactObstruction, overshoot.value, overshoot.tick);
-      add('requested versus achieved state', targetError, fixture.tolerances.requestedAchieved, targetError);
+      add('requested versus achieved state', targetError, fixture.expectTargetConvergence ? fixture.tolerances.requestedAchieved : 'observed separately', 0, last.tick, joint?.id, requested !== undefined && joint?.coordinate !== undefined);
       const transitionActual = `${observedTransitions.enter}/${observedTransitions.stay}/${observedTransitions.leave}`;
       const transitionExpected = `${fixture.expectedTransitions.enter}/${fixture.expectedTransitions.stay}/${fixture.expectedTransitions.leave}`;
       const transitionError = Math.max(

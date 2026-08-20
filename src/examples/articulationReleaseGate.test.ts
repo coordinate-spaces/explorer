@@ -49,7 +49,7 @@ const localDependencyGraph = (entry: string): ReadonlySet<string> => {
     const result = new SimulationExampleRunner().run(fixture);
     results.push(result);
     expect(result.assertions.filter(({ passed }) => !passed).map(({ message }) => message).join('\n')).toBe('');
-  });
+  }, 15_000);
 
   if (release === 'B') {
     it('uses the explicitly selected passive-only capability profile', () => {

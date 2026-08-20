@@ -85,9 +85,12 @@ function verifyFixture(fixture: ArticulationFixture): ProofResult {
 
 export function ArticulationGallery({ onClose }: { onClose: () => void }) {
   const [release, setRelease] = useState<'B' | 'C'>('B');
-  const fixture: ArticulationFixture = (release === 'B' ? RELEASE_B_FIXTURES : RELEASE_C_FIXTURES)[0];
+  const [fixtureIndex, setFixtureIndex] = useState(0);
+  const catalog = release === 'B' ? RELEASE_B_FIXTURES : RELEASE_C_FIXTURES;
+  const fixture: ArticulationFixture = catalog[fixtureIndex] ?? catalog[0];
   const [session, setSession] = useState<SpatialSimulationSession>();
-  const snapshotRef = useRef<PhysicsSnapshot | undefined>(undefined);
+  const snapshotRef = useRef<{ tick: number; snapshot: PhysicsSnapshot } | undefined>(undefined);
+  const maximumPivotErrorRef = useRef(0);
   const [status, setStatus] = useState<Status>('ready');
   const [, setRevision] = useState(0);
   const [motorTarget, setMotorTarget] = useState(fixture.motor?.initial ?? 0);
@@ -98,7 +101,7 @@ export function ArticulationGallery({ onClose }: { onClose: () => void }) {
 
   useEffect(() => {
     const next = new SpatialSimulationSession(fixture.source, undefined, `example:${fixture.id}`, fixture.capabilities);
-    setSession(next); snapshotRef.current = undefined; setStatus('ready'); setReplayError(undefined);
+    setSession(next); snapshotRef.current = undefined; maximumPivotErrorRef.current = 0; setStatus('ready'); setReplayError(undefined);
     setMotorTarget(fixture.motor?.initial ?? 0); setLog([`0000 · loaded ${fixture.capabilities.id}`]);
     setProof(verifyFixture(fixture));
     return () => next.dispose();
@@ -115,7 +118,6 @@ export function ArticulationGallery({ onClose }: { onClose: () => void }) {
   const record = useCallback((value: string) => setLog((entries) => [...entries.slice(-7), `${session?.frame().tick.toString().padStart(4, '0') ?? '0000'} · ${value}`]), [session]);
   if (!session) return <main className="example-gallery"><p>Initializing production articulation runtime…</p></main>;
   const step = () => { session.resume(); session.advance(1 / 60); session.pause(); setStatus('paused'); record('fixed step'); refresh(); };
-  const restoreAndPublish = (snapshot: PhysicsSnapshot) => { session.timeline.simulation.world.restore(snapshot); session.setInput(fixture.source, new Map()); };
   const reset = () => { session.reconstruct(fixture.source); snapshotRef.current = undefined; setStatus('ready'); setReplayError(undefined); record('reset'); refresh(); };
   const joint = session.timeline.simulation.world.inspectArticulations?.()[0];
   const snap = session.timeline.simulation.world.snapshot();
@@ -123,6 +125,14 @@ export function ArticulationGallery({ onClose }: { onClose: () => void }) {
   const child = snap.states.find(({ id }) => definitionById.get(id)?.entityId === joint?.childEntityId);
   const anchor = snap.states.find(({ id }) => definitionById.get(id)?.entityId === joint?.parentEntityId);
   const coordinate = joint?.coordinate ?? 0; const limits = joint?.limits ?? [-Infinity, Infinity];
+  maximumPivotErrorRef.current = Math.max(maximumPivotErrorRef.current, joint?.pivotError ?? 0);
+  const requested = fixture.motor?.unit === 'deg' ? motorTarget * Math.PI / 180 : motorTarget;
+  const achieved = fixture.control === 'velocity' && child ? Math.hypot(...child.angularVelocity) : coordinate;
+  const enqueueControl = (value: number) => {
+    const id = snap.joints?.[0]?.id; if (!id) return;
+    const kind = fixture.control === 'velocity' ? 'joint-velocity-target' : fixture.control === 'effort' || fixture.control === 'touch' ? 'joint-effort' : 'joint-position-target';
+    session.timeline.simulation.enqueueInputs([{ kind, jointId: id, tick: snap.tick + 1, value: fixture.motor?.unit === 'deg' ? value * Math.PI / 180 : value }]);
+  };
   const assertions = [
     ['Anchor remains static', anchor ? Math.hypot(...anchor.linearVelocity) < 1e-8 : false],
     ['Pivot error below tolerance', (joint?.pivotError ?? Infinity) <= fixture.tolerances.pivotError],
@@ -138,15 +148,17 @@ export function ArticulationGallery({ onClose }: { onClose: () => void }) {
 
   return <main className="example-gallery">
     <header><div><span className="eyebrow">ARTICULATION LAB / PRODUCTION RUNTIME</span><h1>Joint behavior, made visible.</h1><p>Deterministic fixtures rendered through the same SceneRoot and SpatialSimulationSession exercised by automated tests.</p></div><button onClick={onClose}>Return to workspace</button></header>
-    <nav aria-label="Gallery filter"><button className={release === 'B' ? 'active' : ''} onClick={() => setRelease('B')}>Release B — passive</button><button className={release === 'C' ? 'active' : ''} onClick={() => setRelease('C')}>Release C — active</button></nav>
+    <nav aria-label="Gallery filter"><button className={release === 'B' ? 'active' : ''} onClick={() => { setRelease('B'); setFixtureIndex(0); }}>Release B — passive</button><button className={release === 'C' ? 'active' : ''} onClick={() => { setRelease('C'); setFixtureIndex(0); }}>Release C — active</button></nav>
+    <nav className="fixture-catalog" aria-label={`Release ${release} examples`}>{catalog.map((entry, index) => <button key={entry.id} className={index === fixtureIndex ? 'active' : ''} onClick={() => setFixtureIndex(index)}><span>{String(index + 1).padStart(2, '0')}</span>{entry.title}</button>)}</nav>
     <section className="example-layout">
       <article className="example-stage"><div className="stage-label"><b>{fixture.title}</b><span>{status} · tick {session.frame().tick}</span></div><div className="example-canvas"><SceneRoot document={session.frame().document} /></div>
         <svg className="joint-overlay" viewBox="0 0 600 420" aria-label="Joint debug overlay"><path d="M300 115 A105 105 0 0 1 390 205"/><line x1="300" y1="115" x2="300" y2="280"/><line className={pivotError > fixture.tolerances.pivotError ? 'error' : ''} x1="300" y1="115" x2={300 + pivotError * 900} y2="115"/><circle className="parent" cx="300" cy="115" r="8"/><circle className="child" cx={300 + pivotError * 900} cy="115" r="5"/><text x="312" y="101">parent pivot / child pivot</text><text x="310" y="275">axis · Z</text><text x="395" y="207">limit range</text></svg>
       </article>
-      <aside className="example-panel"><span className="eyebrow">FIXTURE 01 / {release === 'B' ? 'PASSIVE' : 'ACTIVE'}</span><h2>{fixture.title}</h2><p>{fixture.description}</p>
+      <aside className="example-panel"><span className="eyebrow">FIXTURE {String(fixtureIndex + 1).padStart(2, '0')} / {release === 'B' ? 'PASSIVE' : 'ACTIVE'}</span><h2>{fixture.title}</h2><p>{fixture.description}</p>
         <div className="transport"><button onClick={() => { session.start(); setStatus('running'); record('start'); }}>Start</button><button onClick={() => { session.pause(); setStatus('paused'); record('pause'); }}>Pause</button><button onClick={step}>Step</button><button onClick={() => { session.resume(); setStatus('running'); record('resume'); }}>Resume</button><button onClick={reset}>Reset</button></div>
-        <div className="transport secondary"><button onClick={() => { if (!child) return; session.timeline.simulation.enqueueInputs([{ kind: 'impulse', bodyId: child.id, tick: snap.tick + 1, vector: [...(fixture.inputs.find((input) => input.kind === 'child-impulse')?.vector ?? [2.5, 0, 0])] }]); record('impulse +2.5X'); }}>Apply impulse</button><button onClick={() => { snapshotRef.current = snap; record('snapshot captured'); }}>Capture snapshot</button><button disabled={!snapshotRef.current} onClick={() => { restoreAndPublish(snapshotRef.current!); session.pause(); setStatus('paused'); record('snapshot restored'); refresh(); }}>Restore</button><button disabled={!snapshotRef.current} onClick={() => { const expected = snap; restoreAndPublish(snapshotRef.current!); session.resume(); while (session.timeline.simulation.world.tick < expected.tick) session.advance(1 / 60); session.pause(); setStatus('paused'); setReplayError(dynamicStateDivergence(expected, session.timeline.simulation.world.snapshot())); session.setInput(fixture.source, new Map()); record('deterministic replay'); refresh(); }}>Replay</button></div>
-        {fixture.motor ? <label className="motor-control"><span>Controller target <b>{motorTarget}°</b></span><input type="range" min={fixture.motor.minimum} max={fixture.motor.maximum} value={motorTarget} onChange={(event) => { const value = Number(event.target.value); setMotorTarget(value); const id = snap.joints?.[0]?.id; if (id) session.timeline.simulation.enqueueInputs([{ kind: 'joint-position-target', jointId: id, tick: snap.tick + 1, value: value * Math.PI / 180 }]); record(`motor target ${value}°`); }}/><small>Position servo · 90°/s · 18 N·m maximum</small></label> : <div className="passive-note">Motor target controls intentionally unavailable</div>}
+        <div className="transport secondary"><button disabled={fixture.control !== 'impulse'} onClick={() => { if (!child) return; session.timeline.simulation.enqueueInputs([{ kind: 'impulse', bodyId: child.id, tick: snap.tick + 1, vector: [...(fixture.inputs.find((input) => input.kind === 'child-impulse')?.vector ?? [2.5, 0, 0])] }]); record('impulse queued'); }}>Apply impulse</button><button onClick={() => { snapshotRef.current = { tick: snap.tick, snapshot: snap }; record(`timeline tick ${snap.tick} captured`); }}>Capture tick</button><button disabled={!snapshotRef.current} onClick={() => { if (!session.timeline.simulation.seek(snapshotRef.current!.tick)) return; session.resetTiming(); session.pause(); setStatus('paused'); record('exact tick restored'); refresh(); }}>Restore</button><button disabled={!snapshotRef.current || snap.tick <= (snapshotRef.current?.tick ?? 0)} onClick={() => { const expected = snap; const captured = snapshotRef.current!; if (!session.timeline.simulation.seek(captured.tick)) return; session.resetTiming(); session.start(); while (session.timeline.simulation.world.tick < expected.tick) session.advance(1 / session.timeline.simulation.world.ticksPerSecond); session.pause(); setStatus('paused'); setReplayError(dynamicStateDivergence(expected, session.timeline.simulation.world.snapshot())); record('timeline replay'); refresh(); }}>Replay</button></div>
+        {fixture.motor ? <label className="motor-control"><span>Requested state <b>{motorTarget.toFixed(2)} {fixture.motor.unit}</b></span><input type="range" step="0.05" min={fixture.motor.minimum} max={fixture.motor.maximum} value={motorTarget} onChange={(event) => { const value = Number(event.target.value); setMotorTarget(value); enqueueControl(value); record(`${fixture.control} request ${value}`); }}/><small>Physically achieved state <b>{achieved.toFixed(3)} {fixture.control === 'velocity' ? 'rad/s' : 'rad'}</b> · error {Math.abs(requested - achieved).toFixed(3)}</small></label> : <div className="passive-note">Passive fixture — no active motor command</div>}
+        <h3>Joint telemetry</h3><dl className="joint-telemetry"><div><dt>Kind / stable ID</dt><dd>{joint?.kind ?? '—'} · {joint?.id ?? '—'}</dd></div><div><dt>Parent / child</dt><dd>{joint?.parentEntityId ?? '—'} / {joint?.childEntityId ?? '—'}</dd></div><div><dt>Parent pivot</dt><dd>{joint?.parentAnchorWorld?.map((v) => v.toFixed(3)).join(', ') ?? '—'}</dd></div><div><dt>Child pivot</dt><dd>{joint?.childAnchorWorld?.map((v) => v.toFixed(3)).join(', ') ?? '—'}</dd></div><div><dt>Coordinate / limits</dt><dd>{coordinate.toFixed(3)} / {limits.map((v) => Number.isFinite(v) ? v.toFixed(3) : '∞').join(' … ')}</dd></div><div><dt>Max pivot error</dt><dd>{maximumPivotErrorRef.current.toExponential(2)}</dd></div><div><dt>Tick / replay divergence</dt><dd>{snap.tick} / {replayError?.toExponential(2) ?? 'not run'}</dd></div></dl>
         <h3>Live proof</h3><ul className="assertions">{assertions.map(([label, pass]) => <li className={pass === undefined ? 'pending' : pass ? 'pass' : 'fail'} key={label}><span>{pass === undefined ? '·' : pass ? '✓' : '!'}</span>{label}</li>)}</ul>
         <details open><summary>Capability profile & emitted input log</summary><pre>{JSON.stringify(fixture.capabilities, null, 2)}</pre><ol>{log.map((entry, i) => <li key={`${i}-${entry}`}>{entry}</li>)}</ol></details>
       </aside>

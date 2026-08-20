@@ -8,12 +8,14 @@ import type { PhysicsSnapshot } from '../physics/types';
 
 describe('browser articulation catalogs', () => {
   it('pins every fixture to its release capabilities and production session', () => {
+    expect(RELEASE_B_FIXTURES).toHaveLength(8);
+    expect(RELEASE_C_FIXTURES).toHaveLength(9);
     expect(RELEASE_B_FIXTURES.every(({ capabilities }) => capabilities === RELEASE_B_CAPABILITIES)).toBe(true);
     expect(RELEASE_C_FIXTURES.every(({ capabilities }) => capabilities === RELEASE_C_CAPABILITIES)).toBe(true);
     for (const fixture of [...RELEASE_B_FIXTURES, ...RELEASE_C_FIXTURES]) {
       const session = new SpatialSimulationSession(fixture.source, undefined, fixture.id, fixture.capabilities);
       expect(session.capabilities).toBe(fixture.capabilities);
-      expect(session.timeline.simulation.world.snapshot().joints).toHaveLength(1);
+      expect(session.timeline.simulation.world.snapshot().joints?.map(({ kind }) => kind)).toEqual(fixture.expectedJointKinds);
       session.dispose();
     }
   });
