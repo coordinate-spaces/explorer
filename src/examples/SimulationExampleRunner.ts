@@ -1,6 +1,7 @@
 import { SpatialSimulationSession } from '../simulation/SpatialSimulationSession';
 import type { ArticulationInspection, PhysicsInput, PhysicsSnapshot, RigidBodyState } from '../physics/types';
 import type { ArticulationFixture, ExampleInput } from './fixtures';
+import type { InteractionTransition } from '../transactions/interactionTimeline';
 
 export type ExampleAssertionName =
   | 'maximum pivot error' | 'maximum limit overshoot' | 'static-root drift'
@@ -16,6 +17,7 @@ export interface SampledExampleState {
   readonly tick: number;
   readonly snapshot: PhysicsSnapshot;
   readonly articulations: readonly ArticulationInspection[];
+  readonly transitions: readonly InteractionTransition[];
 }
 
 export interface ExampleAssertion {
@@ -55,7 +57,7 @@ export class SimulationExampleRunner {
     const session = new SpatialSimulationSession(fixture.source, undefined, `example:${fixture.id}`, fixture.capabilities);
     const initial = session.timeline.simulation.world.snapshot();
     const samples: SampledExampleState[] = [this.sample(session)];
-    const snapshots = new Map<number, PhysicsSnapshot>();
+    const snapshotTicks = new Set<number>();
     const inputByTick = new Map<number, ExampleInput[]>();
     fixture.inputs.forEach((input) => inputByTick.set(input.tick, [...(inputByTick.get(input.tick) ?? []), input]));
     session.start();
@@ -65,16 +67,18 @@ export class SimulationExampleRunner {
       // Exactly one fixed tick. No performance clock, RAF, or elapsed-time sampling is involved.
       session.advance(1 / session.timeline.simulation.world.ticksPerSecond);
       samples.push(this.sample(session));
-      if (fixture.snapshotTicks.includes(tick)) snapshots.set(tick, session.timeline.simulation.world.snapshot());
+      if (fixture.snapshotTicks.includes(tick)) snapshotTicks.add(tick);
     }
     session.pause();
     const final = session.timeline.simulation.world.snapshot();
 
     let replayError = 0;
-    snapshots.forEach((snapshot) => {
-      session.timeline.simulation.world.restore(snapshot);
+    snapshotTicks.forEach((snapshotTick) => {
+      // SimulationTimeline snapshots include previous facts and bindings as well
+      // as physics. Restoring the world alone corrupts enter/stay/leave replay.
+      if (!session.timeline.simulation.seek(snapshotTick)) throw new Error(`${fixture.id}: no timeline snapshot exists at tick ${snapshotTick}.`);
       session.resetTiming(); session.start();
-      for (let tick = snapshot.tick + 1; tick <= fixture.ticks; tick += 1) {
+      for (let tick = snapshotTick + 1; tick <= fixture.ticks; tick += 1) {
         const declared = inputByTick.get(tick);
         if (declared) session.timeline.simulation.enqueueInputs(declared.map((input) => this.resolveInput(input, session.timeline.simulation.world.snapshot())));
         session.advance(1 / session.timeline.simulation.world.ticksPerSecond);
@@ -95,7 +99,12 @@ export class SimulationExampleRunner {
   }
 
   private sample(session: SpatialSimulationSession): SampledExampleState {
-    return { tick: session.timeline.simulation.world.tick, snapshot: session.timeline.simulation.world.snapshot(), articulations: session.timeline.simulation.world.inspectArticulations?.() ?? [] };
+    return {
+      tick: session.timeline.simulation.world.tick,
+      snapshot: session.timeline.simulation.world.snapshot(),
+      articulations: session.timeline.simulation.world.inspectArticulations?.() ?? [],
+      transitions: session.frame().transitions,
+    };
   }
 
   private resolveInput(input: ExampleInput, snapshot: PhysicsSnapshot): PhysicsInput {
@@ -114,6 +123,9 @@ export class SimulationExampleRunner {
     if (!Number.isInteger(fixture.ticks) || fixture.ticks < 1) throw new Error(`${fixture.id}: ticks must be a positive integer.`);
     fixture.inputs.forEach((input) => {
       if (!Number.isInteger(input.tick) || input.tick < 1 || input.tick > fixture.ticks) throw new Error(`${fixture.id}: input tick ${input.tick} is outside the run.`);
+    });
+    fixture.snapshotTicks.forEach((tick) => {
+      if (!Number.isInteger(tick) || tick < 0 || tick >= fixture.ticks) throw new Error(`${fixture.id}: snapshot tick ${tick} is outside the replayable run.`);
     });
   }
 
@@ -140,26 +152,52 @@ export class SimulationExampleRunner {
       const id = snapshot.definitions.find((definition) => (definition.entityId ?? definition.id) === entityId)?.id;
       return snapshot.states.find((state) => state.id === id);
     };
-    const relativeComponents = (snapshot: PhysicsSnapshot, parentId: string, childId: string): number[] => {
+    const multiply = (a: readonly number[], b: readonly number[]): [number, number, number, number] => [
+      a[3] * b[0] + a[0] * b[3] + a[1] * b[2] - a[2] * b[1],
+      a[3] * b[1] - a[0] * b[2] + a[1] * b[3] + a[2] * b[0],
+      a[3] * b[2] + a[0] * b[1] - a[1] * b[0] + a[2] * b[3],
+      a[3] * b[3] - a[0] * b[0] - a[1] * b[1] - a[2] * b[2],
+    ];
+    const inverse = (q: readonly number[]): [number, number, number, number] => {
+      const squaredLength = q.reduce((sum, value) => sum + value * value, 0) || 1;
+      return [-q[0] / squaredLength, -q[1] / squaredLength, -q[2] / squaredLength, q[3] / squaredLength];
+    };
+    const rotate = (q: readonly number[], vector: readonly number[]): [number, number, number] => {
+      const rotated = multiply(multiply(q, [vector[0], vector[1], vector[2], 0]), inverse(q));
+      return [rotated[0], rotated[1], rotated[2]];
+    };
+    const relativePose = (snapshot: PhysicsSnapshot, parentId: string, childId: string) => {
       const parent = bodyForEntity(snapshot, parentId); const child = bodyForEntity(snapshot, childId);
-      if (!parent || !child) return [Infinity];
-      return [...child.position.map((value, axis) => value - parent.position[axis]), ...child.orientation.map((value, axis) => value - parent.orientation[axis])];
+      if (!parent || !child) return undefined;
+      const parentInverse = inverse(parent.orientation);
+      return {
+        position: rotate(parentInverse, child.position.map((value, axis) => value - parent.position[axis])),
+        orientation: multiply(parentInverse, child.orientation),
+      };
     };
     const fixed = maximum((sample) => Math.max(0, ...(initial.joints ?? []).filter(({ kind }) => kind === 'fixed').map((definition) => {
-      const expected = relativeComponents(initial, definition.parentEntityId, definition.childEntityId);
-      const actual = relativeComponents(sample.snapshot, definition.parentEntityId, definition.childEntityId);
-      return Math.max(...expected.map((value, index) => Math.abs(value - actual[index])));
+      const expected = relativePose(initial, definition.parentEntityId, definition.childEntityId);
+      const actual = relativePose(sample.snapshot, definition.parentEntityId, definition.childEntityId);
+      if (!expected || !actual) return Infinity;
+      const positionError = Math.hypot(...expected.position.map((value, axis) => value - actual.position[axis]));
+      const dot = Math.abs(expected.orientation.reduce((sum, value, axis) => sum + value * actual.orientation[axis], 0));
+      const angularError = 2 * Math.acos(Math.min(1, Math.max(-1, dot)));
+      return Math.max(positionError, angularError);
     })));
     const prismatic = maximum((sample) => Math.max(0, ...(initial.joints ?? []).map((definition) => {
       if (definition.kind !== 'prismatic') return 0;
-      const before = relativeComponents(initial, definition.parentEntityId, definition.childEntityId).slice(0, 3);
-      const after = relativeComponents(sample.snapshot, definition.parentEntityId, definition.childEntityId).slice(0, 3);
+      const before = relativePose(initial, definition.parentEntityId, definition.childEntityId)?.position ?? [Infinity, Infinity, Infinity];
+      const after = relativePose(sample.snapshot, definition.parentEntityId, definition.childEntityId)?.position ?? [Infinity, Infinity, Infinity];
       const displacement = after.map((value, axis) => value - before[axis]);
       const axisLength = Math.hypot(...definition.parentAxis) || 1;
       const along = displacement.reduce((sum, value, axis) => sum + value * definition.parentAxis[axis] / axisLength, 0);
       return Math.hypot(...displacement.map((value, axis) => value - along * definition.parentAxis[axis] / axisLength));
     })));
     const directChild = fixture.inputs.some((input) => !['child-impulse', 'joint-position-target'].includes(input.kind));
+    const observedTransitions = samples.flatMap(({ transitions }) => transitions).reduce((counts, transition) => {
+      counts[transition.kind] += 1;
+      return counts;
+    }, { enter: 0, stay: 0, leave: 0 });
     const result: ExampleAssertion[] = [];
     const add = (name: ExampleAssertionName, actual: number | string, bound: number | string, error: number, tick = last.tick, subject = joint?.id ?? fixture.id, pass = error <= (typeof bound === 'number' ? bound : 0)) => {
       const message = `Example ${fixture.id}; tick ${tick}; body/joint ${subject}; invariant ${name}; expected bound ${bound}; actual ${actual}; maximum observed error ${error}.`;
@@ -180,7 +218,14 @@ export class SimulationExampleRunner {
       add('maximum applied effort', effort, fixture.tolerances.maximumAppliedEffort, Math.max(0, effort - fixture.tolerances.maximumAppliedEffort));
       add('contact obstruction', overshoot.value, fixture.tolerances.contactObstruction, overshoot.value, overshoot.tick);
       add('requested versus achieved state', targetError, fixture.tolerances.requestedAchieved, targetError);
-      add('enter/stay/leave transition counts', '0/0/0', `${fixture.expectedTransitions.enter}/${fixture.expectedTransitions.stay}/${fixture.expectedTransitions.leave}`, 0, last.tick, fixture.id, fixture.expectedTransitions.enter + fixture.expectedTransitions.stay + fixture.expectedTransitions.leave === 0);
+      const transitionActual = `${observedTransitions.enter}/${observedTransitions.stay}/${observedTransitions.leave}`;
+      const transitionExpected = `${fixture.expectedTransitions.enter}/${fixture.expectedTransitions.stay}/${fixture.expectedTransitions.leave}`;
+      const transitionError = Math.max(
+        Math.abs(observedTransitions.enter - fixture.expectedTransitions.enter),
+        Math.abs(observedTransitions.stay - fixture.expectedTransitions.stay),
+        Math.abs(observedTransitions.leave - fixture.expectedTransitions.leave),
+      );
+      add('enter/stay/leave transition counts', transitionActual, transitionExpected, transitionError, last.tick, fixture.id, transitionError === 0);
       add('controller ownership', initial.jointMotors?.length ?? 0, '<=1 per joint', 0, last.tick, joint?.id, (initial.jointMotors?.length ?? 0) <= (initial.joints?.length ?? 0));
       add('motor replay divergence', replayError, fixture.tolerances.motorReplayDivergence, replayError);
       add('no articulated-child translation, teleport, or direct-orientation input', directChild ? 'forbidden input' : 'none', 'none', directChild ? Infinity : 0, last.tick, joint?.childEntityId, !directChild);
