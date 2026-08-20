@@ -171,7 +171,7 @@ export function compileArticulatedPhysicsScene(document: SpatialDocument, revisi
     seenChildEntities.add(childEntityId);
     const authoredParentPath = spec['joint-parent'];
     const controllerSegment = node.origin?.sourceKind === 'secondary'
-      ? node.namespacePath?.split('/').filter(Boolean).find((segment) => segment.startsWith('Controller'))
+      ? node.metadata?.intentControllerSegment as string | undefined
       : undefined;
     const parentPath = authoredParentPath && controllerSegment
       ? `${topLevelNamespace(authoredParentPath)}/${controllerSegment}/${authoredParentPath.split('/').filter(Boolean).slice(1).join('/')}/`

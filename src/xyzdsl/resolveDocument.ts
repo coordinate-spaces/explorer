@@ -25,6 +25,9 @@ export interface ResolvedSpatialObject extends SpatialObject {
   collisionOrder?: number;
   anchorScale?: [number, number, number];
   runtimeIntentId?: string;
+  /** Original baseline namespace retained when a controller segment is injected. */
+  runtimeAuthoredNamespacePath?: string;
+  runtimeControllerSegment?: string;
 }
 
 export interface ResolvedConditionalVariant extends Omit<SpatialObject, 'box'> {

@@ -205,9 +205,8 @@ export class AccumulativeSpatialTimeline {
       const pointer = this.intents.apply({ id: intent.id, mode: intent.mode, coordinate: intent.coordinate, frameId }).pointer;
       const intentNodes = renderable(authored.nodes).filter((candidate) => candidate.metadata?.intentId === intent.id);
       const controlTarget = intent.definition.physics['control-target'];
-      const normalizedNamespace = (namespace = '') => namespace.split('/').filter((segment) => !segment.startsWith('Controller')).join('/') + '/';
       const node = controlTarget
-        ? intentNodes.find((candidate) => normalizedNamespace(candidate.namespacePath) === controlTarget)
+        ? intentNodes.find((candidate) => candidate.metadata?.intentAuthoredNamespacePath === controlTarget)
         : intentNodes[0];
       const state = node ? states.get(node.id) : undefined;
       if (!node || !state) return [];

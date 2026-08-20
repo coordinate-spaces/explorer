@@ -362,6 +362,8 @@ export function createSpatialDocument(source: string, options: CreateSpatialDocu
         origin: intent.origin,
         source: `runtime instance of ${intent.definitionNamespacePath}`,
         runtimeIntentId: intent.id,
+        runtimeAuthoredNamespacePath: template.namespacePath,
+        runtimeControllerSegment: controllerSegment,
       };
     });
   });
@@ -417,6 +419,8 @@ export function createSpatialDocument(source: string, options: CreateSpatialDocu
           materializedFrom: object.materializedFrom,
           anchorScale: object.anchorScale,
           intentId: object.runtimeIntentId,
+          intentAuthoredNamespacePath: object.runtimeAuthoredNamespacePath,
+          intentControllerSegment: object.runtimeControllerSegment,
         },
         origin: object.origin,
         baseBox: object.box,
