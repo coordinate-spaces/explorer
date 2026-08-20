@@ -1,0 +1,65 @@
+name: Articulation release gates
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  articulation-release-b-historical:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the immutable Release B boundary
+        uses: actions/checkout@v5
+        with:
+          ref: c2e908cb0879887bd35dddabf088ca8c5aa92374
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Verify the historical Release B suite
+        run: npm test
+
+  articulation-release-b-current:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Run current code with RELEASE_B_CAPABILITIES
+        run: npm run test:articulation:b
+      - name: Upload Release B result report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: articulation-release-b-results
+          path: artifacts/articulation-release-b.json
+          if-no-files-found: error
+
+  articulation-release-c-current:
+    needs: articulation-release-b-current
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Run current Release C gate
+        run: npm run test:articulation:c
+      - name: Upload Release C result report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: articulation-release-c-results
+          path: artifacts/articulation-release-c.json
+          if-no-files-found: error

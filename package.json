@@ -8,6 +8,9 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "check:articulation-docs": "node scripts/check-articulation-docs.mjs",
+    "test:articulation:b": "RELEASE_B_CAPABILITIES=release-b-passive ARTICULATION_RELEASE=B ARTICULATION_REPORT=artifacts/articulation-release-b.json vitest run src/examples/articulationReleaseGate.test.ts",
+    "test:articulation:c": "ARTICULATION_RELEASE=C ARTICULATION_REPORT=artifacts/articulation-release-c.json vitest run src/examples/articulationReleaseGate.test.ts",
+    "test:articulation": "npm run test:articulation:b && npm run test:articulation:c",
     "preview": "vite preview",
     "test": "vitest run"
   },
@@ -23,6 +26,7 @@
     "three-stdlib": "^2.36.1"
   },
   "devDependencies": {
+    "@types/node": "^26.2.0",
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",
     "@types/three": "^0.181.0",
