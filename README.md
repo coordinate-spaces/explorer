@@ -135,6 +135,11 @@ hierarchy precision while contacts and joint limits remain physics-owned. The
 default document includes an arm, palm, articulated index finger, and thumb;
 see [experimental articulation](docs/experimental-articulation.md) for the
 authoring contract and current direct-angle limitations.
+
+When **Local cursor** and an articulated definition are selected, the simulation
+controls expose **Target** and **Precision** selectors. They remain available
+while running, so control can move between an individual finger body, its joint
+chain, a hand subtree, and the connected component without restarting physics.
 See [the experimental articulation contract](docs/experimental-articulation.md).
 
 ## Interaction directives

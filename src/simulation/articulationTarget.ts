@@ -1,5 +1,11 @@
 import type { ArticulationControlScope, ArticulationControlTarget, JointDefinition } from '../physics/types';
 
+/** Maps the local cursor's horizontal displacement into a bounded direct motor angle. */
+export function articulationPointerAngle(pointer: readonly [number, number, number]): number {
+  const degrees = ((pointer[0] - 6) + (4 - pointer[2])) * 30;
+  return Math.max(-170, Math.min(170, degrees)) * Math.PI / 180;
+}
+
 /** Resolves a stable rigid-body selection without exposing physics-engine handles. */
 export function resolveArticulationTarget(
   joints: readonly JointDefinition[],

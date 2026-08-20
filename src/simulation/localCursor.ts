@@ -7,6 +7,8 @@ export const LOCAL_CURSOR_NAMESPACE = 'LocalCursor/';
 
 export interface LocalCoordinateIntent {
   namespace: string;
+  controlTarget?: string;
+  controlScope?: 'body' | 'chain' | 'subtree' | 'component';
   pointer: [number, number, number];
   heading: number;
   mode: 'absolute' | 'relative';
@@ -22,6 +24,8 @@ export function resetLocalCoordinateIntent(intent: LocalCoordinateIntent, namesp
     ...DEFAULT_LOCAL_COORDINATE_INTENT,
     namespace,
     mode: intent.mode,
+    controlTarget: intent.controlTarget,
+    controlScope: intent.controlScope,
     pointer: intent.mode === 'relative' ? [0, 0, 0] : [...DEFAULT_LOCAL_COORDINATE_INTENT.pointer],
   };
 }
@@ -35,6 +39,30 @@ export function localIntentDefinitions(source: string): string[] {
     .map((object) => canonicalNamespacePath(object.namespace))
     .filter((namespace, index, all) => all.indexOf(namespace) === index)
     .sort();
+}
+
+export interface LocalArticulationControls {
+  targets: string[];
+  defaultTarget?: string;
+  defaultScope: NonNullable<LocalCoordinateIntent['controlScope']>;
+}
+
+/** Articulated body namespaces available beneath one controller definition. */
+export function localArticulationControls(source: string, definitionNamespace: string): LocalArticulationControls {
+  const objects = parseXyzDslDocument(source).value ?? [];
+  const definition = objects.find((object) => object.declarationOnly && canonicalNamespacePath(object.namespace) === definitionNamespace);
+  const segments = definitionNamespace.split('/').filter(Boolean);
+  const targets = objects.filter((object) => object.box && object.physics.body
+      && object.namespace.length > segments.length
+      && segments.every((segment, index) => object.namespace[index] === segment))
+    .map((object) => canonicalNamespacePath(object.namespace))
+    .filter((namespace, index, all) => all.indexOf(namespace) === index)
+    .sort();
+  return {
+    targets,
+    defaultTarget: definition?.physics['control-target'],
+    defaultScope: definition?.physics['control-scope'] ?? 'body',
+  };
 }
 
 export interface LocalCursorPose {
@@ -129,5 +157,8 @@ export function localCoordinateIntentXyzDsl(intent: LocalCoordinateIntent): stri
     const centiunits = Math.round(value * 100);
     return `${centiunits < 0 ? '-' : '+'}${Math.abs(centiunits)}c`;
   });
-  return `"${namespace}${coordinate.join('/')}" : "intent: ${intent.mode}"`;
+  const control = intent.controlTarget
+    ? `; control-target: ${intent.controlTarget}; control-scope: ${intent.controlScope ?? 'body'}`
+    : '';
+  return `"${namespace}${coordinate.join('/')}" : "intent: ${intent.mode}${control}"`;
 }

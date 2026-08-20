@@ -11,7 +11,7 @@ import type { XyzDslDeclarationOrigin } from '../xyzdsl/types';
 import { SimulationTimeline } from './SimulationTimeline';
 import type { PhysicsDirectiveBinding } from './SimulationTimeline';
 import { CoordinateIntentReducer, coordinateIntentInputs } from '../simulation/coordinateIntent';
-import { resolveArticulationTarget } from '../simulation/articulationTarget';
+import { articulationPointerAngle, resolveArticulationTarget } from '../simulation/articulationTarget';
 import type { CompiledPhysicsScene } from '../physics/compilePhysicsScene';
 
 export interface AccumulativeSpatialFrame {
@@ -214,7 +214,7 @@ export class AccumulativeSpatialTimeline {
         const body = scene.bodies.find((candidate) => candidate.id === node.id);
         if (!body) return [];
         const target = resolveArticulationTarget(scene.joints, body.entityId ?? body.id, intent.definition.physics['control-scope'] ?? 'body');
-        const angle = Math.max(-170, Math.min(170, (pointer[0] - 6) * 30)) * Math.PI / 180;
+        const angle = articulationPointerAngle(pointer);
         return target.jointIds.map((jointId) => ({
           kind: 'joint-motor' as const, bodyId: node.id, jointId, tick, targetAngle: angle,
           stiffness: intent.definition.physics['motor-stiffness'] ?? 18,

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { advanceLocalCoordinateIntent, advanceLocalCursor, DEFAULT_LOCAL_COORDINATE_INTENT, DEFAULT_LOCAL_CURSOR_POSE, localCoordinateIntentXyzDsl, localCursorXyzDsl, localIntentDefinitions, resetLocalCoordinateIntent } from './localCursor';
+import { advanceLocalCoordinateIntent, advanceLocalCursor, DEFAULT_LOCAL_COORDINATE_INTENT, DEFAULT_LOCAL_CURSOR_POSE, localArticulationControls, localCoordinateIntentXyzDsl, localCursorXyzDsl, localIntentDefinitions, resetLocalCoordinateIntent } from './localCursor';
 import { parseXyzDslDeclaration } from '../xyzdsl/parser';
 import { composeSpatialEditorSourceBundle } from '../transactions/composeTransactionSources';
 import { createSpatialDocument } from '../model/createSpatialDocument';
@@ -10,10 +10,20 @@ describe('local cursor simulation', () => {
   it('lists only definition namespaces with concrete descendants', () => {
     expect(localIntentDefinitions('"Character/" : ""\n"Character/Body/+0+1/+0+2/+0+1" : ""\n"Empty/" : ""')).toEqual(['Character/']);
   });
+  it('lists articulated control targets and definition defaults', () => {
+    const source = '"Arm/" : "control-target: Arm/Hand/Finger/; control-scope: chain"\n"Arm/Upper/+0+1/+0+2/+0+1" : "body: Upper"\n"Arm/Hand/Finger/+0+1/+0+1/+0+1" : "body: Finger"';
+    expect(localArticulationControls(source, 'Arm/')).toEqual({
+      targets: ['Arm/Hand/Finger/', 'Arm/Upper/'], defaultTarget: 'Arm/Hand/Finger/', defaultScope: 'chain',
+    });
+  });
   it('authors an intent pointer without emitting character pose or size', () => {
     const intent = advanceLocalCoordinateIntent(DEFAULT_LOCAL_COORDINATE_INTENT, { forward: 1, right: 0, up: 0, yawDelta: 0, pitchDelta: 0, deltaSeconds: 0.1 });
     expect(intent.pointer).toEqual([6, 0, 3.6]);
     expect(localCoordinateIntentXyzDsl(intent)).toBe('"Character/+600c/+0c/+360c" : "intent: absolute"');
+  });
+  it('authors an explicit articulation target and precision', () => {
+    expect(localCoordinateIntentXyzDsl({ ...DEFAULT_LOCAL_COORDINATE_INTENT, namespace: 'Arm/', controlTarget: 'Arm/Hand/Finger/', controlScope: 'subtree' }))
+      .toBe('"Arm/+600c/+0c/+400c" : "intent: absolute; control-target: Arm/Hand/Finger/; control-scope: subtree"');
   });
 
   it('emits only the current displacement in relative mode', () => {

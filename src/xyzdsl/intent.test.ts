@@ -5,6 +5,12 @@ import { resolveXyzDslDocument } from './resolveDocument';
 const secondary = new Map([[2, { sourceKind: 'secondary' as const, streamId: 'player-1', transactionId: 'tx-1' }]]);
 
 describe('XYZDSL coordinate intents', () => {
+  it('allows a controller frame to choose an authored articulation target and scope', () => {
+    const source = '"Arm/" : "control-target: Arm/Hand/; control-scope: body"\n"Arm/Hand/+0+1/+0+1/+0+1" : "body: Hand"\n"Arm/+6/+0/+4" : "intent: absolute; control-target: Arm/Hand/Finger/; control-scope: chain"';
+    const origins = new Map([[3, { sourceKind: 'secondary' as const, streamId: 'controller' }]]);
+    const resolved = resolveXyzDslDocument(parseXyzDslDocument(source, origins).value ?? []);
+    expect(resolved.intents[0].definition.physics).toMatchObject({ 'control-target': 'Arm/Hand/Finger/', 'control-scope': 'chain' });
+  });
   it('parses signed absolute and relative coordinates without geometry', () => {
     const parsed = parseXyzDslDocument('"Character/" : "max-speed: 6"\n"Character/+10/-2/+50c" : "intent: relative"', secondary);
     expect(parsed.diagnostics).toEqual([]);

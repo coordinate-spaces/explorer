@@ -505,6 +505,15 @@ export function resolveXyzDslDocument(objects: SpatialObject[]): {
     }
     const resolvedDefinition = resolvePropertiesFor(definition, ordinaryObjects);
     diagnostics.push(...resolvedDefinition.diagnostics);
+    const controllerPhysics = object.physics;
+    const definitionProperties = {
+      ...resolvedDefinition.properties,
+      physics: {
+        ...resolvedDefinition.properties.physics,
+        ...(controllerPhysics['control-target'] ? { 'control-target': controllerPhysics['control-target'] } : {}),
+        ...(controllerPhysics['control-scope'] ? { 'control-scope': controllerPhysics['control-scope'] } : {}),
+      },
+    };
     const streamId = object.origin.streamId ?? object.origin.publicKey ?? 'secondary';
     return [{
       id: `${streamId}::${namespacePath}`,
@@ -514,7 +523,7 @@ export function resolveXyzDslDocument(objects: SpatialObject[]): {
       streamId,
       lineNumber: object.lineNumber,
       origin: object.origin,
-      definition: resolvedDefinition.properties,
+      definition: definitionProperties,
     }];
   });
   const concreteNamespaces = concreteNamespaceSet(effectiveObjects);

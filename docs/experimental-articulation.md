@@ -16,17 +16,18 @@ when a secondary controller materializes a runtime instance:
 
 `body` drives only the selected body's owning joint, `chain` drives every joint
 from the articulation root to the selected body, and `subtree` drives joints
-beneath it. `component` selects both directions. Cursor X is currently mapped
-to a bounded revolute target angle; Rapier's motor applies bounded torque, so
+beneath it. `component` selects both directions. Horizontal cursor displacement
+is currently mapped to a bounded revolute target angle, so every WASD direction
+has an immediate visible effect. Rapier's motor applies bounded torque, so
 contacts, gravity, damping, and joint limits remain authoritative. The mapping
 is deliberately an exploratory direct-joint controller rather than inverse
 kinematics. Stable joint IDs—not Rapier handles—cross the simulation boundary.
 
 The default editor document contains an `Arm/Hand/Index` hierarchy plus a thumb.
-Choose the **Arm/** local controller and start simulation. A/D changes the
-target angle for the selected index-to-shoulder chain. Changing
-`control-target` or `control-scope` demonstrates finger, hand-subtree, arm-chain,
-and whole-component precision without changing the physics topology.
+Choose the **Arm/** local controller, choose a **Target** and **Precision**, and
+start simulation. WASD changes the target angle, while the same selectors remain
+available during simulation for live retargeting. Finger, hand-subtree,
+arm-chain, and whole-component precision do not change the physics topology.
 
 | Property | Meaning |
 | --- | --- |

@@ -27,7 +27,7 @@ import { XyzDslDrawer } from './ui/XyzDslDrawer';
 import { SelectedNodeInspector } from './ui/SelectedNodeInspector';
 import { usePersistentState } from './ui/usePersistentState';
 import { CoordinateIntentConsole } from './ui/CoordinateIntentConsole';
-import { advanceLocalCoordinateIntent, DEFAULT_LOCAL_COORDINATE_INTENT, LOCAL_CURSOR_STREAM_ID, localCoordinateIntentXyzDsl, localIntentDefinitions, resetLocalCoordinateIntent, type LocalCursorInput } from './simulation/localCursor';
+import { advanceLocalCoordinateIntent, DEFAULT_LOCAL_COORDINATE_INTENT, LOCAL_CURSOR_STREAM_ID, localArticulationControls, localCoordinateIntentXyzDsl, localIntentDefinitions, resetLocalCoordinateIntent, type LocalCursorInput } from './simulation/localCursor';
 
 const INITIAL_XYZDSL = `"+2+4/+0+6/+1+3" : "geometry: cylinder; color: 0x333333; metalness: 0.8; roughness: 0.2"
 "+2+4/+7+6/+0+10c" : "geometry: cone; color: yellow; metalness: 0.2; roughness: 0.5"
@@ -51,7 +51,7 @@ const INITIAL_XYZDSL = `"+2+4/+0+6/+1+3" : "geometry: cylinder; color: 0x333333;
 "Arm/Hand/Palm/+970c+120c/+470c+80c/+385c+90c" : "body: Palm; mass: 0.8; color: 0xcbd5e1; joint: revolute; joint-parent: Arm/Forearm/; joint-anchor: 10.3 5.5 4.3; joint-axis: 0 0 1; joint-limits: -70 70"
 "Arm/Hand/Index/Proximal/+980c+35c/+380c+90c/+390c+25c" : "body: IndexProximal; mass: 0.18; color: 0xe2e8f0; joint: revolute; joint-parent: Arm/Hand/Palm/; joint-anchor: 9.975 4.7 4.025; joint-axis: 0 0 1; joint-limits: -95 15"
 "Arm/Hand/Index/Distal/+980c+35c/+320c+60c/+390c+25c" : "body: IndexDistal; mass: 0.12; color: 0xf8fafc; joint: revolute; joint-parent: Arm/Hand/Index/Proximal/; joint-anchor: 9.975 3.8 4.025; joint-axis: 0 0 1; joint-limits: -100 5"
-"Arm/Hand/Thumb/Proximal/+1080c+30c/+440c+70c/+390c+30c" : "body: Thumb; mass: 0.15; color: 0xe2e8f0; rotation: 0,0,-35; joint: revolute; joint-parent: Arm/Hand/Palm/; joint-anchor: 10.75 4.9 4.05; joint-axis: 0 0 1; joint-limits: -70 45"`;
+"Arm/Hand/Thumb/Proximal/+1080c+30c/+4+70c/+390c+30c" : "body: Thumb; mass: 0.15; color: 0xe2e8f0; joint: revolute; joint-parent: Arm/Hand/Palm/; joint-anchor: 10.95 4.7 4.05; joint-axis: 0 0 1; joint-limits: -70 45"`;
 
 const DEFAULT_TRANSACTION_ENDPOINT = 'wss://sure-formerly-filly.ngrok-free.app/00000000e29a7850088d660489b7b9ae2da763bc3bd83324ecc54eee04840adb';
 
@@ -582,13 +582,23 @@ export default function App() {
   const localDefinitionChoices = useMemo(() => localIntentDefinitions(authoringSource), [authoringSource]);
   const selectedLocalDefinition = localDefinitionChoices.includes(localCoordinateIntent.namespace)
     ? localCoordinateIntent.namespace : (localDefinitionChoices[0] ?? '');
+  const localArticulation = useMemo(
+    () => localArticulationControls(authoringSource, selectedLocalDefinition),
+    [authoringSource, selectedLocalDefinition],
+  );
+  const selectedLocalControlTarget = localArticulation.targets.includes(localCoordinateIntent.controlTarget ?? '')
+    ? localCoordinateIntent.controlTarget!
+    : localArticulation.targets.includes(localArticulation.defaultTarget ?? '')
+      ? localArticulation.defaultTarget!
+      : (localArticulation.targets[0] ?? '');
+  const selectedLocalControlScope = localCoordinateIntent.controlScope ?? localArticulation.defaultScope;
   const localCursorStream = useMemo(() => ({
     id: LOCAL_CURSOR_STREAM_ID,
     transactionId: `local-frame-${localCoordinateIntent.sequence}`,
     transactionTime: localCoordinateIntent.sequence,
-    declarations: localCoordinateIntentXyzDsl({ ...localCoordinateIntent, namespace: selectedLocalDefinition }),
+    declarations: localCoordinateIntentXyzDsl({ ...localCoordinateIntent, namespace: selectedLocalDefinition, controlTarget: selectedLocalControlTarget || undefined, controlScope: selectedLocalControlScope }),
     bypassNamespacePolicy: true,
-  }), [localCoordinateIntent, selectedLocalDefinition]);
+  }), [localCoordinateIntent, selectedLocalControlScope, selectedLocalControlTarget, selectedLocalDefinition]);
   const renderedBundle = useMemo(
     () => composeSpatialEditorSourceBundle(
       authoringSource,
@@ -1034,8 +1044,18 @@ export default function App() {
               </select>
             </label>
             {simulationSource === 'local' ? <label className="simulation-camera-control">Definition
-              <select aria-label="Local controller definition" value={selectedLocalDefinition} onChange={(event) => setLocalCoordinateIntent((intent) => ({ ...intent, namespace: event.target.value }))}>
+              <select aria-label="Local controller definition" value={selectedLocalDefinition} onChange={(event) => setLocalCoordinateIntent((intent) => ({ ...intent, namespace: event.target.value, controlTarget: undefined, controlScope: undefined }))}>
                 {localDefinitionChoices.length ? localDefinitionChoices.map((namespace) => <option key={namespace}>{namespace}</option>) : <option value="">No controller definitions</option>}
+              </select>
+            </label> : null}
+            {simulationSource === 'local' && localArticulation.targets.length ? <label className="simulation-camera-control">Target
+              <select aria-label="Local articulation target" value={selectedLocalControlTarget} onChange={(event) => setLocalCoordinateIntent((intent) => ({ ...intent, controlTarget: event.target.value, sequence: intent.sequence + 1 }))}>
+                {localArticulation.targets.map((namespace) => <option key={namespace}>{namespace}</option>)}
+              </select>
+            </label> : null}
+            {simulationSource === 'local' && localArticulation.targets.length ? <label className="simulation-camera-control">Precision
+              <select aria-label="Local articulation precision" value={selectedLocalControlScope} onChange={(event) => setLocalCoordinateIntent((intent) => ({ ...intent, controlScope: event.target.value as NonNullable<typeof intent.controlScope>, sequence: intent.sequence + 1 }))}>
+                <option value="body">Body</option><option value="chain">Chain</option><option value="subtree">Subtree</option><option value="component">Component</option>
               </select>
             </label> : null}
             {simulationSource === 'local' ? <label className="simulation-camera-control">Intent
@@ -1051,9 +1071,19 @@ export default function App() {
               {simulationMode === 'running' ? 'Pause' : 'Resume'}
             </button>
             <button type="button" onClick={stopSimulation}>Stop and reset</button>
+            {simulationSource === 'local' && localArticulation.targets.length ? <label className="simulation-camera-control">Target
+              <select aria-label="Active articulation target" value={selectedLocalControlTarget} onChange={(event) => setLocalCoordinateIntent((intent) => ({ ...intent, controlTarget: event.target.value, sequence: intent.sequence + 1 }))}>
+                {localArticulation.targets.map((namespace) => <option key={namespace}>{namespace}</option>)}
+              </select>
+            </label> : null}
+            {simulationSource === 'local' && localArticulation.targets.length ? <label className="simulation-camera-control">Precision
+              <select aria-label="Active articulation precision" value={selectedLocalControlScope} onChange={(event) => setLocalCoordinateIntent((intent) => ({ ...intent, controlScope: event.target.value as NonNullable<typeof intent.controlScope>, sequence: intent.sequence + 1 }))}>
+                <option value="body">Body</option><option value="chain">Chain</option><option value="subtree">Subtree</option><option value="component">Component</option>
+              </select>
+            </label> : null}
             {simulationSource === 'local' ? (
               <span className="local-cursor-status" title="Click the scene to capture the mouse; press Escape to release.">
-                {localCursorCaptured ? 'Mouse captured' : 'Click scene · WASD · Space/Shift · mouse'} · frame {localCoordinateIntent.sequence}
+                {localCursorCaptured ? 'Mouse captured · WASD bends articulation' : 'Click scene · WASD bends articulation · mouse changes heading'} · frame {localCoordinateIntent.sequence}
                 {' · '}XYZ {localCoordinateIntent.pointer.map((value) => value.toFixed(2)).join(', ')}
                 {' · '}{document.interactions?.length ?? 0} interaction{document.interactions?.length === 1 ? '' : 's'}
               </span>
@@ -1079,8 +1109,8 @@ export default function App() {
         )}
       </div>
       {simulationSource === 'local' ? <CoordinateIntentConsole
-        declaration={localCoordinateIntentXyzDsl({ ...localCoordinateIntent, namespace: selectedLocalDefinition })}
-        intent={{ ...localCoordinateIntent, namespace: selectedLocalDefinition }}
+        declaration={localCoordinateIntentXyzDsl({ ...localCoordinateIntent, namespace: selectedLocalDefinition, controlTarget: selectedLocalControlTarget || undefined, controlScope: selectedLocalControlScope })}
+        intent={{ ...localCoordinateIntent, namespace: selectedLocalDefinition, controlTarget: selectedLocalControlTarget || undefined, controlScope: selectedLocalControlScope }}
         diagnostics={document.diagnostics}
       /> : null}
       <XyzDslDrawer
