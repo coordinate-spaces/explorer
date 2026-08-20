@@ -2,6 +2,7 @@ import { SpatialSimulationSession } from '../simulation/SpatialSimulationSession
 import type { ArticulationInspection, PhysicsInput, PhysicsSnapshot, RigidBodyState } from '../physics/types';
 import type { ArticulationFixture, ExampleInput } from './fixtures';
 import type { InteractionTransition } from '../transactions/interactionTimeline';
+import type { InteractionFact } from '../model/interactions';
 
 export type ExampleAssertionName =
   | 'maximum pivot error' | 'maximum limit overshoot' | 'static-root drift'
@@ -64,10 +65,14 @@ export class SimulationExampleRunner {
     session.start();
     for (let tick = 1; tick <= fixture.ticks; tick += 1) {
       const declared = inputByTick.get(tick);
-      if (declared) session.timeline.simulation.enqueueInputs(declared.map((input) => this.resolveInput(input, session.timeline.simulation.world.snapshot())));
-      // Exactly one fixed tick. No performance clock, RAF, or elapsed-time sampling is involved.
-      session.advance(1 / session.timeline.simulation.world.ticksPerSecond);
-      samples.push(this.sample(session));
+      const touch = declared?.find((input) => input.kind === 'touch-joint-effort');
+      const ordinary = declared?.filter((input) => input.kind !== 'touch-joint-effort') ?? [];
+      if (ordinary.length) session.timeline.simulation.enqueueInputs(ordinary.map((input) => this.resolveInput(input, session.timeline.simulation.world.snapshot())));
+      // Touch fixtures intentionally exercise the production interaction-to-motor
+      // binding path. Every other fixture advances through the owning session.
+      const transitions = touch ? this.evaluateTouchInput(touch, session) : undefined;
+      if (!touch) session.advance(1 / session.timeline.simulation.world.ticksPerSecond);
+      samples.push(this.sample(session, transitions));
       if (fixture.snapshotTicks.includes(tick)) snapshotTicks.add(tick);
     }
     session.pause();
@@ -81,8 +86,11 @@ export class SimulationExampleRunner {
       session.resetTiming(); session.start();
       for (let tick = snapshotTick + 1; tick <= fixture.ticks; tick += 1) {
         const declared = inputByTick.get(tick);
-        if (declared) session.timeline.simulation.enqueueInputs(declared.map((input) => this.resolveInput(input, session.timeline.simulation.world.snapshot())));
-        session.advance(1 / session.timeline.simulation.world.ticksPerSecond);
+        const touch = declared?.find((input) => input.kind === 'touch-joint-effort');
+        const ordinary = declared?.filter((input) => input.kind !== 'touch-joint-effort') ?? [];
+        if (ordinary.length) session.timeline.simulation.enqueueInputs(ordinary.map((input) => this.resolveInput(input, session.timeline.simulation.world.snapshot())));
+        if (touch) this.evaluateTouchInput(touch, session);
+        else session.advance(1 / session.timeline.simulation.world.ticksPerSecond);
       }
       session.pause(); replayError = Math.max(replayError, stateError(final, session.timeline.simulation.world.snapshot()));
     });
@@ -99,23 +107,34 @@ export class SimulationExampleRunner {
     return { fixture, samples, assertions, passed: assertions.every(({ passed }) => passed) };
   }
 
-  private sample(session: SpatialSimulationSession): SampledExampleState {
+  private sample(session: SpatialSimulationSession, transitions = session.frame().transitions): SampledExampleState {
     return {
       tick: session.timeline.simulation.world.tick,
       snapshot: session.timeline.simulation.world.snapshot(),
       articulations: session.timeline.simulation.world.inspectArticulations?.() ?? [],
-      transitions: session.frame().transitions,
+      transitions,
     };
+  }
+
+  private evaluateTouchInput(input: Extract<ExampleInput, { kind: 'touch-joint-effort' }>, session: SpatialSimulationSession): readonly InteractionTransition[] {
+    const snapshot = session.timeline.simulation.world.snapshot();
+    const joint = snapshot.joints?.[input.jointIndex ?? 0];
+    if (!joint) throw new Error('Touch fixture declares a joint input but has no joint.');
+    const target = snapshot.definitions.find((definition) => (definition.entityId ?? definition.id) === joint.childEntityId);
+    if (!target) throw new Error('Touch fixture has no articulated target body.');
+    const fact: InteractionFact = { state: 'touch', targetId: target.id, targetNamespace: `${joint.childEntityId}/`, cursorId: 'example-touch-cursor', cursorNamespace: 'ExampleCursor/', streamId: 'example-touch', normal: [1, 0, 0], inferredDirection: [1, 0, 0] };
+    return session.timeline.simulation.evaluate(input.tick, input.tick, 0, [fact], [{ targetId: target.id, mode: 'joint-effort', jointId: joint.id, value: input.value, phase: 'enter' }]).transitions;
   }
 
   private resolveInput(input: ExampleInput, snapshot: PhysicsSnapshot): PhysicsInput {
     const joint = snapshot.joints?.[input.jointIndex ?? 0];
-    if (input.kind !== 'child-impulse') {
+    if (input.kind !== 'child-impulse' && input.kind !== 'touch-joint-effort') {
       if (!joint) throw new Error('Example declares a joint input but has no joint.');
       return { kind: input.kind, jointId: joint.id, tick: input.tick, value: input.value,
         controllerPriority: input.controllerPriority, blendWeight: input.blendWeight,
         exclusive: input.exclusive };
     }
+    if (input.kind === 'touch-joint-effort') throw new Error('Touch inputs must be evaluated through interaction bindings.');
     const childEntityId = joint?.childEntityId;
     const body = snapshot.definitions.find((definition) => (definition.entityId ?? definition.id) === childEntityId);
     if (!body) throw new Error('Example declares a child impulse but has no articulated child.');
@@ -146,9 +165,21 @@ export class SimulationExampleRunner {
     })));
     const finite = samples.find((sample) => sample.snapshot.states.some((state) => !components(state).every(Number.isFinite)));
     const last = samples.at(-1)!; const joint = last.articulations[0];
+    const stateForEntity = (snapshot: PhysicsSnapshot, entityId: string) => {
+      const id = snapshot.definitions.find((definition) => (definition.entityId ?? definition.id) === entityId)?.id;
+      return snapshot.states.find((state) => state.id === id);
+    };
     const requestedInput = [...fixture.inputs].reverse().find((input) => input.kind !== 'child-impulse');
     const requested = requestedInput?.value;
-    const targetError = requested === undefined || joint?.coordinate === undefined ? 0 : Math.abs(requested - joint.coordinate);
+    const finalJointDefinition = last.snapshot.joints?.[requestedInput?.jointIndex ?? 0];
+    const finalChild = finalJointDefinition ? stateForEntity(last.snapshot, finalJointDefinition.childEntityId) : undefined;
+    const initialChild = finalJointDefinition ? stateForEntity(initial, finalJointDefinition.childEntityId) : undefined;
+    const achieved = requestedInput?.kind === 'joint-velocity-target' && finalChild && finalJointDefinition && 'parentAxis' in finalJointDefinition
+      ? Math.abs(finalChild.angularVelocity.reduce((sum, value, axis) => sum + value * finalJointDefinition.parentAxis[axis], 0))
+      : requestedInput?.kind === 'joint-effort' || requestedInput?.kind === 'touch-joint-effort'
+        ? finalChild && initialChild ? Math.abs(finalChild.angularVelocity[2] - initialChild.angularVelocity[2]) : undefined
+        : joint?.coordinate;
+    const targetError = requested === undefined || achieved === undefined ? Infinity : Math.abs(requested - achieved);
     const speed = maximum((sample) => Math.max(0, ...sample.snapshot.states.map((state) => Math.hypot(...state.angularVelocity, ...state.linearVelocity))));
     const effort = Math.max(0, ...(initial.joints ?? []).map((definition) => definition.motor?.maxEffort ?? 0));
     const bodyForEntity = (snapshot: PhysicsSnapshot, entityId: string) => {
@@ -223,7 +254,9 @@ export class SimulationExampleRunner {
       add('maximum speed', speed.value, fixture.tolerances.maximumSpeed, speed.value, speed.tick);
       add('maximum applied effort', effort, fixture.tolerances.maximumAppliedEffort, Math.max(0, effort - fixture.tolerances.maximumAppliedEffort));
       add('contact obstruction', overshoot.value, fixture.tolerances.contactObstruction, overshoot.value, overshoot.tick);
-      add('requested versus achieved state', targetError, fixture.expectTargetConvergence ? fixture.tolerances.requestedAchieved : 'observed separately', 0, last.tick, joint?.id, requested !== undefined && joint?.coordinate !== undefined);
+      const effortResponse = requestedInput?.kind === 'joint-effort' || requestedInput?.kind === 'touch-joint-effort';
+      const requestedAchievedPass = requested !== undefined && achieved !== undefined && (effortResponse ? achieved > 1e-5 : Number.isFinite(targetError));
+      add('requested versus achieved state', `${requested ?? 'missing'} requested / ${achieved ?? 'missing'} achieved`, effortResponse ? 'non-zero physical velocity response' : 'same coordinate units', requestedAchievedPass ? 0 : Infinity, last.tick, joint?.id, requestedAchievedPass);
       const transitionActual = `${observedTransitions.enter}/${observedTransitions.stay}/${observedTransitions.leave}`;
       const transitionExpected = `${fixture.expectedTransitions.enter}/${fixture.expectedTransitions.stay}/${fixture.expectedTransitions.leave}`;
       const transitionError = Math.max(

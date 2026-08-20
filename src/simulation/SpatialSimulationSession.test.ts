@@ -151,6 +151,16 @@ describe('application spatial simulation session', () => {
     expect(sought.frame().tick).toBe(fresh.frame().tick);
     expect(bodyY(sought)).toBeCloseTo(bodyY(fresh), 8);
   });
+
+  it('republishes the document and displayed tick after exact timeline seeking', () => {
+    const session = new SpatialSimulationSession(fallingBody);
+    session.start(); session.advance(1 / 60); session.advance(1 / 60); session.pause();
+    expect(session.frame().tick).toBe(2);
+    expect(session.seek(1)?.tick).toBe(1);
+    expect(session.frame().tick).toBe(1);
+    expect(session.timeline.simulation.world.tick).toBe(1);
+    session.dispose();
+  });
   it('does not advance when a completed authored frame is reread or recompiled', () => {
     const session = new SpatialSimulationSession(fallingBody); session.start(); session.advance(1 / 60);
     const tick = session.frame().tick;

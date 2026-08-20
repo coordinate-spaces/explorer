@@ -95,7 +95,7 @@ export class SimulationTimeline {
   /** Capability-enforced lower-level input path used by playback and headless callers. */
   enqueueInputs(inputs: readonly PhysicsInput[]): void {
     validatePhysicsInputs(this.capabilities, inputs);
-    this.world.enqueueInputs(inputs);
+    this.world.enqueueInputs(resolveJointControllerInputs(inputs));
   }
 
   dispose(): void { this.world.dispose(); }
@@ -181,7 +181,7 @@ export class SimulationTimeline {
         inputs.push({ kind: 'impulse', bodyId: binding.targetId, tick, stableSourceOrder, vector: direction(fact).map((value) => value * (binding.magnitude ?? 0)) as Vector3Tuple });
       });
     });
-    this.enqueueInputs(resolveJointControllerInputs(inputs));
+    this.enqueueInputs(inputs);
     const physics = this.world.step(tick);
     this.previousFacts = [...facts];
     this.previousBindings = [...bindings];

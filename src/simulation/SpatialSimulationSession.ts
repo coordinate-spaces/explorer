@@ -64,6 +64,14 @@ export class SpatialSimulationSession {
   resume(): void { this.runner.reset(); this.running = true; }
   resetTiming(): void { this.runner.reset(); }
 
+  /** Restores an exact timeline tick and republishes that pose for renderers. */
+  seek(tick: number): AccumulativeSpatialFrame | undefined {
+    if (!this.timeline.simulation.seek(tick)) return undefined;
+    this.runner.reset();
+    this.published = this.timeline.compile(this.input.source, this.input.originsByLine);
+    return this.published;
+  }
+
   advance(elapsedSeconds: number): AccumulativeSpatialFrame | undefined {
     if (!this.running) return undefined;
     const result = this.runner.update(elapsedSeconds);

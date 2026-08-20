@@ -3,6 +3,7 @@ import type { JointDefinition } from '../physics/types';
 
 export type ExampleInput =
   | { readonly tick: number; readonly kind: 'child-impulse'; readonly vector: readonly [number, number, number]; readonly jointIndex?: number }
+  | { readonly tick: number; readonly kind: 'touch-joint-effort'; readonly value: number; readonly jointIndex?: number }
   | { readonly tick: number; readonly kind: 'joint-position-target' | 'joint-velocity-target' | 'joint-effort'; readonly value: number; readonly jointIndex?: number; readonly controllerPriority?: number; readonly blendWeight?: number; readonly exclusive?: boolean };
 
 export type ExampleControl = 'impulse' | 'position' | 'velocity' | 'effort' | 'touch' | 'direct' | 'competing';
