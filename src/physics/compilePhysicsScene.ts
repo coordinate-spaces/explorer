@@ -1,5 +1,6 @@
 import type { SpatialDocument } from '../model/SpatialDocument';
 import type { SpatialNode } from '../model/SpatialNode';
+import type { SpatialTransform } from '../model/transform';
 import type { ColliderDefinition, ColliderShape, JointDefinition, RigidBodyDefinition, Vector3Tuple } from './types';
 import { Euler, Quaternion, Vector3 } from 'three';
 import { authoredPhysicsEntityId, physicsOriginScope, scopedPhysicsNamespace } from './physicsIdentity';
@@ -10,6 +11,18 @@ function flatten(nodes: readonly SpatialNode[]): SpatialNode[] {
   return nodes.flatMap((node) => [node.renderable ? node : undefined, ...flatten(node.children ?? [])])
     .filter(Boolean) as SpatialNode[];
 }
+
+function flattenAll(nodes: readonly SpatialNode[]): SpatialNode[] {
+  return nodes.flatMap((node) => [node, ...flattenAll(node.children ?? [])]);
+}
+
+function topLevelNamespace(namespace: string | undefined): string | undefined {
+  return namespace?.split('/').find(Boolean);
+}
+
+const IDENTITY_TRANSFORM: SpatialTransform = {
+  position: [0, 0, 0], rotation: [0, 0, 0], scale: [1, 1, 1], pivot: [0, 0, 0],
+};
 
 function colliderShape(node: SpatialNode): ColliderShape {
   switch (node.geometry.kind) {
@@ -46,15 +59,23 @@ export function compileArticulatedPhysicsScene(document: SpatialDocument, revisi
   // All secondary primitives are compiled: ordinary cursors are zero-mass sensors,
   // while the explicit physical-body opt-in retains ordinary rigid-body semantics.
   const candidates = flatten(document.nodes);
-  // Articulations cannot cross a top-level component boundary. Keep the
-  // component frame for every descendant so authored joint data is never
-  // interpreted as a project-world coordinate.
-  const componentTransformByNode = new Map<SpatialNode, NonNullable<SpatialNode['worldTransform']>>();
-  const rememberComponentFrame = (node: SpatialNode, component: SpatialNode): void => {
-    componentTransformByNode.set(node, component.worldTransform ?? component.transform);
-    node.children?.forEach((child) => rememberComponentFrame(child, component));
+  // Namespace identity, rather than tree shape, defines a component. A valid
+  // component may omit its concrete root declaration, leaving its body
+  // primitives as separate document roots; that means an identity component
+  // frame, not one frame per primitive.
+  const componentRootByIdentity = new Map<string, SpatialNode>();
+  flattenAll(document.nodes).forEach((node) => {
+    const component = topLevelNamespace(node.namespacePath);
+    if (component && node.namespacePath === `${component}/`) {
+      componentRootByIdentity.set(`${physicsOriginScope(node)}\0${component}`, node);
+    }
+  });
+  const componentTransform = (node: SpatialNode): SpatialTransform => {
+    const component = topLevelNamespace(node.namespacePath);
+    if (!component) return IDENTITY_TRANSFORM;
+    const root = componentRootByIdentity.get(`${physicsOriginScope(node)}\0${component}`);
+    return root ? (root.worldTransform ?? root.transform) : IDENTITY_TRANSFORM;
   };
-  document.nodes.forEach((component) => rememberComponentFrame(component, component));
   const physicsEntityId = (node: SpatialNode): string => {
     const baseId = csgEntityByNodeId.get(node.id) ?? authoredPhysicsEntityId(node);
     if (node.origin?.sourceKind !== 'secondary') return baseId;
@@ -156,6 +177,10 @@ export function compileArticulatedPhysicsScene(document: SpatialDocument, revisi
       diagnose({ line: Number(node.metadata?.lineNumber ?? 0), source: node.source, message: `Joint parent "${parentPath ?? ''}" was not found.` });
       return;
     }
+    if (topLevelNamespace(parentPath) !== topLevelNamespace(node.namespacePath)) {
+      diagnose({ line: Number(node.metadata?.lineNumber ?? 0), source: node.source, message: 'Joint parent must belong to the same top-level component as its child.' });
+      return;
+    }
     if (parentEntityId === childEntityId) {
       diagnose({ line: Number(node.metadata?.lineNumber ?? 0), source: node.source, message: 'Joint endpoints must resolve to different rigid bodies.' });
       return;
@@ -166,12 +191,12 @@ export function compileArticulatedPhysicsScene(document: SpatialDocument, revisi
     }
     const parent = representativeByEntity.get(parentEntityId)!;
     const child = representativeByEntity.get(childEntityId)!;
-    const componentTransform = componentTransformByNode.get(node)!;
-    const componentOrientation = new Quaternion().setFromEuler(new Euler(...componentTransform.rotation, 'XYZ'));
+    const frame = componentTransform(node);
+    const componentOrientation = new Quaternion().setFromEuler(new Euler(...frame.rotation, 'XYZ'));
     const worldAnchor = new Vector3(...anchor)
-      .multiply(new Vector3(...componentTransform.scale))
+      .multiply(new Vector3(...frame.scale))
       .applyQuaternion(componentOrientation)
-      .add(new Vector3(...componentTransform.position));
+      .add(new Vector3(...frame.position));
     const localPoint = (body: RigidBodyDefinition): Vector3Tuple => {
       const q = new Quaternion(...(body.orientation ?? [0, 0, 0, 1])).invert();
       const point = worldAnchor.clone().sub(new Vector3(...body.position)).applyQuaternion(q);
