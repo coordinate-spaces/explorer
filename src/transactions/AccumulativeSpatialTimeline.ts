@@ -12,10 +12,13 @@ import { SimulationTimeline } from './SimulationTimeline';
 import type { PhysicsDirectiveBinding } from './SimulationTimeline';
 import { RELEASE_C_ACTIVE_CAPABILITIES, type ArticulationCapabilities } from '../physics/articulationCapabilities';
 import { CoordinateIntentReducer, coordinateIntentInputs, jointCoordinateIntentInput, releasedJointIntentInput } from '../simulation/coordinateIntent';
+import type { InteractionTransition } from './interactionTimeline';
 
 export interface AccumulativeSpatialFrame {
   document: SpatialDocument;
   tick: number;
+  /** Interaction phases emitted by this exact fixed tick. */
+  transitions: readonly InteractionTransition[];
 }
 
 /** Small deterministic hash used to bind a simulation session to one authored baseline. */
@@ -202,6 +205,7 @@ export class AccumulativeSpatialTimeline {
     });
     return {
       tick: this.simulation.world.tick,
+      transitions: [],
       document: withActivePhysicsJoints(withCompilerDiagnostics(document, effective), effective, this.simulation.world as RapierPhysicsWorld),
     };
   }
@@ -259,6 +263,7 @@ export class AccumulativeSpatialTimeline {
     const frame = this.simulation.evaluate(tick, tick, 0, facts, bindings, [...releasedInputs, ...controllerInputs]);
     return {
       tick,
+      transitions: frame.transitions,
       document: withActivePhysicsJoints(withCompilerDiagnostics(createSpatialDocument(source, {
         originsByLine,
         physicsFrame: frame.physics,

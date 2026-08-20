@@ -32,7 +32,7 @@ function verifyFixture(fixture: ArticulationFixture): ProofResult {
   const before = reconcile.timeline.simulation.world.snapshot();
   // A static, non-colliding declaration forces a real unrelated reconciliation.
   reconcile.setInput(`${fixture.source}\n"ProofMarker/+20+1/+20+1/+20+1":"physics-mode: static; sensor: true"`);
-  const reconciliation = dynamicStateDivergence(before, reconcile.timeline.simulation.world.snapshot()) <= fixture.tolerance;
+  const reconciliation = dynamicStateDivergence(before, reconcile.timeline.simulation.world.snapshot()) <= fixture.tolerances.pivotError;
   reconcile.dispose();
 
   const timeline = new SimulationTimeline(undefined, fixture.capabilities);
@@ -72,9 +72,9 @@ function verifyFixture(fixture: ArticulationFixture): ProofResult {
       const inspection = motor.timeline.simulation.world.inspectArticulations?.()[0];
       const configured = jointDefinition.motor;
       motorBounded = configured !== undefined && Number.isFinite(configured.maxEffort) && configured.maxEffort <= 18
-        && maximumAngularSpeed <= configured.maxSpeed + fixture.tolerance;
+        && maximumAngularSpeed <= configured.maxSpeed + fixture.tolerances.pivotError;
       obstructedMotor = obstructedMotor && maximumStepDistance < 0.25
-        && (inspection?.coordinate ?? Infinity) <= limit + fixture.tolerance;
+        && (inspection?.coordinate ?? Infinity) <= limit + fixture.tolerances.pivotError;
     } else {
       motorBounded = false; obstructedMotor = false;
     }
@@ -106,9 +106,10 @@ export function ArticulationGallery({ onClose }: { onClose: () => void }) {
 
   useEffect(() => {
     if (status !== 'running' || !session) return;
-    let previous = performance.now(); let request = 0;
-    const animate = (now: number) => { session.advance(Math.min((now - previous) / 1000, 0.05)); previous = now; refresh(); request = requestAnimationFrame(animate); };
-    request = requestAnimationFrame(animate); return () => cancelAnimationFrame(request);
+    // The timer only requests a tick; physics always receives exactly one fixed
+    // quantum and is never driven by requestAnimationFrame or measured wall time.
+    const timer = window.setInterval(() => { session.advance(1 / 60); refresh(); }, 1000 / 60);
+    return () => window.clearInterval(timer);
   }, [session, status]);
 
   const record = useCallback((value: string) => setLog((entries) => [...entries.slice(-7), `${session?.frame().tick.toString().padStart(4, '0') ?? '0000'} · ${value}`]), [session]);
@@ -124,11 +125,11 @@ export function ArticulationGallery({ onClose }: { onClose: () => void }) {
   const coordinate = joint?.coordinate ?? 0; const limits = joint?.limits ?? [-Infinity, Infinity];
   const assertions = [
     ['Anchor remains static', anchor ? Math.hypot(...anchor.linearVelocity) < 1e-8 : false],
-    ['Pivot error below tolerance', (joint?.pivotError ?? Infinity) <= fixture.tolerance],
-    ['Joint coordinate within limits', coordinate >= limits[0] - fixture.tolerance && coordinate <= limits[1] + fixture.tolerance],
+    ['Pivot error below tolerance', (joint?.pivotError ?? Infinity) <= fixture.tolerances.pivotError],
+    ['Joint coordinate within limits', coordinate >= limits[0] - fixture.tolerances.pivotError && coordinate <= limits[1] + fixture.tolerances.pivotError],
     ['No NaN or infinity', snap.states.every(finiteState)],
     ['Unrelated reconcile preserves pose + velocity', proof.reconciliation],
-    ['Replay divergence below tolerance', replayError === undefined ? undefined : replayError <= fixture.tolerance],
+    ['Replay divergence below tolerance', replayError === undefined ? undefined : replayError <= fixture.tolerances.pivotError],
     ['Motor speed + effort bounded', !fixture.motor || proof.motorBounded],
     ['Obstructed motors do not teleport', !fixture.motor || proof.obstructedMotor],
     ['One-shot reactions exactly once per entry', proof.oneShot],
@@ -140,11 +141,11 @@ export function ArticulationGallery({ onClose }: { onClose: () => void }) {
     <nav aria-label="Gallery filter"><button className={release === 'B' ? 'active' : ''} onClick={() => setRelease('B')}>Release B — passive</button><button className={release === 'C' ? 'active' : ''} onClick={() => setRelease('C')}>Release C — active</button></nav>
     <section className="example-layout">
       <article className="example-stage"><div className="stage-label"><b>{fixture.title}</b><span>{status} · tick {session.frame().tick}</span></div><div className="example-canvas"><SceneRoot document={session.frame().document} /></div>
-        <svg className="joint-overlay" viewBox="0 0 600 420" aria-label="Joint debug overlay"><path d="M300 115 A105 105 0 0 1 390 205"/><line x1="300" y1="115" x2="300" y2="280"/><line className={pivotError > fixture.tolerance ? 'error' : ''} x1="300" y1="115" x2={300 + pivotError * 900} y2="115"/><circle className="parent" cx="300" cy="115" r="8"/><circle className="child" cx={300 + pivotError * 900} cy="115" r="5"/><text x="312" y="101">parent pivot / child pivot</text><text x="310" y="275">axis · Z</text><text x="395" y="207">limit range</text></svg>
+        <svg className="joint-overlay" viewBox="0 0 600 420" aria-label="Joint debug overlay"><path d="M300 115 A105 105 0 0 1 390 205"/><line x1="300" y1="115" x2="300" y2="280"/><line className={pivotError > fixture.tolerances.pivotError ? 'error' : ''} x1="300" y1="115" x2={300 + pivotError * 900} y2="115"/><circle className="parent" cx="300" cy="115" r="8"/><circle className="child" cx={300 + pivotError * 900} cy="115" r="5"/><text x="312" y="101">parent pivot / child pivot</text><text x="310" y="275">axis · Z</text><text x="395" y="207">limit range</text></svg>
       </article>
       <aside className="example-panel"><span className="eyebrow">FIXTURE 01 / {release === 'B' ? 'PASSIVE' : 'ACTIVE'}</span><h2>{fixture.title}</h2><p>{fixture.description}</p>
         <div className="transport"><button onClick={() => { session.start(); setStatus('running'); record('start'); }}>Start</button><button onClick={() => { session.pause(); setStatus('paused'); record('pause'); }}>Pause</button><button onClick={step}>Step</button><button onClick={() => { session.resume(); setStatus('running'); record('resume'); }}>Resume</button><button onClick={reset}>Reset</button></div>
-        <div className="transport secondary"><button onClick={() => { if (!child) return; session.timeline.simulation.enqueueInputs([{ kind: 'impulse', bodyId: child.id, tick: snap.tick + 1, vector: [...fixture.impulse] }]); record('impulse +2.5X'); }}>Apply impulse</button><button onClick={() => { snapshotRef.current = snap; record('snapshot captured'); }}>Capture snapshot</button><button disabled={!snapshotRef.current} onClick={() => { restoreAndPublish(snapshotRef.current!); session.pause(); setStatus('paused'); record('snapshot restored'); refresh(); }}>Restore</button><button disabled={!snapshotRef.current} onClick={() => { const expected = snap; restoreAndPublish(snapshotRef.current!); session.resume(); while (session.timeline.simulation.world.tick < expected.tick) session.advance(1 / 60); session.pause(); setStatus('paused'); setReplayError(dynamicStateDivergence(expected, session.timeline.simulation.world.snapshot())); session.setInput(fixture.source, new Map()); record('deterministic replay'); refresh(); }}>Replay</button></div>
+        <div className="transport secondary"><button onClick={() => { if (!child) return; session.timeline.simulation.enqueueInputs([{ kind: 'impulse', bodyId: child.id, tick: snap.tick + 1, vector: [...(fixture.inputs.find((input) => input.kind === 'child-impulse')?.vector ?? [2.5, 0, 0])] }]); record('impulse +2.5X'); }}>Apply impulse</button><button onClick={() => { snapshotRef.current = snap; record('snapshot captured'); }}>Capture snapshot</button><button disabled={!snapshotRef.current} onClick={() => { restoreAndPublish(snapshotRef.current!); session.pause(); setStatus('paused'); record('snapshot restored'); refresh(); }}>Restore</button><button disabled={!snapshotRef.current} onClick={() => { const expected = snap; restoreAndPublish(snapshotRef.current!); session.resume(); while (session.timeline.simulation.world.tick < expected.tick) session.advance(1 / 60); session.pause(); setStatus('paused'); setReplayError(dynamicStateDivergence(expected, session.timeline.simulation.world.snapshot())); session.setInput(fixture.source, new Map()); record('deterministic replay'); refresh(); }}>Replay</button></div>
         {fixture.motor ? <label className="motor-control"><span>Controller target <b>{motorTarget}°</b></span><input type="range" min={fixture.motor.minimum} max={fixture.motor.maximum} value={motorTarget} onChange={(event) => { const value = Number(event.target.value); setMotorTarget(value); const id = snap.joints?.[0]?.id; if (id) session.timeline.simulation.enqueueInputs([{ kind: 'joint-position-target', jointId: id, tick: snap.tick + 1, value: value * Math.PI / 180 }]); record(`motor target ${value}°`); }}/><small>Position servo · 90°/s · 18 N·m maximum</small></label> : <div className="passive-note">Motor target controls intentionally unavailable</div>}
         <h3>Live proof</h3><ul className="assertions">{assertions.map(([label, pass]) => <li className={pass === undefined ? 'pending' : pass ? 'pass' : 'fail'} key={label}><span>{pass === undefined ? '·' : pass ? '✓' : '!'}</span>{label}</li>)}</ul>
         <details open><summary>Capability profile & emitted input log</summary><pre>{JSON.stringify(fixture.capabilities, null, 2)}</pre><ol>{log.map((entry, i) => <li key={`${i}-${entry}`}>{entry}</li>)}</ol></details>
