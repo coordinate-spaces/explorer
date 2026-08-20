@@ -12,6 +12,47 @@ describe('compilePhysicsScene', () => {
     expect(scene.joints).toEqual([expect.objectContaining({ parentAnchor: [0, -0.5, 0], childAnchor: [0, 2.5, 0], parentAxis: [0, 0, 1], childAxis: [0, 0, 1] })]);
     expect(document.diagnostics.map(({ message }) => message)).not.toEqual(expect.arrayContaining([expect.stringContaining('Conflicting physics-mode')]));
   });
+  it('keeps all joint spatial properties component-local when its component moves', () => {
+    const pendulum = (root: string, properties = '') => createSpatialDocument(`"Pendulum/${root}" : "${properties}"
+"Pendulum/Anchor/+45c+10c/+8+1/+45c+10c" : "body: Anchor; physics-mode: static"
+"Pendulum/Rod/+45c+10c/+3+5/+45c+10c" : "body: Rod; joint: revolute; joint-parent: Pendulum/Anchor/; joint-anchor: 0.5 8 0.5; joint-axis: 0 0 1"`);
+    const origin = compileArticulatedPhysicsScene(pendulum('+0+1/+0+1/+0+1')).joints[0];
+    const translated = compileArticulatedPhysicsScene(pendulum('+15+1/+0+1/+0+1')).joints[0];
+    const rotated = compileArticulatedPhysicsScene(pendulum('+15+1/+0+1/+0+1', 'rotation: 0, 90, 0')).joints[0];
+
+    expect(translated).toMatchObject({
+      parentAnchor: origin.parentAnchor,
+      childAnchor: origin.childAnchor,
+      parentAxis: origin.parentAxis,
+      childAxis: origin.childAxis,
+    });
+    expect(rotated.parentAnchor).toEqual(origin.parentAnchor.map((value) => expect.closeTo(value)));
+    expect(rotated.childAnchor).toEqual(origin.childAnchor.map((value) => expect.closeTo(value)));
+    expect(rotated.parentAxis).toEqual(origin.parentAxis.map((value) => expect.closeTo(value)));
+    expect(rotated.childAxis).toEqual(origin.childAxis.map((value) => expect.closeTo(value)));
+  });
+  it('uses an identity component frame when the namespace root declaration is omitted', () => {
+    const document = createSpatialDocument(`"Pendulum/+0+1/+0+1/+0+1" : ""
+"Pendulum/Anchor/+45c+10c/+8+1/+45c+10c" : "body: Anchor; physics-mode: static"
+"Pendulum/Rod/+45c+10c/+3+5/+45c+10c" : "body: Rod; joint: revolute; joint-parent: Pendulum/Anchor/; joint-anchor: 0.5 8 0.5; joint-axis: 0 0 1"`);
+    document.nodes = document.nodes[0].children ?? [];
+    const scene = compileArticulatedPhysicsScene(document);
+
+    expect(scene.joints).toEqual([expect.objectContaining({
+      parentAnchor: [0, -0.5, 0], childAnchor: [0, 2.5, 0],
+      parentAxis: [0, 0, 1], childAxis: [0, 0, 1],
+    })]);
+  });
+  it('rejects a joint parent outside the child top-level component', () => {
+    const document = createSpatialDocument(`"Stand/+0+1/+0+1/+0+1" : ""
+"Stand/Anchor/+0+1/+8+1/+0+1" : "body: Anchor; physics-mode: static"
+"Pendulum/+0+1/+0+1/+0+1" : ""
+"Pendulum/Rod/+0+1/+3+5/+0+1" : "body: Rod; joint: revolute; joint-parent: Stand/Anchor/; joint-anchor: 0.5 8 0.5; joint-axis: 0 0 1"`);
+    const scene = compileArticulatedPhysicsScene(document);
+
+    expect(scene.joints).toEqual([]);
+    expect(document.diagnostics.map(({ message }) => message)).toContain('Joint parent must belong to the same top-level component as its child.');
+  });
   it('resolves joint parents only within the child projection scope', () => {
     const source = `"Pendulum/+0+1/+0+1/+0+1" : ""
 "Pendulum/Anchor/+45c+10c/+8+1/+45c+10c" : "body: Anchor; physics-mode: static"

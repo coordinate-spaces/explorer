@@ -106,7 +106,8 @@ and compilation details.
 ### Experimental passive articulation
 
 Release A supports explicit rigid-body boundaries connected by passive revolute
-joints. A joint is authored on its child body with a world-space pivot and axis:
+joints. A joint is authored on its child body with a pivot and axis in the
+top-level component's local space:
 
 ```txt
 "Pendulum/+0+1/+0+1/+0+1" : ""
@@ -119,6 +120,9 @@ rotated top endpoint is `(0.5, 8, 0.5)`, exactly the authored joint anchor, so
 gravity immediately makes it swing without an external impulse.
 
 Unjointed components retain their existing top-level compound-body behavior.
+Because articulations cannot cross component boundaries, joint spatial data is
+always component-local and remains attached when the component is translated,
+rotated, reconciled, or simulated; there is no world-space joint mode.
 The experimental release supports passive revolute motion, optional degree-based
 `joint-limits`, damping, and connected-body collision control. Motors, cursor
 joint targeting, other joint kinds, and closed loops are intentionally deferred.

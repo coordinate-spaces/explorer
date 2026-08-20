@@ -118,9 +118,9 @@ export interface XyzDslPhysicsSpec {
   body?: string;
   joint?: XyzDslJointKind;
   'joint-parent'?: string;
-  /** Authored world-space pivot in project units. */
+  /** Pivot in top-level component-local project units. */
   'joint-anchor'?: [number, number, number];
-  /** Authored world-space revolute axis. */
+  /** Revolute axis in the top-level component-local frame. */
   'joint-axis'?: [number, number, number];
   /** Revolute limits in degrees. */
   'joint-limits'?: [number, number];
