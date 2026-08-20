@@ -124,8 +124,17 @@ Because articulations cannot cross component boundaries, joint spatial data is
 always component-local and remains attached when the component is translated,
 rotated, reconciled, or simulated; there is no world-space joint mode.
 The experimental release supports passive revolute motion, optional degree-based
-`joint-limits`, damping, and connected-body collision control. Motors, cursor
-joint targeting, other joint kinds, and closed loops are intentionally deferred.
+`joint-limits`, damping, and connected-body collision control. Other joint kinds,
+inverse kinematics, and closed loops remain intentionally deferred.
+
+The experimental cursor controller now supports bounded revolute motors. Put
+`control-target`, `control-scope`, and optional motor tuning on a declaration-only
+component, then select that component as the local simulation definition.
+`body`, `chain`, `subtree`, and `component` scopes provide progressively broader
+hierarchy precision while contacts and joint limits remain physics-owned. The
+default document includes an arm, palm, articulated index finger, and thumb;
+see [experimental articulation](docs/experimental-articulation.md) for the
+authoring contract and current direct-angle limitations.
 See [the experimental articulation contract](docs/experimental-articulation.md).
 
 ## Interaction directives

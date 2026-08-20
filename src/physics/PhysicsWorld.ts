@@ -153,6 +153,7 @@ export class PhysicsWorld implements RigidBodyWorld {
         });
       }
       entityInputs.forEach((input) => {
+        if (input.kind === 'joint-motor') return;
         if (input.kind === 'translation') {
           if (input.vector[1] > 0) skipVerticalSettling.add(this.definitions.get(input.bodyId)?.entityId ?? input.bodyId);
           states.forEach((state) => {

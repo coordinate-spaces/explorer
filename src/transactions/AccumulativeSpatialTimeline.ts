@@ -11,6 +11,8 @@ import type { XyzDslDeclarationOrigin } from '../xyzdsl/types';
 import { SimulationTimeline } from './SimulationTimeline';
 import type { PhysicsDirectiveBinding } from './SimulationTimeline';
 import { CoordinateIntentReducer, coordinateIntentInputs } from '../simulation/coordinateIntent';
+import { resolveArticulationTarget } from '../simulation/articulationTarget';
+import type { CompiledPhysicsScene } from '../physics/compilePhysicsScene';
 
 export interface AccumulativeSpatialFrame {
   document: SpatialDocument;
@@ -126,6 +128,7 @@ export class AccumulativeSpatialTimeline {
     authored: SpatialDocument;
     effective: SpatialDocument;
     facts: InteractionFact[];
+    scene: CompiledPhysicsScene;
   } {
     const retainedFrame = this.simulation.world.frame();
     const retainedSnapshot = this.simulation.world.snapshot();
@@ -156,7 +159,7 @@ export class AccumulativeSpatialTimeline {
     this.simulation.world.restore(retainedSnapshot);
     const definitions = compileArticulatedPhysicsScene(effective, this.baselineRevision);
     this.simulation.reconcileDefinitions(definitions.bodies, definitions.joints);
-    return { authored, effective, facts };
+    return { authored, effective, facts, scene: definitions };
   }
 
   /** Recompile against retained state without advancing simulation time. */
@@ -175,7 +178,7 @@ export class AccumulativeSpatialTimeline {
   }
 
   evaluate(source: string, originsByLine?: ReadonlyMap<number, XyzDslDeclarationOrigin>): AccumulativeSpatialFrame {
-    const { authored, effective, facts } = this.reconcile(source, originsByLine);
+    const { authored, effective, facts, scene } = this.reconcile(source, originsByLine);
 
     const parsed = parseXyzDslDocument(source, originsByLine);
     const resolved = resolveXyzDslDocument(parsed.value ?? []);
@@ -200,9 +203,26 @@ export class AccumulativeSpatialTimeline {
     const controllerInputs = resolved.intents.flatMap((intent) => {
       const frameId = intent.origin.transactionId ?? `${intent.origin.transactionTime ?? tick}:${intent.origin.sourceOrder ?? intent.lineNumber}`;
       const pointer = this.intents.apply({ id: intent.id, mode: intent.mode, coordinate: intent.coordinate, frameId }).pointer;
-      const node = renderable(authored.nodes).find((candidate) => candidate.metadata?.intentId === intent.id);
+      const intentNodes = renderable(authored.nodes).filter((candidate) => candidate.metadata?.intentId === intent.id);
+      const controlTarget = intent.definition.physics['control-target'];
+      const normalizedNamespace = (namespace = '') => namespace.split('/').filter((segment) => !segment.startsWith('Controller')).join('/') + '/';
+      const node = controlTarget
+        ? intentNodes.find((candidate) => normalizedNamespace(candidate.namespacePath) === controlTarget)
+        : intentNodes[0];
       const state = node ? states.get(node.id) : undefined;
       if (!node || !state) return [];
+      if (controlTarget) {
+        const body = scene.bodies.find((candidate) => candidate.id === node.id);
+        if (!body) return [];
+        const target = resolveArticulationTarget(scene.joints, body.entityId ?? body.id, intent.definition.physics['control-scope'] ?? 'body');
+        const angle = Math.max(-170, Math.min(170, (pointer[0] - 6) * 30)) * Math.PI / 180;
+        return target.jointIds.map((jointId) => ({
+          kind: 'joint-motor' as const, bodyId: node.id, jointId, tick, targetAngle: angle,
+          stiffness: intent.definition.physics['motor-stiffness'] ?? 18,
+          damping: intent.definition.physics['motor-damping'] ?? 4,
+          maxTorque: intent.definition.physics['motor-max-torque'] ?? 20,
+        }));
+      }
       const grounded = Math.abs(state.linearVelocity[1]) < 1e-3;
       return coordinateIntentInputs(node.id, state, pointer, intent.definition.physics, tick, grounded).inputs;
     });

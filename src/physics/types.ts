@@ -19,6 +19,16 @@ export interface JointDefinition {
   collideConnected?: boolean;
 }
 
+export type ArticulationControlScope = 'body' | 'chain' | 'subtree' | 'component';
+
+export interface ArticulationControlTarget {
+  bodyId: string;
+  rootBodyId: string;
+  jointIds: string[];
+  bodyIds: string[];
+  scope: ArticulationControlScope;
+}
+
 export interface ColliderDefinition {
   id: string;
   bodyId: string;
@@ -120,7 +130,8 @@ export type PhysicsInput =
   | (TimedInput & { kind: 'translation'; vector: Vector3Tuple })
   | (TimedInput & { kind: 'orientation'; orientation: QuaternionTuple })
   | (TimedInput & { kind: 'kinematic-target'; position: Vector3Tuple })
-  | (TimedInput & { kind: 'teleport'; position: Vector3Tuple; clearVelocity?: boolean });
+  | (TimedInput & { kind: 'teleport'; position: Vector3Tuple; clearVelocity?: boolean })
+  | (TimedInput & { kind: 'joint-motor'; jointId: string; targetAngle: number; stiffness: number; damping: number; maxTorque: number });
 
 export interface PhysicsFrame {
   tick: number;

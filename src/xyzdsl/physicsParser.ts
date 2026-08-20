@@ -4,6 +4,7 @@ import type { XyzDslPhysicsMode, XyzDslPhysicsSpec } from './types';
 export const SUPPORTED_PHYSICS_KEYS = [
   'body', 'joint', 'joint-parent', 'joint-anchor', 'joint-axis', 'joint-limits',
   'joint-damping', 'collide-connected',
+  'control-target', 'control-scope', 'motor-stiffness', 'motor-damping', 'motor-max-torque',
   'physics-mode', 'mass', 'density', 'friction', 'restitution', 'linear-damping',
   'gravity-scale', 'ccd', 'can-sleep', 'lock-translations', 'lock-rotations',
   'sensor', 'physical-body', 'collision-groups', 'solver-groups',
@@ -68,6 +69,13 @@ export function parsePhysicsDeclaration(declarations: XyzDslPropertyDeclaration[
   }
   const jointParent = latest.get('joint-parent');
   if (jointParent !== undefined) result['joint-parent'] = jointParent.endsWith('/') ? jointParent : `${jointParent}/`;
+  const controlTarget = latest.get('control-target');
+  if (controlTarget !== undefined) result['control-target'] = controlTarget.endsWith('/') ? controlTarget : `${controlTarget}/`;
+  const controlScope = latest.get('control-scope');
+  if (controlScope !== undefined) {
+    if (['body', 'chain', 'subtree', 'component'].includes(controlScope)) result['control-scope'] = controlScope as NonNullable<XyzDslPhysicsSpec['control-scope']>;
+    else result.diagnostics.push(`Invalid control-scope "${controlScope}"; expected body, chain, subtree, or component.`);
+  }
   tuple('joint-anchor'); tuple('joint-axis');
   const limits = latest.get('joint-limits');
   if (limits !== undefined) {
@@ -76,6 +84,7 @@ export function parsePhysicsDeclaration(declarations: XyzDslPropertyDeclaration[
     else result['joint-limits'] = values as [number, number];
   }
   number('joint-damping', { min: 0 });
+  number('motor-stiffness', { min: 0 }); number('motor-damping', { min: 0 }); number('motor-max-torque', { min: 0 });
 
   const mode = latest.get('physics-mode');
   if (mode !== undefined) {

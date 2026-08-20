@@ -169,7 +169,13 @@ export function compileArticulatedPhysicsScene(document: SpatialDocument, revisi
     const childEntityId = bodies[index].entityId ?? bodies[index].id;
     if (seenChildEntities.has(childEntityId)) return;
     seenChildEntities.add(childEntityId);
-    const parentPath = spec['joint-parent'];
+    const authoredParentPath = spec['joint-parent'];
+    const controllerSegment = node.origin?.sourceKind === 'secondary'
+      ? node.namespacePath?.split('/').filter(Boolean).find((segment) => segment.startsWith('Controller'))
+      : undefined;
+    const parentPath = authoredParentPath && controllerSegment
+      ? `${topLevelNamespace(authoredParentPath)}/${controllerSegment}/${authoredParentPath.split('/').filter(Boolean).slice(1).join('/')}/`
+      : authoredParentPath;
     const parentEntityId = parentPath && entityByNamespace.get(scopedPhysicsNamespace(node, parentPath));
     const anchor = spec['joint-anchor'];
     const axis = spec['joint-axis'];
@@ -177,7 +183,7 @@ export function compileArticulatedPhysicsScene(document: SpatialDocument, revisi
       diagnose({ line: Number(node.metadata?.lineNumber ?? 0), source: node.source, message: `Joint parent "${parentPath ?? ''}" was not found.` });
       return;
     }
-    if (topLevelNamespace(parentPath) !== topLevelNamespace(node.namespacePath)) {
+    if (topLevelNamespace(authoredParentPath) !== topLevelNamespace(node.namespacePath)) {
       diagnose({ line: Number(node.metadata?.lineNumber ?? 0), source: node.source, message: 'Joint parent must belong to the same top-level component as its child.' });
       return;
     }

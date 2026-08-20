@@ -126,6 +126,12 @@ export interface XyzDslPhysicsSpec {
   'joint-limits'?: [number, number];
   'joint-damping'?: number;
   'collide-connected'?: boolean;
+  /** Canonical descendant namespace controlled by coordinate intent. */
+  'control-target'?: string;
+  'control-scope'?: 'body' | 'chain' | 'subtree' | 'component';
+  'motor-stiffness'?: number;
+  'motor-damping'?: number;
+  'motor-max-torque'?: number;
   'physics-mode'?: XyzDslPhysicsMode;
   /** Explicit rigid-body mass in kilograms. */
   mass?: number;

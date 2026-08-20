@@ -4,6 +4,38 @@ Release A introduces passive revolute joints without exposing Rapier handles to
 XYZDSL, rendering, or transaction code. Articulations are rooted forests of
 stable rigid-body identities connected by engine-neutral joint definitions.
 
+## Cursor articulation control
+
+A declaration-only component may route coordinate intent to a body at any depth
+of its articulation. The target remains a canonical authored namespace even
+when a secondary controller materializes a runtime instance:
+
+```xyzdsl
+"Arm/" : "control-target: Arm/Hand/Index/Distal/; control-scope: chain; motor-stiffness: 24; motor-damping: 6; motor-max-torque: 30"
+```
+
+`body` drives only the selected body's owning joint, `chain` drives every joint
+from the articulation root to the selected body, and `subtree` drives joints
+beneath it. `component` selects both directions. Cursor X is currently mapped
+to a bounded revolute target angle; Rapier's motor applies bounded torque, so
+contacts, gravity, damping, and joint limits remain authoritative. The mapping
+is deliberately an exploratory direct-joint controller rather than inverse
+kinematics. Stable joint IDs—not Rapier handles—cross the simulation boundary.
+
+The default editor document contains an `Arm/Hand/Index` hierarchy plus a thumb.
+Choose the **Arm/** local controller and start simulation. A/D changes the
+target angle for the selected index-to-shoulder chain. Changing
+`control-target` or `control-scope` demonstrates finger, hand-subtree, arm-chain,
+and whole-component precision without changing the physics topology.
+
+| Property | Meaning |
+| --- | --- |
+| `control-target` | Canonical namespace of the controlled articulated body. |
+| `control-scope` | `body`, `chain`, `subtree`, or `component`. |
+| `motor-stiffness` | Non-negative positional motor stiffness. |
+| `motor-damping` | Non-negative motor damping. |
+| `motor-max-torque` | Non-negative maximum motor torque. |
+
 ## Authoring
 
 ```xyzdsl

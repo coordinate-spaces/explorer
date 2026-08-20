@@ -169,6 +169,14 @@ export class RapierPhysicsWorld implements RigidBodyWorld {
     while (this.currentTick < targetTick) {
       const tick = this.currentTick + 1;
       [...(this.queuedInputs.get(tick) ?? [])].sort((a, b) => (a.stableSourceOrder ?? 0) - (b.stableSourceOrder ?? 0)).forEach((input) => {
+        if (input.kind === 'joint-motor') {
+          const joint = this.jointById.get(input.jointId) as RAPIER.RevoluteImpulseJoint | undefined;
+          if (joint) {
+            joint.configureMotorPosition(input.targetAngle, input.stiffness, input.damping);
+            joint.setMotorMaxForce(input.maxTorque);
+          }
+          return;
+        }
         const body = this.bodyFor(input.bodyId); if (!body) return;
         if (input.kind === 'force') body.addForce({ x: input.vector[0], y: input.vector[1], z: input.vector[2] }, true);
         else if (input.kind === 'impulse') body.applyImpulse({ x: input.vector[0], y: input.vector[1], z: input.vector[2] }, true);

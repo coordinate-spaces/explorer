@@ -104,6 +104,9 @@ function TreeItem({
           {node.geometry.operation ? <em>operation {node.geometry.operation}</em> : null}
           {node.unionGroupId ? <em>{node.unionGroupId}</em> : null}
           {node.physics?.['physics-mode'] ? <em>physics {node.physics['physics-mode']}</em> : null}
+          {node.physics?.body ? <em>body {node.physics.body}</em> : null}
+          {node.physics?.joint ? <em>{node.physics.joint} joint</em> : null}
+          {node.physics?.['control-scope'] ? <em>control {node.physics['control-scope']}</em> : null}
           {node.physics?.sensor ? <em>sensor</em> : null}
           {csgLabel ? <em>{csgLabel}</em> : null}
         </div>

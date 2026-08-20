@@ -3,6 +3,10 @@ import { parseXyzDslDocument } from './parser';
 import { resolveXyzDslDocument } from './resolveDocument';
 
 describe('XYZDSL physics properties', () => {
+  it('parses bounded articulation controller properties', () => {
+    const parsed = parseXyzDslDocument('"Arm/" : "control-target: Arm/Hand/Index/; control-scope: chain; motor-stiffness: 24; motor-damping: 6; motor-max-torque: 30"');
+    expect(parsed.value?.[0].physics).toMatchObject({ 'control-target': 'Arm/Hand/Index/', 'control-scope': 'chain', 'motor-stiffness': 24, 'motor-damping': 6, 'motor-max-torque': 30 });
+  });
   it('parses experimental revolute articulation properties', () => {
     const parsed = parseXyzDslDocument('"Pendulum/Rod/+45c+10c/+3+5/+45c+10c" : "body: Rod; joint: revolute; joint-parent: Pendulum/Anchor/; joint-anchor: 0.5 8 0.5; joint-axis: 0 0 1; joint-limits: -170 170; joint-damping: 0.05"');
     expect(parsed.value?.[0].physics).toMatchObject({ body: 'Rod', joint: 'revolute', 'joint-parent': 'Pendulum/Anchor/', 'joint-anchor': [0.5, 8, 0.5], 'joint-axis': [0, 0, 1], 'joint-limits': [-170, 170], 'joint-damping': 0.05 });

@@ -3,6 +3,18 @@ import { createSpatialDocument } from '../model/createSpatialDocument';
 import { compileArticulatedPhysicsScene, compilePhysicsScene } from './compilePhysicsScene';
 
 describe('compilePhysicsScene', () => {
+  it('rebuilds authored joint-parent paths inside a controller-owned runtime instance', () => {
+    const source = `"Arm/" : "control-target: Arm/Finger/; control-scope: chain"
+"Arm/Shoulder/+0+1/+3+1/+0+1" : "body: Shoulder; physics-mode: static"
+"Arm/Hand/+0+1/+2+1/+0+1" : "body: Hand; joint: revolute; joint-parent: Arm/Shoulder/; joint-anchor: .5 3 .5; joint-axis: 0 0 1"
+"Arm/Finger/+0+1/+1+1/+0+1" : "body: Finger; joint: revolute; joint-parent: Arm/Hand/; joint-anchor: .5 2 .5; joint-axis: 0 0 1"
+"Arm/+6/+0/+4" : "intent: absolute"`;
+    const document = createSpatialDocument(source, { originsByLine: new Map([[5, { sourceKind: 'secondary' as const, streamId: 'local' }]]) });
+    const scene = compileArticulatedPhysicsScene(document);
+    expect(scene.joints).toHaveLength(2);
+    expect(document.diagnostics.filter(({ message }) => message.startsWith('Joint '))).toEqual([]);
+  });
+
   it('splits explicit bodies and resolves a revolute pivot into local frames', () => {
     const document = createSpatialDocument(`"Pendulum/+0+1/+0+1/+0+1" : ""
 "Pendulum/Anchor/+45c+10c/+8+1/+45c+10c" : "body: Anchor; physics-mode: static"

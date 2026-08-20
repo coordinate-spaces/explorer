@@ -42,7 +42,16 @@ const INITIAL_XYZDSL = `"+2+4/+0+6/+1+3" : "geometry: cylinder; color: 0x333333;
 "Table/Leg/+7+1/+0+5/+7+1" : ""
 
 "Character/" : "physics-mode: dynamic; max-speed: 4; max-acceleration: 12; max-deceleration: 16; max-turn-rate: 360; arrival-radius: 10c"
-"Character/Body/+0+6c/+0+18c/+0+6c" : "geometry: cylinder; mass: 1; lock-rotations: x,z"`;
+"Character/Body/+0+6c/+0+18c/+0+6c" : "geometry: cylinder; mass: 1; lock-rotations: x,z"
+
+"Arm/" : "control-target: Arm/Hand/Index/Distal/; control-scope: chain; motor-stiffness: 24; motor-damping: 6; motor-max-torque: 30"
+"Arm/Shoulder/+10+60c/+11+60c/+4+60c" : "body: Shoulder; physics-mode: static; color: 0x334155"
+"Arm/Upper/+10+60c/+8+3/+4+60c" : "body: Upper; mass: 2; color: 0x64748b; joint: revolute; joint-parent: Arm/Shoulder/; joint-anchor: 10.3 11 4.3; joint-axis: 0 0 1; joint-limits: -120 120"
+"Arm/Forearm/+10+55c/+550c+250c/+4+55c" : "body: Forearm; mass: 1.4; color: 0x94a3b8; joint: revolute; joint-parent: Arm/Upper/; joint-anchor: 10.3 8 4.3; joint-axis: 0 0 1; joint-limits: -145 20"
+"Arm/Hand/Palm/+970c+120c/+470c+80c/+385c+90c" : "body: Palm; mass: 0.8; color: 0xcbd5e1; joint: revolute; joint-parent: Arm/Forearm/; joint-anchor: 10.3 5.5 4.3; joint-axis: 0 0 1; joint-limits: -70 70"
+"Arm/Hand/Index/Proximal/+980c+35c/+380c+90c/+390c+25c" : "body: IndexProximal; mass: 0.18; color: 0xe2e8f0; joint: revolute; joint-parent: Arm/Hand/Palm/; joint-anchor: 9.975 4.7 4.025; joint-axis: 0 0 1; joint-limits: -95 15"
+"Arm/Hand/Index/Distal/+980c+35c/+320c+60c/+390c+25c" : "body: IndexDistal; mass: 0.12; color: 0xf8fafc; joint: revolute; joint-parent: Arm/Hand/Index/Proximal/; joint-anchor: 9.975 3.8 4.025; joint-axis: 0 0 1; joint-limits: -100 5"
+"Arm/Hand/Thumb/Proximal/+1080c+30c/+440c+70c/+390c+30c" : "body: Thumb; mass: 0.15; color: 0xe2e8f0; rotation: 0,0,-35; joint: revolute; joint-parent: Arm/Hand/Palm/; joint-anchor: 10.75 4.9 4.05; joint-axis: 0 0 1; joint-limits: -70 45"`;
 
 const DEFAULT_TRANSACTION_ENDPOINT = 'wss://sure-formerly-filly.ngrok-free.app/00000000e29a7850088d660489b7b9ae2da763bc3bd83324ecc54eee04840adb';
 
