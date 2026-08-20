@@ -18,6 +18,7 @@
 
 /artifacts/*.png
 /artifacts/*.webm
+/artifacts/articulation-release-*.json
 
 # misc
 .DS_Store
