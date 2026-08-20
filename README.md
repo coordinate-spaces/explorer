@@ -111,8 +111,12 @@ joints. A joint is authored on its child body with a world-space pivot and axis:
 ```txt
 "Pendulum/+0+1/+0+1/+0+1" : ""
 "Pendulum/Anchor/+45c+10c/+8+1/+45c+10c" : "body: Anchor; physics-mode: static"
-"Pendulum/Rod/+45c+10c/+3+5/+45c+10c" : "body: Rod; mass: 1; joint: revolute; joint-parent: Pendulum/Anchor/; joint-anchor: 0.5 8 0.5; joint-axis: 0 0 1; joint-damping: 0.05"
+"Pendulum/Rod/+295c+10c/+550c+5/+45c+10c" : "body: Rod; mass: 1; rotation: 0,0,90; joint: revolute; joint-parent: Pendulum/Anchor/; joint-anchor: 0.5 8 0.5; joint-axis: 0 0 1; joint-damping: 0.05"
 ```
+
+The rod starts horizontal rather than at its gravity-aligned equilibrium. Its
+rotated top endpoint is `(0.5, 8, 0.5)`, exactly the authored joint anchor, so
+gravity immediately makes it swing without an external impulse.
 
 Unjointed components retain their existing top-level compound-body behavior.
 The experimental release supports passive revolute motion, optional degree-based

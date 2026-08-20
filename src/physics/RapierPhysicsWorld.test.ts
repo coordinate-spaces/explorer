@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { createSpatialDocument } from '../model/createSpatialDocument';
+import { compileArticulatedPhysicsScene } from './compilePhysicsScene';
 import { RapierPhysicsWorld } from './RapierPhysicsWorld';
 import type { JointDefinition, RigidBodyDefinition } from './types';
 
@@ -8,6 +10,28 @@ const body: RigidBodyDefinition = {
 };
 
 describe('RapierPhysicsWorld', () => {
+  it('swings the documented tilted pendulum under gravity while retaining its pivot distance', () => {
+    const source = `"Pendulum/+0+1/+0+1/+0+1" : ""
+"Pendulum/Anchor/+45c+10c/+8+1/+45c+10c" : "body: Anchor; physics-mode: static"
+"Pendulum/Rod/+295c+10c/+550c+5/+45c+10c" : "body: Rod; mass: 1; rotation: 0,0,90; joint: revolute; joint-parent: Pendulum/Anchor/; joint-anchor: 0.5 8 0.5; joint-axis: 0 0 1; joint-damping: 0.05"`;
+    const scene = compileArticulatedPhysicsScene(createSpatialDocument(source));
+    const rod = scene.bodies.find(({ entityId }) => entityId === 'component:Pendulum/body:Rod')!;
+    const world = new RapierPhysicsWorld(60);
+    world.reconcileDefinitions(scene.bodies, scene.joints);
+
+    const initial = world.frame().states.get(rod.id)!;
+    const state = world.step(30).states.get(rod.id)!;
+    const angularDisplacement = Math.abs(
+      initial.orientation[0] * state.orientation[0]
+      + initial.orientation[1] * state.orientation[1]
+      + initial.orientation[2] * state.orientation[2]
+      + initial.orientation[3] * state.orientation[3],
+    );
+    expect(angularDisplacement).toBeLessThan(0.99);
+    expect(Math.hypot(state.position[0] - 0.5, state.position[1] - 8)).toBeCloseTo(2.5, 2);
+    world.dispose();
+  });
+
   it('swings a revolute pendulum while retaining its pivot distance', () => {
     const anchor: RigidBodyDefinition = { ...body, id: 'anchor', entityId: 'anchor-body', mode: 'static', position: [0, 8.5, 0] };
     const rod: RigidBodyDefinition = { ...body, id: 'rod', entityId: 'rod-body', mass: 1, position: [0, 5.5, 0],

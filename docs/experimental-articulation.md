@@ -9,8 +9,14 @@ stable rigid-body identities connected by engine-neutral joint definitions.
 ```xyzdsl
 "Pendulum/+0+1/+0+1/+0+1" : ""
 "Pendulum/Anchor/+45c+10c/+8+1/+45c+10c" : "body: Anchor; physics-mode: static"
-"Pendulum/Rod/+45c+10c/+3+5/+45c+10c" : "body: Rod; mass: 1; joint: revolute; joint-parent: Pendulum/Anchor/; joint-anchor: 0.5 8 0.5; joint-axis: 0 0 1; joint-limits: -170 170; joint-damping: 0.05"
+"Pendulum/Rod/+295c+10c/+550c+5/+45c+10c" : "body: Rod; mass: 1; rotation: 0,0,90; joint: revolute; joint-parent: Pendulum/Anchor/; joint-anchor: 0.5 8 0.5; joint-axis: 0 0 1; joint-limits: -170 170; joint-damping: 0.05"
 ```
+
+This initial transform puts the five-unit rod horizontally, away from its
+gravity-aligned equilibrium. Rotation is about the rod center at
+`(3, 8, 0.5)`; after the 90-degree Z rotation its top endpoint is therefore
+`(0.5, 8, 0.5)`, matching `joint-anchor`. Gravity supplies torque immediately,
+while the revolute constraint keeps that endpoint attached to the hinge.
 
 `body` starts an explicit rigid component. Primitives resolving to the same body
 name within a top-level component remain one compound rigid body. Components
