@@ -26,6 +26,10 @@ function displayName(node: SpatialNode): string {
 const AXES: AxisName[] = ['x', 'y', 'z'];
 const GEOMETRY_OPTIONS: XyzDslGeometryKind[] = ['box', 'cylinder', 'cone', 'sphere'];
 
+export function rotationDegreesForInspector(rotationRadians: readonly number[]): number[] {
+  return rotationRadians.map((value) => Number(((value * 180) / Math.PI).toFixed(3)));
+}
+
 export function SelectedNodeInspector({
   node,
   canEdit,
@@ -53,7 +57,7 @@ export function SelectedNodeInspector({
 
   const lineNumber = metadataValue<number>(node, 'lineNumber');
   const childNodes = node.children ?? [];
-  const rotation = (node.localTransform?.rotation ?? node.transform.rotation).map((value) => Math.round((value * 180) / Math.PI));
+  const rotation = rotationDegreesForInspector(node.localTransform?.rotation ?? node.transform.rotation);
   const transforms = [
     { label: 'Position', values: [node.box.x, node.box.y, node.box.z], step: linearStep, onStep: onMove, unit: 'units' },
     { label: 'Size', values: [node.box.width, node.box.height, node.box.depth], step: linearStep, onStep: onResize, unit: 'units' },
