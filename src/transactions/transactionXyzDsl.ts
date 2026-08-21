@@ -117,9 +117,9 @@ function nodeEndpointFromMemo(memo: string, primaryEndpoint: string, secondaryEn
 
   if (!value || /^primary$/i.test(value)) return primaryEndpoint;
   if (/^secondary$/i.test(value)) return secondaryEndpoint;
-  // Accept the colon-less spelling used by some transaction authors.
-  const directEndpoint = value.replace(/^wss\/\//i, 'wss://');
-  return /^wss:\/\//i.test(directEndpoint) ? directEndpoint : '';
+  if (/^wss:\/\//i.test(value)) return value;
+  if (/^[a-z][a-z\d+.-]*:\/\//i.test(value) || /^wss\/\//i.test(value)) return '';
+  return `wss://${value}`;
 }
 
 function memoToXyzDslProperties(path: string, memo: string): string {

@@ -234,7 +234,7 @@ describe('transactionsToXyzDslSource', () => {
     ['', 'wss://primary.example/ws'],
     ['node: primary', 'wss://primary.example/ws'],
     ['node: secondary', 'wss://secondary.example/ws'],
-    ['node: wss//direct.example/ws', 'wss://direct.example/ws'],
+    ['node: direct.example/ws', 'wss://direct.example/ws'],
   ])('resolves node definition %j', (memo, endpoint) => {
     const secondaryPublicKey = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=';
     const result = transactionsToXyzDslSource([
@@ -245,6 +245,18 @@ describe('transactionsToXyzDslSource', () => {
     });
 
     expect(result.secondaryKeys[0]?.endpoint).toBe(endpoint);
+  });
+
+  it('does not interpret a colon-less wss spelling as a protocol-less host', () => {
+    const secondaryPublicKey = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=';
+    const result = transactionsToXyzDslSource([
+      transaction('node: wss//direct.example/ws', 0, secondaryPublicKey),
+    ], {
+      primaryEndpoint: 'wss://primary.example/ws',
+      secondaryEndpoint: 'wss://secondary.example/ws',
+    });
+
+    expect(result.secondaryKeys[0]?.endpoint).toBe('');
   });
 
   it('uses the latest definition for a repeatedly defined public key', () => {
