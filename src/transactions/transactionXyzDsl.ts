@@ -10,7 +10,6 @@ import type { XyzDslTransaction, PrimaryHistoricalBaselineXyzDsl, RejectedTransa
 const TRAILING_FILLER_PATTERN = /\/[0=]+$/;
 const TERMINAL_AXIS_SIZE_FILLER_PATTERN = /(?<prefix>\+\d+\+)(?<size>[1-9]\d*?)0*=$/;
 const MAX_MEMO_PREVIEW_LENGTH = 120;
-export const DEFAULT_OVERLAY_TRANSACTION_ENDPOINT = 'wss://ungallant-unimpeding-kade.ngrok-free.dev/000006913ccf73b5990eb4833e4cdbd5ef58061384481ff1f6cee3cb7f18b2cd';
 
 function transactionFallbackId(transaction: XyzDslTransaction, index: number): string {
   return [transaction.time, trimTransactionPathFiller(transaction.to), transaction.series ?? 'none', index].join(':');
@@ -94,6 +93,8 @@ function secondaryKeyReferenceFromInvalidDeclaration(
   memo: string,
   transactionId: string,
   rawDestination = path,
+  primaryEndpoint = '',
+  secondaryEndpoint = '',
 ): SecondaryKeyReference | undefined {
   const publicKey = secondaryPublicKeyCandidate(rawDestination)
     ?? secondaryPublicKeyCandidate(path)
@@ -105,9 +106,20 @@ function secondaryKeyReferenceFromInvalidDeclaration(
 
   return {
     publicKey,
+    endpoint: nodeEndpointFromMemo(memo, primaryEndpoint, secondaryEndpoint),
     sourceTransactionId: transactionId,
     memoPreview: previewMemo(`${publicKey}: ${memo}`),
   };
+}
+
+function nodeEndpointFromMemo(memo: string, primaryEndpoint: string, secondaryEndpoint: string): string {
+  const value = memo.match(/(?:^|;)\s*node\s*:\s*([^;]*)/i)?.[1].trim();
+
+  if (!value || /^primary$/i.test(value)) return primaryEndpoint;
+  if (/^secondary$/i.test(value)) return secondaryEndpoint;
+  // Accept the colon-less spelling used by some transaction authors.
+  const directEndpoint = value.replace(/^wss\/\//i, 'wss://');
+  return /^wss:\/\//i.test(directEndpoint) ? directEndpoint : '';
 }
 
 function memoToXyzDslProperties(path: string, memo: string): string {
@@ -142,6 +154,8 @@ function parseValidXyzDsl(source: string) {
 
 interface TransactionsToXyzDslSourceOptions {
   publicKey?: string;
+  primaryEndpoint?: string;
+  secondaryEndpoint?: string;
 }
 
 export function transactionsToXyzDslSource(
@@ -150,7 +164,8 @@ export function transactionsToXyzDslSource(
 ): PrimaryHistoricalBaselineXyzDsl & { secondaryKeys: SecondaryKeyReference[] } {
   const accepted: string[] = [];
   const rejected: RejectedTransaction[] = [];
-  const secondaryKeys: SecondaryKeyReference[] = [];
+  const secondaryKeys = new Map<string, SecondaryKeyReference>();
+  const secondaryKeyOrder = new Map<string, { time: number; index: number }>();
   const publicKey = options.publicKey?.trim();
   transactions.forEach((transaction, index) => {
     if (publicKey && transaction.from !== publicKey) {
@@ -186,10 +201,16 @@ export function transactionsToXyzDslSource(
       memo,
       id,
       rawDestination,
+      options.primaryEndpoint,
+      options.secondaryEndpoint,
     );
 
     if (secondaryKey) {
-      secondaryKeys.push(secondaryKey);
+      const previous = secondaryKeyOrder.get(secondaryKey.publicKey);
+      if (!previous || transaction.time > previous.time || (transaction.time === previous.time && index > previous.index)) {
+        secondaryKeys.set(secondaryKey.publicKey, secondaryKey);
+        secondaryKeyOrder.set(secondaryKey.publicKey, { time: transaction.time, index });
+      }
       return;
     }
 
@@ -204,22 +225,6 @@ export function transactionsToXyzDslSource(
   return {
     source: accepted.join('\n'),
     rejected,
-    secondaryKeys,
+    secondaryKeys: [...secondaryKeys.values()],
   };
-}
-
-/**
- * Maps primary-key transactions observed on the overlay node into declarations
- * applied in order by the remote spatial editor.
- */
-export function transactionsToRemoteEditorSource(transactions: readonly XyzDslTransaction[], publicKey: string): string {
-  if (!publicKey.trim()) {
-    return '';
-  }
-
-  return transactionsToXyzDslSource(transactions, { publicKey }).source;
-}
-
-export function transactionToRemoteEditorSource(transaction: XyzDslTransaction | undefined, publicKey: string): string {
-  return transactionsToRemoteEditorSource(transaction ? [transaction] : [], publicKey);
 }

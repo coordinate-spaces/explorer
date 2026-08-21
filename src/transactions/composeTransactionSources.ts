@@ -6,7 +6,6 @@ export type TransactionSourceNamespacePolicy = 'append' | 'consume-primary-names
 export interface SecondaryTransactionSourceDeclaration {
   source: string;
 }
-
 export interface ComposeTransactionSecondaryStream {
   declarations: readonly SecondaryTransactionSourceDeclaration[] | string;
   id?: string;
@@ -89,19 +88,6 @@ export function composeTransactionSources(
   });
 
   return [primary, composedSecondarySources.join('\n')]
-    .filter((source) => source.trim().length > 0)
-    .join('\n');
-}
-
-/** Composes the static/local document, referenced-key projections, then the canonical remote editor. */
-export function composeSpatialEditorSources(
-  documentSource: string,
-  secondaryStreams: readonly ComposeTransactionSecondaryStream[],
-  remoteEditorSource: string,
-): string {
-  return [composeTransactionSources(documentSource, secondaryStreams, {
-    namespacePolicy: 'consume-primary-namespaces',
-  }), remoteEditorSource]
     .filter((source) => source.trim().length > 0)
     .join('\n');
 }
