@@ -547,12 +547,12 @@ button {
 }
 
 .diagnostics > summary {
-  display: flex;
-  justify-content: space-between;
-  gap: 0.75rem;
+  display: list-item;
 }
 
 .diagnostics > summary span {
+  float: right;
+  margin-left: 0.75rem;
   border-radius: 999px;
   padding: 0.05rem 0.4rem;
   background: rgb(251 191 36 / 16%);
