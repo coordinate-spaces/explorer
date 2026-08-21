@@ -1,5 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
-import type { CSSProperties, PointerEvent } from 'react';
+import { useState } from 'react';
 import type { AxisName, XyzDslGeometryKind } from '../xyzdsl/types';
 import type { SpatialNode } from '../model/SpatialNode';
 
@@ -24,35 +23,8 @@ function displayName(node: SpatialNode): string {
   return node.namespacePath?.replace(/\/$/, '') || node.id;
 }
 
+const AXES: AxisName[] = ['x', 'y', 'z'];
 const GEOMETRY_OPTIONS: XyzDslGeometryKind[] = ['box', 'cylinder', 'cone', 'sphere'];
-
-const ROTATION_AXIS_DESCRIPTIONS: Record<AxisName, string> = {
-  x: 'Rotates around the left-right X axis, pitching the object forward or backward.',
-  y: 'Rotates around the vertical Y axis, yawing the object left or right.',
-  z: 'Rotates around the depth Z axis, rolling the object clockwise or counterclockwise.',
-};
-
-interface InspectorPosition {
-  x: number;
-  y: number;
-}
-
-interface DragState {
-  pointerId: number;
-  offsetX: number;
-  offsetY: number;
-}
-
-function clampedInspectorPosition(x: number, y: number, width: number, height: number): InspectorPosition {
-  const margin = 16;
-  const maxX = Math.max(margin, window.innerWidth - width - margin);
-  const maxY = Math.max(margin, window.innerHeight - height - margin);
-
-  return {
-    x: Math.min(Math.max(margin, x), maxX),
-    y: Math.min(Math.max(margin, y), maxY),
-  };
-}
 
 export function SelectedNodeInspector({
   node,
@@ -66,121 +38,51 @@ export function SelectedNodeInspector({
   onPropertyChange,
   onSelectNode,
 }: SelectedNodeInspectorProps) {
-  const inspectorRef = useRef<HTMLElement>(null);
-  const dragStateRef = useRef<DragState | undefined>(undefined);
-  const [position, setPosition] = useState<InspectorPosition | undefined>();
-
-  const handleDragStart = useCallback((event: PointerEvent<HTMLElement>) => {
-    if ((event.target as HTMLElement).closest('button, input, select, textarea, a')) {
-      return;
-    }
-
-    const inspector = inspectorRef.current;
-
-    if (!inspector) {
-      return;
-    }
-
-    const rect = inspector.getBoundingClientRect();
-    dragStateRef.current = {
-      pointerId: event.pointerId,
-      offsetX: event.clientX - rect.left,
-      offsetY: event.clientY - rect.top,
-    };
-    setPosition(clampedInspectorPosition(rect.left, rect.top, rect.width, rect.height));
-    inspector.setPointerCapture(event.pointerId);
-    event.preventDefault();
-  }, []);
-
-  const handleDragMove = useCallback((event: PointerEvent<HTMLElement>) => {
-    const dragState = dragStateRef.current;
-    const inspector = inspectorRef.current;
-
-    if (!dragState || !inspector || event.pointerId !== dragState.pointerId) {
-      return;
-    }
-
-    const rect = inspector.getBoundingClientRect();
-    setPosition(clampedInspectorPosition(event.clientX - dragState.offsetX, event.clientY - dragState.offsetY, rect.width, rect.height));
-  }, []);
-
-  const handleDragEnd = useCallback((event: PointerEvent<HTMLElement>) => {
-    const dragState = dragStateRef.current;
-    const inspector = inspectorRef.current;
-
-    if (!dragState || event.pointerId !== dragState.pointerId) {
-      return;
-    }
-
-    dragStateRef.current = undefined;
-
-    if (inspector?.hasPointerCapture(event.pointerId)) {
-      inspector.releasePointerCapture(event.pointerId);
-    }
-  }, []);
+  const [linearStep, setLinearStep] = useState(0.01);
+  const [rotationStep, setRotationStep] = useState(1);
 
   if (!node) {
-    return null;
+    return (
+      <section className="selected-node-inspector is-empty" aria-label="Object properties">
+        <div className="inspector-empty-icon" aria-hidden="true">◇</div>
+        <strong>No object selected</strong>
+        <p>Select an object in the scene or outline to inspect its properties.</p>
+      </section>
+    );
   }
 
   const lineNumber = metadataValue<number>(node, 'lineNumber');
-  const unitStep = 1;
-  const centiunitStep = 0.01;
-  const rotationCoarseStep = 15;
-  const rotationFineStep = 1;
   const childNodes = node.children ?? [];
-  const inspectorStyle: CSSProperties | undefined = position
-    ? { left: position.x, top: position.y, right: 'auto', bottom: 'auto' }
-    : undefined;
+  const rotation = (node.localTransform?.rotation ?? node.transform.rotation).map((value) => Math.round((value * 180) / Math.PI));
+  const transforms = [
+    { label: 'Position', values: [node.box.x, node.box.y, node.box.z], step: linearStep, onStep: onMove, unit: 'units' },
+    { label: 'Size', values: [node.box.width, node.box.height, node.box.depth], step: linearStep, onStep: onResize, unit: 'units' },
+    { label: 'Rotation', values: rotation, step: rotationStep, onStep: onRotate, unit: 'degrees' },
+  ];
 
   return (
-    <section
-      ref={inspectorRef}
-      className="selected-node-inspector"
-      style={inspectorStyle}
-      aria-label="Selected scene object editor"
-      onPointerMove={handleDragMove}
-      onPointerUp={handleDragEnd}
-      onPointerCancel={handleDragEnd}
-    >
-      <div
-        className="section-heading-row inspector-drag-handle"
-        title="Drag to move object selection pane"
-        onPointerDown={handleDragStart}
-      >
+    <section className="selected-node-inspector" aria-label="Object properties">
+      <div className="section-heading-row inspector-heading">
         <div>
-          <h2>Object selection</h2>
-          <p>{displayName(node)}</p>
+          <h2>Properties</h2>
+          <p title={displayName(node)}>{displayName(node)}</p>
         </div>
-        <button type="button" onClick={onClearSelection}>
-          Clear
-        </button>
+        <button className="icon-button" type="button" aria-label="Clear object selection" title="Clear selection" onClick={onClearSelection}>×</button>
       </div>
 
-      <dl>
-        <div>
-          <dt>Declaration line</dt>
-          <dd>{lineNumber ?? 'unknown'}</dd>
-        </div>
-        <div>
-          <dt>Bounds</dt>
-          <dd>
-            {node.box.width} × {node.box.height} × {node.box.depth} at ({node.box.x}, {node.box.y}, {node.box.z})
-          </dd>
-        </div>
-      </dl>
+      <div className="inspector-facts">
+        <span>{node.renderable ? node.geometry.kind : 'group'}</span>
+        <span>line {lineNumber ?? 'unknown'}</span>
+        {!canEdit ? <span>read only</span> : null}
+      </div>
 
       {selectionPath.length > 1 ? (
         <nav className="inspector-selection-path" aria-label="Selection hierarchy">
-          <strong>Hierarchy</strong>
           <ol>
-            {selectionPath.map((pathNode) => (
+            {selectionPath.map((pathNode, index) => (
               <li key={pathNode.id}>
-                <button
-                  type="button"
-                  aria-current={pathNode.id === node.id ? 'true' : undefined}
-                  onClick={() => onPathNodeSelect(pathNode.id)}
-                >
+                {index > 0 ? <span aria-hidden="true">/</span> : null}
+                <button type="button" aria-current={pathNode.id === node.id ? 'true' : undefined} onClick={() => onPathNodeSelect(pathNode.id)}>
                   {displayName(pathNode)}
                 </button>
               </li>
@@ -189,162 +91,64 @@ export function SelectedNodeInspector({
         </nav>
       ) : null}
 
-      {childNodes.length > 0 ? (
-        <section className="inspector-child-list" aria-label="Child selections">
-          <strong>Child elements</strong>
-          <ul>
-            {childNodes.map((child) => (
-              <li key={child.id}>
-                <button type="button" onClick={() => onSelectNode(child.id)}>
-                  {displayName(child)}
-                </button>
-                <span>
-                  {child.renderable ? child.geometry.kind : 'group'}
-                  {child.geometry.operation ? ` · ${child.geometry.operation}` : ''}
-                  {child.csgConsumed ? ' · csg tool' : ''}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
+      {!canEdit ? <p className="inspector-warning">This declaration cannot be rewritten directly. Properties are shown for reference.</p> : null}
 
-      {!canEdit ? <p className="inspector-warning">This selection cannot be rewritten as a single editable spatial declaration.</p> : null}
-
-      <div className="inspector-grid" aria-label="Move selected object">
-        <strong>Move</strong>
-        {(['x', 'y', 'z'] as AxisName[]).map((axis) => (
-          <span key={`move-${axis}`} className="inspector-control-row">
-            <span className="inspector-axis-label">{axis.toUpperCase()}</span>
-            <button type="button" disabled={!canEdit} aria-label={`Move ${axis.toUpperCase()} -1 unit`} onClick={() => onMove(axis, -unitStep)}>
-              -1
-            </button>
-            <button type="button" disabled={!canEdit} aria-label={`Move ${axis.toUpperCase()} +1 unit`} onClick={() => onMove(axis, unitStep)}>
-              +1
-            </button>
-            <button type="button" disabled={!canEdit} aria-label={`Move ${axis.toUpperCase()} -1 centiunit`} onClick={() => onMove(axis, -centiunitStep)}>
-              -1c
-            </button>
-            <button type="button" disabled={!canEdit} aria-label={`Move ${axis.toUpperCase()} +1 centiunit`} onClick={() => onMove(axis, centiunitStep)}>
-              +1c
-            </button>
-          </span>
-        ))}
-      </div>
-
-      <div className="inspector-grid" aria-label="Resize selected object">
-        <strong>Resize</strong>
-        {(['x', 'y', 'z'] as AxisName[]).map((axis) => (
-          <span key={`resize-${axis}`} className="inspector-control-row">
-            <span className="inspector-axis-label">{axis.toUpperCase()}</span>
-            <button type="button" disabled={!canEdit} aria-label={`Resize ${axis.toUpperCase()} -1 unit`} onClick={() => onResize(axis, -unitStep)}>
-              -1
-            </button>
-            <button type="button" disabled={!canEdit} aria-label={`Resize ${axis.toUpperCase()} +1 unit`} onClick={() => onResize(axis, unitStep)}>
-              +1
-            </button>
-            <button type="button" disabled={!canEdit} aria-label={`Resize ${axis.toUpperCase()} -1 centiunit`} onClick={() => onResize(axis, -centiunitStep)}>
-              -1c
-            </button>
-            <button type="button" disabled={!canEdit} aria-label={`Resize ${axis.toUpperCase()} +1 centiunit`} onClick={() => onResize(axis, centiunitStep)}>
-              +1c
-            </button>
-          </span>
-        ))}
-      </div>
-
-      <div className="inspector-grid" aria-label="Rotate selected object">
-        <strong>Rotate</strong>
-        <p className="inspector-help">Rotations happen around the named axis: X pitches forward/back, Y yaws left/right, and Z rolls clockwise/counterclockwise.</p>
-        {(['x', 'y', 'z'] as AxisName[]).map((axis) => (
-          <span key={`rotate-${axis}`} className="inspector-control-row">
-            <span className="inspector-axis-label" title={ROTATION_AXIS_DESCRIPTIONS[axis]}>{axis.toUpperCase()}</span>
-            <button
-              type="button"
-              disabled={!canEdit}
-              aria-label={`Rotate ${axis.toUpperCase()} -${rotationCoarseStep} degrees`}
-              title={ROTATION_AXIS_DESCRIPTIONS[axis]}
-              onClick={() => onRotate(axis, -rotationCoarseStep)}
-            >
-              -{rotationCoarseStep}°
-            </button>
-            <button
-              type="button"
-              disabled={!canEdit}
-              aria-label={`Rotate ${axis.toUpperCase()} +${rotationCoarseStep} degrees`}
-              title={ROTATION_AXIS_DESCRIPTIONS[axis]}
-              onClick={() => onRotate(axis, rotationCoarseStep)}
-            >
-              +{rotationCoarseStep}°
-            </button>
-            <button
-              type="button"
-              disabled={!canEdit}
-              aria-label={`Rotate ${axis.toUpperCase()} -${rotationFineStep} degree`}
-              title={ROTATION_AXIS_DESCRIPTIONS[axis]}
-              onClick={() => onRotate(axis, -rotationFineStep)}
-            >
-              -{rotationFineStep}°
-            </button>
-            <button
-              type="button"
-              disabled={!canEdit}
-              aria-label={`Rotate ${axis.toUpperCase()} +${rotationFineStep} degree`}
-              title={ROTATION_AXIS_DESCRIPTIONS[axis]}
-              onClick={() => onRotate(axis, rotationFineStep)}
-            >
-              +{rotationFineStep}°
-            </button>
-          </span>
-        ))}
-      </div>
-
-      <div className="inspector-fields">
+      <div className="inspector-section-heading">
+        <strong>Transform</strong>
         <label>
-          Geometry
-          <select disabled={!canEdit} value={node.geometry.kind} onChange={(event) => onPropertyChange('geometry', event.target.value)}>
-            {GEOMETRY_OPTIONS.map((kind) => (
-              <option key={kind} value={kind}>
-                {kind}
-              </option>
-            ))}
+          Step
+          <select
+            aria-label="Linear transform step"
+            value={linearStep}
+            onChange={(event) => setLinearStep(Number(event.target.value))}
+          >
+            <option value="0.01">0.01</option>
+            <option value="1">1</option>
           </select>
         </label>
         <label>
-          Color
-          <input
-            disabled={!canEdit}
-            type="text"
-            value={String(node.material.color ?? '')}
-            placeholder="blue or 0x3366ff"
-            onChange={(event) => onPropertyChange('color', event.target.value)}
-          />
-        </label>
-        <label>
-          Roughness
-          <input
-            disabled={!canEdit}
-            type="number"
-            step="0.05"
-            min="0"
-            max="1"
-            value={node.material.roughness ?? ''}
-            onChange={(event) => onPropertyChange('roughness', event.target.value)}
-          />
-        </label>
-        <label>
-          Metalness
-          <input
-            disabled={!canEdit}
-            type="number"
-            step="0.05"
-            min="0"
-            max="1"
-            value={node.material.metalness ?? ''}
-            onChange={(event) => onPropertyChange('metalness', event.target.value)}
-          />
+          Angle
+          <select
+            aria-label="Rotation step"
+            value={rotationStep}
+            onChange={(event) => setRotationStep(Number(event.target.value))}
+          >
+            <option value="1">1°</option>
+            <option value="15">15°</option>
+          </select>
         </label>
       </div>
+
+      <div className="inspector-transform-grid">
+        {transforms.map((transform) => (
+          <div className="inspector-transform-group" key={transform.label}>
+            <strong>{transform.label}</strong>
+            {AXES.map((axis, index) => (
+              <div className="inspector-transform-row" key={axis}>
+                <span className={`axis axis-${axis}`}>{axis.toUpperCase()}</span>
+                <output aria-label={`${transform.label} ${axis.toUpperCase()} value`}>{transform.values[index]}</output>
+                <button type="button" disabled={!canEdit} aria-label={`Decrease ${transform.label.toLowerCase()} ${axis.toUpperCase()} by ${transform.step} ${transform.unit}`} onClick={() => transform.onStep(axis, -transform.step)}>−</button>
+                <button type="button" disabled={!canEdit} aria-label={`Increase ${transform.label.toLowerCase()} ${axis.toUpperCase()} by ${transform.step} ${transform.unit}`} onClick={() => transform.onStep(axis, transform.step)}>+</button>
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+
+      <div className="inspector-section-heading"><strong>Appearance</strong></div>
+      <div className="inspector-fields">
+        <label>Geometry<select disabled={!canEdit} value={node.geometry.kind} onChange={(event) => onPropertyChange('geometry', event.target.value)}>{GEOMETRY_OPTIONS.map((kind) => <option key={kind} value={kind}>{kind}</option>)}</select></label>
+        <label>Color<input disabled={!canEdit} type="text" value={String(node.material.color ?? '')} placeholder="blue or 0x3366ff" onChange={(event) => onPropertyChange('color', event.target.value)} /></label>
+        <label>Roughness<input disabled={!canEdit} type="number" step="0.05" min="0" max="1" value={node.material.roughness ?? ''} onChange={(event) => onPropertyChange('roughness', event.target.value)} /></label>
+        <label>Metalness<input disabled={!canEdit} type="number" step="0.05" min="0" max="1" value={node.material.metalness ?? ''} onChange={(event) => onPropertyChange('metalness', event.target.value)} /></label>
+      </div>
+
+      {childNodes.length > 0 ? (
+        <section className="inspector-child-list" aria-label="Child selections">
+          <strong>Children</strong>
+          <ul>{childNodes.map((child) => <li key={child.id}><button type="button" onClick={() => onSelectNode(child.id)}>{displayName(child)}</button><span>{child.renderable ? child.geometry.kind : 'group'}</span></li>)}</ul>
+        </section>
+      ) : null}
     </section>
   );
 }
