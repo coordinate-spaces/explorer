@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { composeSpatialEditorSources, composeTransactionSources } from './composeTransactionSources';
+import { composeTransactionSources } from './composeTransactionSources';
 
 describe('composeTransactionSources', () => {
   const primary = '"Table/" : "color: white"\n"Table/+0+1/+0+1/+0+1" : ""';
@@ -61,21 +61,5 @@ describe('composeTransactionSources', () => {
     ]);
 
     expect(result).toBe('"+0+1/+0+1/+0+1" : ""');
-  });
-});
-
-describe('composeSpatialEditorSources', () => {
-  it('applies the remote editor after the document and namespace-filtered projections', () => {
-    const document = '"Table/" : "color: white"';
-    const result = composeSpatialEditorSources(document, [
-      { declarations: '"Lamp/+0+1/+0+1/+0+1" : "color: yellow"\n"Table/+0+1/+0+1/+0+1" : "color: blue"' },
-    ], '"Table/" : "color: cyan"');
-
-    expect(result).toBe(`${document}\n"Table/+0+1/+0+1/+0+1" : "color: blue"\n"Table/" : "color: cyan"`);
-  });
-
-  it('keeps the remote editor independent when there are no secondary references', () => {
-    expect(composeSpatialEditorSources('', [], '"+0+1/+0+1/+0+1" : "color: cyan"'))
-      .toBe('"+0+1/+0+1/+0+1" : "color: cyan"');
   });
 });

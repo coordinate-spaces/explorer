@@ -2,8 +2,6 @@ import { describe, expect, it } from 'vitest';
 import {
   normalizeXyzDslTransaction,
   normalizeXyzDslTransactions,
-  transactionToRemoteEditorSource,
-  transactionsToRemoteEditorSource,
   transactionsToXyzDslSource,
   trimTransactionMemoFiller,
   trimTransactionPathFiller,
@@ -22,35 +20,6 @@ function transaction(memo: string, index = 0, to = `+${index}+1/+0+1/+0+1`, from
 }
 
 describe('transactionsToXyzDslSource', () => {
-  it('maps the current primary-key transaction into a remote editor declaration', () => {
-    const editorSource = transactionToRemoteEditorSource(
-      transaction('color: cyan', 0, '+4+1/+2+1/+0+1', 'originating-key'),
-      'originating-key',
-    );
-
-    expect(editorSource).toBe('"+4+1/+2+1/+0+1" : "color: cyan"');
-    expect(transactionToRemoteEditorSource(
-      transaction('color: cyan', 0, '+4+1/+2+1/+0+1', 'another-key'),
-      'originating-key',
-    )).toBe('');
-  });
-
-  it('maps multiple outgoing remote editor transactions and filters other senders', () => {
-    const editorSource = transactionsToRemoteEditorSource([
-      transaction('color: cyan', 0, '+4+1/+2+1/+0+1', 'originating-key'),
-      transaction('color: magenta', 1, '+5+1/+2+1/+0+1', 'other-key'),
-      transaction('color: yellow', 2, '+6+1/+2+1/+0+1', 'originating-key'),
-    ], 'originating-key');
-
-    expect(editorSource).toBe('"+4+1/+2+1/+0+1" : "color: cyan"\n"+6+1/+2+1/+0+1" : "color: yellow"');
-  });
-
-  it('returns an empty remote editor source when the public key is blank', () => {
-    expect(transactionsToRemoteEditorSource([
-      transaction('color: cyan', 0, '+4+1/+2+1/+0+1', 'originating-key'),
-    ], '   ')).toBe('');
-  });
-
   it('builds valid XYZDSL coordinate declarations from transaction path and memo properties', () => {
     const result = transactionsToXyzDslSource([
       transaction('geometry: box', 0, '+0+1/+0+1/+0+1'),
@@ -243,7 +212,7 @@ describe('transactionsToXyzDslSource', () => {
     expect(result.rejected).toEqual([]);
   });
 
-  it('discovers secondary public keys without using node memo properties as endpoints', () => {
+  it('uses a direct node endpoint from a secondary-key definition', () => {
     const secondaryPublicKey = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=';
     const result = transactionsToXyzDslSource([
       transaction(`node: wss://secondary.example/ws`, 3, secondaryPublicKey),
@@ -254,10 +223,62 @@ describe('transactionsToXyzDslSource', () => {
     expect(result.secondaryKeys).toEqual([
       {
         publicKey: secondaryPublicKey,
+        endpoint: 'wss://secondary.example/ws',
         sourceTransactionId: `103:${secondaryPublicKey}:none:0`,
         memoPreview: `${secondaryPublicKey}: node: wss://secondary.example/ws`,
       },
     ]);
+  });
+
+  it.each([
+    ['', 'wss://primary.example/ws'],
+    ['node: primary', 'wss://primary.example/ws'],
+    ['node: secondary', 'wss://secondary.example/ws'],
+    ['node: direct.example/ws', 'wss://direct.example/ws'],
+  ])('resolves node definition %j', (memo, endpoint) => {
+    const secondaryPublicKey = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=';
+    const result = transactionsToXyzDslSource([
+      transaction(memo, 0, secondaryPublicKey),
+    ], {
+      primaryEndpoint: 'wss://primary.example/ws',
+      secondaryEndpoint: 'wss://secondary.example/ws',
+    });
+
+    expect(result.secondaryKeys[0]?.endpoint).toBe(endpoint);
+  });
+
+  it('does not interpret a colon-less wss spelling as a protocol-less host', () => {
+    const secondaryPublicKey = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=';
+    const result = transactionsToXyzDslSource([
+      transaction('node: wss//direct.example/ws', 0, secondaryPublicKey),
+    ], {
+      primaryEndpoint: 'wss://primary.example/ws',
+      secondaryEndpoint: 'wss://secondary.example/ws',
+    });
+
+    expect(result.secondaryKeys[0]?.endpoint).toBe('');
+  });
+
+  it('uses the latest definition for a repeatedly defined public key', () => {
+    const secondaryPublicKey = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=';
+    const result = transactionsToXyzDslSource([
+      transaction('node: secondary', 1, secondaryPublicKey),
+      transaction('node: wss://old.example/ws', 0, secondaryPublicKey),
+    ], {
+      primaryEndpoint: 'wss://primary.example/ws',
+      secondaryEndpoint: 'wss://secondary.example/ws',
+    });
+
+    expect(result.secondaryKeys).toHaveLength(2);
+    expect(result.secondaryKeys.map(({ endpoint }) => endpoint)).toEqual([
+      'wss://secondary.example/ws',
+      'wss://old.example/ws',
+    ]);
+    expect(result.latestSecondaryKeys).toHaveLength(1);
+    expect(result.latestSecondaryKeys[0]).toMatchObject({
+      publicKey: secondaryPublicKey,
+      endpoint: 'wss://secondary.example/ws',
+    });
   });
 
   it('discovers secondary-key references without an endpoint', () => {
