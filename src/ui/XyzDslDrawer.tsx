@@ -1,5 +1,7 @@
 import type { ReactNode } from 'react';
 import type { SpatialDocument } from '../model/SpatialDocument';
+import type { SpatialNode } from '../model/SpatialNode';
+import type { AxisName } from '../xyzdsl/types';
 import { UNIT_SCALE_DESCRIPTION } from '../model/units';
 import type { RejectedTransaction, SecondaryProjection, TransactionRange } from '../transactions/types';
 import { normalizeXyzDslTransaction } from '../transactions/transactionXyzDsl';
@@ -7,6 +9,10 @@ import { XyzDslEditor } from './XyzDslEditor';
 import { XyzDslTransactionControls } from './XyzDslTransactionControls';
 import { SecondaryProjectionPanel } from './SecondaryProjectionPanel';
 import { XyzDslTreeView } from './XyzDslTreeView';
+import { SelectedNodeInspector } from './SelectedNodeInspector';
+import { usePersistentState } from './usePersistentState';
+
+type DrawerTab = 'objects' | 'source' | 'data' | 'problems';
 
 function describeAuthoringState(
   hasRemoteBaseline: boolean,
@@ -118,6 +124,15 @@ interface XyzDslDrawerProps {
   onLoadSecondaryHistory: (publicKey: string) => void;
   selectedNodeId?: string;
   onSelectNode?: (id: string) => void;
+  selectedNode?: SpatialNode;
+  selectedNodeCanEdit: boolean;
+  selectionPath: SpatialNode[];
+  onClearSelection: () => void;
+  onMoveNode: (axis: AxisName, delta: number) => void;
+  onResizeNode: (axis: AxisName, delta: number) => void;
+  onRotateNode: (axis: AxisName, delta: number) => void;
+  onPathNodeSelect: (id: string) => void;
+  onNodePropertyChange: (key: string, value: string) => void;
 }
 
 export function XyzDslDrawer({
@@ -157,8 +172,25 @@ export function XyzDslDrawer({
   onLoadSecondaryHistory,
   selectedNodeId,
   onSelectNode,
+  selectedNode,
+  selectedNodeCanEdit,
+  selectionPath,
+  onClearSelection,
+  onMoveNode,
+  onResizeNode,
+  onRotateNode,
+  onPathNodeSelect,
+  onNodePropertyChange,
 }: XyzDslDrawerProps) {
   const isEditorMode = appMode === 'editor';
+  const [activeTab, setActiveTab] = usePersistentState<DrawerTab>('xyzdsl-drawer-active-tab', 'objects');
+  const problemCount = document.diagnostics.length + rejectedTransactions.length;
+  const tabs: { id: DrawerTab; label: string; count?: number }[] = [
+    { id: 'objects', label: 'Objects' },
+    { id: 'source', label: 'Source' },
+    { id: 'data', label: 'Data' },
+    { id: 'problems', label: 'Problems', count: problemCount },
+  ];
   return (
     <aside className={`xyzdsl-drawer xyzdsl-drawer--${appMode} ${isOpen ? 'is-open' : ''}`}>
       <div className="mode-controls" aria-label="Application mode">
@@ -175,16 +207,40 @@ export function XyzDslDrawer({
 
       {isEditorMode && isOpen ? (
         <div className="drawer-panel">
-          <button className="drawer-close-button" type="button" aria-label="Close declarations and return to viewer mode" onClick={() => onModeChange('viewer')}>
-            ×
-          </button>
-
-          <header>
-            <p className="eyebrow">Candid Spaces</p>
-            <p>Compose primitive geometry in a shared coordinate space.</p>
+          <header className="drawer-titlebar">
+            <strong>Candid Spaces</strong>
+            <span>Workspace</span>
+            <button className="drawer-close-button" type="button" aria-label="Close workspace and return to viewer mode" title="Close workspace" onClick={() => onModeChange('viewer')}>×</button>
           </header>
 
-          <XyzDslTransactionControls
+          <nav className="drawer-tabs" aria-label="Workspace panels">
+            {tabs.map((tab) => (
+              <button key={tab.id} type="button" aria-selected={activeTab === tab.id} role="tab" onClick={() => setActiveTab(tab.id)}>
+                {tab.label}{tab.count ? <span>{tab.count}</span> : null}
+              </button>
+            ))}
+          </nav>
+
+          <div className="drawer-content" role="tabpanel">
+          {activeTab === 'objects' ? (
+            <div className="object-workspace">
+              <XyzDslTreeView document={document} selectedNodeId={selectedNodeId} onSelectNode={onSelectNode} />
+              <SelectedNodeInspector
+                node={selectedNode}
+                canEdit={selectedNodeCanEdit}
+                selectionPath={selectionPath}
+                onClearSelection={onClearSelection}
+                onMove={onMoveNode}
+                onResize={onResizeNode}
+                onRotate={onRotateNode}
+                onPathNodeSelect={onPathNodeSelect}
+                onPropertyChange={onNodePropertyChange}
+                onSelectNode={(id) => onSelectNode?.(id)}
+              />
+            </div>
+          ) : null}
+
+          {activeTab === 'data' ? <div className="drawer-tool-section"><XyzDslTransactionControls
             publicKey={transactionPublicKey}
             publicKeyShareUrl={transactionPublicKeyShareUrl}
             range={transactionRange}
@@ -202,8 +258,16 @@ export function XyzDslDrawer({
             onReload={onReloadTransactions}
             onUseTip={onUseTransactionTip}
           />
+          <SecondaryProjectionPanel
+            projections={secondaryProjections}
+            onReplay={onSecondaryReplay}
+            onPlaybackToggle={onSecondaryPlaybackToggle}
+            onPlaybackSpeedChange={onSecondaryPlaybackSpeedChange}
+            onPlaybackSeek={onSecondaryPlaybackSeek}
+            onLoadHistory={onLoadSecondaryHistory}
+          /></div> : null}
 
-          <XyzDslEditor
+          {activeTab === 'source' ? <div className="drawer-tool-section"><XyzDslEditor
             actions={
               <button type="button" disabled={!hasRemoteBaseline || !hasAuthoringEdits} onClick={onResetToRemote}>
                 Reset to remote
@@ -230,17 +294,10 @@ export function XyzDslDrawer({
                 <textarea spellCheck={false} value={mappedTransactionSource} wrap="off" readOnly />
               </label>
             </details>
-          ) : null}
+          ) : null}</div> : null}
 
-          <SecondaryProjectionPanel
-            projections={secondaryProjections}
-            onReplay={onSecondaryReplay}
-            onPlaybackToggle={onSecondaryPlaybackToggle}
-            onPlaybackSpeedChange={onSecondaryPlaybackSpeedChange}
-            onPlaybackSeek={onSecondaryPlaybackSeek}
-            onLoadHistory={onLoadSecondaryHistory}
-          />
-
+          {activeTab === 'problems' ? <div className="drawer-tool-section problems-panel">
+          {problemCount === 0 ? <p className="empty-panel-message">No problems detected.</p> : null}
           {document.diagnostics.length > 0 ? (
             <details className="diagnostics" aria-label="Spatial declaration diagnostics">
               <summary>Diagnostics</summary>
@@ -271,8 +328,8 @@ export function XyzDslDrawer({
               </ul>
             </details>
           ) : null}
-
-          <XyzDslTreeView document={document} selectedNodeId={selectedNodeId} onSelectNode={onSelectNode} />
+          </div> : null}
+          </div>
         </div>
       ) : null}
     </aside>

@@ -21,7 +21,6 @@ import type { ActiveSecondaryTransactionStream, XyzDslTransaction, SecondaryKeyR
 import { usePublicKeyTransactions } from './transactions/usePublicKeyTransactions';
 import { useRealtimePublicKeyTransactions } from './transactions/useRealtimePublicKeyTransactions';
 import { XyzDslDrawer } from './ui/XyzDslDrawer';
-import { SelectedNodeInspector } from './ui/SelectedNodeInspector';
 import { usePersistentState } from './ui/usePersistentState';
 
 const INITIAL_XYZDSL = `"+2+4/+0+6/+1+3" : "geometry: cylinder; color: 0x333333; metalness: 0.8; roughness: 0.2"
@@ -817,20 +816,6 @@ export default function App() {
         selectedNodeId={selectedSceneNodeId}
         onSelectNode={handleSelectNode}
       />
-      {appMode === 'editor' ? (
-        <SelectedNodeInspector
-          canEdit={selectedNodeCanEdit}
-          node={selectedNode}
-          selectionPath={selectedHierarchyPath}
-          onClearSelection={() => handleSelectNode(undefined)}
-          onMove={moveSelectedDeclaration}
-          onPathNodeSelect={handleSelectHierarchyNode}
-          onPropertyChange={updateSelectedDeclarationProperty}
-          onResize={resizeSelectedDeclaration}
-          onSelectNode={handleSelectExactNode}
-          onRotate={rotateSelectedDeclaration}
-        />
-      ) : null}
       <XyzDslDrawer
         appMode={appMode}
         document={document}
@@ -868,6 +853,15 @@ export default function App() {
         onLoadSecondaryHistory={handleLoadSecondaryHistory}
         selectedNodeId={selectedNode?.id}
         onSelectNode={handleSelectExactNode}
+        selectedNode={selectedNode}
+        selectedNodeCanEdit={selectedNodeCanEdit}
+        selectionPath={selectedHierarchyPath}
+        onClearSelection={() => handleSelectNode(undefined)}
+        onMoveNode={moveSelectedDeclaration}
+        onResizeNode={resizeSelectedDeclaration}
+        onRotateNode={rotateSelectedDeclaration}
+        onPathNodeSelect={handleSelectHierarchyNode}
+        onNodePropertyChange={updateSelectedDeclarationProperty}
       />
     </main>
   );
