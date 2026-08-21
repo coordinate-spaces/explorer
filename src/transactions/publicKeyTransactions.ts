@@ -7,6 +7,14 @@ export interface PublicKeyTransactionRequest {
   signal?: AbortSignal;
 }
 
+/**
+ * The UI describes an inclusive, newest-to-oldest block range, while the
+ * protocol's start_height is the exclusive upper boundary of that range.
+ */
+export function protocolStartHeight(range: TransactionRange): number {
+  return range.startHeight + 1;
+}
+
 export function normalizeEndpoint(endpoint: string): string {
   const trimmed = endpoint.trim();
 
@@ -140,7 +148,7 @@ export function fetchPublicKeyTransactions({
       type: 'get_public_key_transactions',
       body: {
         public_key: publicKey,
-        start_height: range.startHeight,
+        start_height: protocolStartHeight(range),
         end_height: range.endHeight,
         limit: range.limit,
       },
