@@ -81,25 +81,17 @@ function streamKeyForSecondaryReference(reference: Pick<SecondaryKeyReference, '
   return `${reference.publicKey}@@${reference.endpoint}`;
 }
 
-function uniqueSecondaryReferences(references: readonly SecondaryKeyReference[]): SecondaryKeyReference[] {
-  const uniqueReferences = new Map<string, SecondaryKeyReference>();
-
-  references.forEach((reference) => {
-    const key = streamKeyForSecondaryReference(reference);
-
-    if (!uniqueReferences.has(key)) {
-      uniqueReferences.set(key, reference);
-    }
-  });
-
-  return [...uniqueReferences.values()];
-}
-
-function referencesBySecondaryProjection(references: readonly SecondaryKeyReference[]): Map<string, SecondaryKeyReference[]> {
+function referencesBySecondaryProjection(
+  references: readonly SecondaryKeyReference[],
+  activeReferences: readonly SecondaryKeyReference[],
+): Map<string, SecondaryKeyReference[]> {
   const grouped = new Map<string, SecondaryKeyReference[]>();
+  const activeByPublicKey = new Map(activeReferences.map((reference) => [reference.publicKey, reference]));
 
   references.forEach((reference) => {
-    const key = streamKeyForSecondaryReference(reference);
+    const activeReference = activeByPublicKey.get(reference.publicKey);
+    if (!activeReference) return;
+    const key = streamKeyForSecondaryReference(activeReference);
     grouped.set(key, [...(grouped.get(key) ?? []), reference]);
   });
 
@@ -297,8 +289,8 @@ export default function App() {
   );
   const primaryRemoteBaselineSource = transactionXyzDsl.source;
   const secondaryKeyReferences = useMemo(
-    () => uniqueSecondaryReferences(transactionXyzDsl.secondaryKeys),
-    [transactionXyzDsl.secondaryKeys],
+    () => transactionXyzDsl.latestSecondaryKeys,
+    [transactionXyzDsl.latestSecondaryKeys],
   );
 
   const handleSecondaryRealtimeTransaction = useCallback((reference: SecondaryKeyReference, transaction: XyzDslTransaction) => {
@@ -472,14 +464,14 @@ export default function App() {
     }));
   }, [secondaryTransactionOverlayStreams, secondaryTransactionStreams]);
   const secondaryProjections = useMemo<SecondaryProjection[]>(() => {
-    const referencesByProjection = referencesBySecondaryProjection(transactionXyzDsl.secondaryKeys);
+    const referencesByProjection = referencesBySecondaryProjection(transactionXyzDsl.secondaryKeys, secondaryKeyReferences);
 
     return secondaryTransactionStreamsWithDiagnostics.map((stream) => ({
       ...stream,
       references: referencesByProjection.get(streamKeyForSecondaryReference(stream)) ?? [],
       compositionPolicy: 'consume-primary-namespaces',
     }));
-  }, [secondaryTransactionStreamsWithDiagnostics, transactionXyzDsl.secondaryKeys]);
+  }, [secondaryKeyReferences, secondaryTransactionStreamsWithDiagnostics, transactionXyzDsl.secondaryKeys]);
   const remoteBaselineSource = primaryRemoteBaselineSource;
   const hasRemoteBaseline = remoteBaselineSource.trim().length > 0;
   const hasAuthoringEdits = hasRemoteBaseline

@@ -257,8 +257,13 @@ describe('transactionsToXyzDslSource', () => {
       secondaryEndpoint: 'wss://secondary.example/ws',
     });
 
-    expect(result.secondaryKeys).toHaveLength(1);
-    expect(result.secondaryKeys[0]).toMatchObject({
+    expect(result.secondaryKeys).toHaveLength(2);
+    expect(result.secondaryKeys.map(({ endpoint }) => endpoint)).toEqual([
+      'wss://secondary.example/ws',
+      'wss://old.example/ws',
+    ]);
+    expect(result.latestSecondaryKeys).toHaveLength(1);
+    expect(result.latestSecondaryKeys[0]).toMatchObject({
       publicKey: secondaryPublicKey,
       endpoint: 'wss://secondary.example/ws',
     });

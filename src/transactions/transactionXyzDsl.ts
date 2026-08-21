@@ -161,10 +161,14 @@ interface TransactionsToXyzDslSourceOptions {
 export function transactionsToXyzDslSource(
   transactions: readonly XyzDslTransaction[],
   options: TransactionsToXyzDslSourceOptions = {},
-): PrimaryHistoricalBaselineXyzDsl & { secondaryKeys: SecondaryKeyReference[] } {
+): PrimaryHistoricalBaselineXyzDsl & {
+  secondaryKeys: SecondaryKeyReference[];
+  latestSecondaryKeys: SecondaryKeyReference[];
+} {
   const accepted: string[] = [];
   const rejected: RejectedTransaction[] = [];
-  const secondaryKeys = new Map<string, SecondaryKeyReference>();
+  const secondaryKeys: SecondaryKeyReference[] = [];
+  const latestSecondaryKeys = new Map<string, SecondaryKeyReference>();
   const secondaryKeyOrder = new Map<string, { time: number; index: number }>();
   const publicKey = options.publicKey?.trim();
   transactions.forEach((transaction, index) => {
@@ -206,9 +210,10 @@ export function transactionsToXyzDslSource(
     );
 
     if (secondaryKey) {
+      secondaryKeys.push(secondaryKey);
       const previous = secondaryKeyOrder.get(secondaryKey.publicKey);
       if (!previous || transaction.time > previous.time || (transaction.time === previous.time && index > previous.index)) {
-        secondaryKeys.set(secondaryKey.publicKey, secondaryKey);
+        latestSecondaryKeys.set(secondaryKey.publicKey, secondaryKey);
         secondaryKeyOrder.set(secondaryKey.publicKey, { time: transaction.time, index });
       }
       return;
@@ -225,6 +230,7 @@ export function transactionsToXyzDslSource(
   return {
     source: accepted.join('\n'),
     rejected,
-    secondaryKeys: [...secondaryKeys.values()],
+    secondaryKeys,
+    latestSecondaryKeys: [...latestSecondaryKeys.values()],
   };
 }
