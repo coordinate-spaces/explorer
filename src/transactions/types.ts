@@ -11,7 +11,9 @@ export interface XyzDslTransaction {
 }
 
 export interface TransactionRange {
+  /** Inclusive height of the newest block shown in the UI. */
   startHeight: number;
+  /** Inclusive height of the oldest block shown in the UI. */
   endHeight: number;
   limit: number;
 }

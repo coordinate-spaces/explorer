@@ -245,10 +245,13 @@ export default function App() {
 
     fetchTipHeight(DEFAULT_TRANSACTION_ENDPOINT, controller.signal)
       .then((height) => {
+        // Keep UI ranges inclusive; fetchPublicKeyTransactions converts the
+        // newest block to the protocol's exclusive upper boundary.
         setTipHeight(height);
         setTransactionRange((range) => ({
           ...range,
           startHeight: height,
+          // This is a backwards range, so its end must not exceed its start.
           endHeight: Math.min(range.endHeight, height),
           limit: DEFAULT_TRANSACTION_RANGE.limit,
         }));
