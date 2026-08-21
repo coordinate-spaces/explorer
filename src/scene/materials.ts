@@ -14,8 +14,8 @@ export const floorMaterial: MeshStandardMaterialParameters = {
 
 export const defaultBoxMaterial: MeshStandardMaterialParameters = {
   color: '#64748b',
-  roughness: 0.42,
-  metalness: 0.08,
+  roughness: 0.7,
+  metalness: 0,
 };
 
 export const unionHighlightMaterial: MeshStandardMaterialParameters = {

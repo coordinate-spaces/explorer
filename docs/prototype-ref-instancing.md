@@ -56,7 +56,7 @@ The resolver should:
 3. Expand a compound `ref` into synthetic cloned root + descendant objects.
 4. Scale cloned descendant boxes from the prototype root box into the referencing box.
 5. Assign synthetic namespaces/ids to cloned objects so they form an independent tree.
-6. Resolve inherited material, geometry, and transform properties over the expanded object list.
+6. Resolve inherited color, metalness, roughness, geometry, and transform properties over the expanded object list.
 7. Continue producing flattened `renderNodes` for the current renderer.
 
 ## Prototype registry

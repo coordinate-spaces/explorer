@@ -47,12 +47,12 @@ Boolean composition operations (`operation: union`, `operation: subtraction`, an
 "Mug/HandleHole/+700c+70c/+175c+70c/+155c+90c" : "box-radius: 0.12; operation: subtraction"
 ```
 
-Spatial transaction validation may limit each memo/properties field to 100 bytes, but that is a transport constraint rather than a renderer limit. A spatial transaction is a remote transaction whose path and memo/properties payload map into one spatial declaration. Once declarations are loaded, the renderer consumes the resolved spatial document and does not impose a practical size limit on the inherited property set. Authors targeting the remote format can fit richer scenes into the 100-byte fields by putting shared material, geometry, texture, and deformation properties on namespace declarations, then letting child instances inherit those defaults or add compact overrides across additional declarations.
+Spatial transaction validation may limit each memo/properties field to 100 bytes, but that is a transport constraint rather than a renderer limit. A spatial transaction is a remote transaction whose path and memo/properties payload map into one spatial declaration. Once declarations are loaded, the renderer consumes the resolved spatial document and does not impose a practical size limit on the inherited property set. Authors targeting the remote format can fit richer scenes into the 100-byte fields by putting shared material, geometry, and deformation properties on namespace declarations, then letting child instances inherit those defaults or add compact overrides across additional declarations.
 
 ```txt
 "+2+4/+0+6/+1+3" : "geometry: box; box-radius: 0.15; color: 0x333333; metalness: 0.8; roughness: 0.2"
 "Sofa/+7+4/+0+3/+0+2" : "color: brown; metalness: 0.2; roughness: 0.8"
-"Sofa/Cushion/" : "material-preset: upholstery.fabric; color: 0xf5f3ef; texture: fabric.weave; texture-repeat: 6 6; puff: 5"
+"Sofa/Cushion/" : "color: 0xf5f3ef; metalness: 0; roughness: 0.88; puff: 5"
 "Seat/+3+5/+0+3/+0+15" : "ref: Sofa/"
 
 "Table/+18+8/+0+5/+4+8" : "color: white; metalness: 0.8; roughness: 0.2"
@@ -81,100 +81,23 @@ Manual spatial declarations can use `content-text`/`content-url` for simple valu
 
 Primitive dimensions are derived from the bounding box and use the same project-unit scale as paths (`1` = `10 cm`, `1c` = `1 mm`). For example, a cone or cylinder uses X/Z as its footprint and Y as its height. Non-square footprints are rendered as scaled elliptical primitives so every primitive fills the declared bounding box. `box-radius` applies only to box geometry and is measured in project units; omitted or zero radius renders a sharp box, and the renderer clamps positive radii to half of the smallest box dimension. `puff` is intentionally a geometry modifier, not a material setting, because it changes the rendered cushion shape.
 
-## Material and texture declaration reference
+## Material declaration reference
 
-Materials now support semantic authoring first, with low-level texture channels still available as advanced overrides. Prefer author-facing material families such as `wood`, `metal`, `ceramic`, `plastic`, `fabric`, `concrete`, `stone`, `glass`, and `leather` instead of hand-selecting every texture map.
+Spatial primitives intentionally expose only the basic scalar properties needed by the standard metallic/roughness shading model. Material presets, semantic material families, textures, transparency, and extended physical-material properties are not supported.
 
-```txt
-"OakTable/+0+8/+0+4/+0+8" : "material: wood; grain: oak; finish: satin; texture-scale: 3 1"
-"SteelHandle/+0+4/+5+1/+0+1" : "material: metal; pattern: brushed; finish: semi-gloss; reflectivity: 0.8"
-"SpeckledMug/+0+2/+0+3/+0+2" : "material: ceramic; pattern: speckled; finish: glazed"
-"FabricCushion/+0+4/+0+1/+0+3" : "material: fabric; pattern: weave; color: 0xf5f3ef; bump: 3; puff: 5"
-"PolishedCounter/+0+8/+0+1/+0+3" : "material: concrete; pattern: aggregate; finish: polished"
-"MarbleTop/+0+8/+0+1/+0+3" : "material: stone; variant: marble; pattern: vein; finish: polished"
-"GlassDoor/+0+4/+0+8/+0+1" : "material: glass; variant: frosted; pattern: reeded"
-"LeatherSeat/+0+4/+0+1/+0+4" : "material: leather; variant: tan; pattern: pebbled; finish: satin"
-```
-
-### Semantic material properties
-
-| Property | Purpose | Examples |
+| Property | Purpose | Range / examples |
 | --- | --- | --- |
-| `material` | Material family | `wood`, `metal`, `ceramic`, `plastic`, `fabric`, `concrete`, `stone`, `glass`, `leather` |
-| `grain` / `variant` | Family variant, mostly for wood color/grain choices | `oak`, `walnut`, `pine`, `maple`, `marble`, `clear`, `tan` |
-| `pattern` | Procedural visual/texture pattern | `linear`, `grain`, `brushed`, `speckled`, `weave`, `aggregate`, `vein`, `reeded`, `pebbled` |
-| `finish` | Surface response preset | `raw`, `matte`, `satin`, `semi-gloss`, `glossy`, `polished`, `mirror`, `glazed` |
-| `texture-scale` | Repeat all active procedural/image channels | `3 1`, `6 6` |
-| `bump` | Simple 0..5 bump strength override | `2`, `4` |
-| `reflectivity` | Direct reflectivity override | `0.6` |
-| `clearcoat` | Direct clearcoat override for physical materials | `0.4` |
-| `opacity` | Transparency override, useful for glass | `0.3` |
-| `transmission` | Physical glass-like light transmission | `0.75` |
-| `ior` | Index of refraction for physical materials | `1.45` |
+| `color` | Base surface color | `blue`, `white`, `0x3366ff` |
+| `metalness` | Nonmetal-to-metal surface response | `0..1` |
+| `roughness` | Smooth-to-rough surface response | `0..1` |
 
-Semantic declarations compile to the same renderer-neutral material fields used by the old system: color, metalness, roughness, reflectivity, clearcoat, opacity, transmission, index of refraction, and texture descriptors. Explicit low-level properties such as `roughness`, `metalness`, `texture-src`, or `normal-texture-src` override semantic defaults.
-
-### Compatibility material presets
-
-The older `material-preset` property is still supported as a compatibility alias, but new scenes should prefer semantic materials.
-
-| Old syntax | Preferred syntax |
-| --- | --- |
-| `material-preset: upholstery.fabric` | `material: fabric; pattern: weave; finish: matte` |
-| `material-preset: wood.oak` | `material: wood; grain: oak; pattern: grain; finish: satin` |
-| `material-preset: metal.brushed` | `material: metal; pattern: brushed; finish: semi-gloss` |
-| `material-preset: plastic.matte` | `material: plastic; finish: matte` |
-
-### Advanced texture sources
-
-Every texture channel can still come from a built-in procedural preset or a custom image source. Generic `texture`/`texture-src` targets the color map channel. The value prefixes `preset:` and `src:` are optional shortcuts when you want to make the source kind explicit inline.
+`metalness` and `roughness` reject nonnumeric values and values outside `0..1`. The default primitive material is a neutral nonmetal with `color: #64748b`, `metalness: 0`, and `roughness: 0.7`. These properties inherit through namespace declarations and `ref` like other object defaults.
 
 ```txt
-"PresetColor/+0+4/+0+1/+0+3" : "texture: wood.rings"
-"ImageColor/+10+4/+0+1/+0+3" : "texture-src: /textures/albedo.png"
-"ImageColorInline/+15+4/+0+1/+0+3" : "texture: src:/textures/albedo.png"
-```
-
-Built-in procedural texture presets include `fabric.weave`, `fabric.knit`, `fabric.corduroy`, `bump.noise`, `wood.rings`, `wood.linear`, `wood.oak`, `metal.brushed`, `metal.cast`, `ceramic.speckle`, `ceramic.clay`, `concrete.aggregate`, `concrete.smooth`, `stone.vein`, `stone.granite`, `stone.slate`, `glass.frosted`, `glass.reeded`, `leather.grain`, `leather.pebbled`, and `leather.smooth`.
-
-### Texture channels
-
-Supported texture channels map directly to ThreeJS material map slots:
-
-| Channel | Preset key | Image key | Repeat aliases | Offset aliases | Rotation aliases | Strength aliases |
-| --- | --- | --- | --- | --- | --- | --- |
-| Color map (`map`) | `texture`, `map`, `color-texture` | `texture-src`, `map-src`, `color-texture-src` | `texture-repeat`, `map-repeat`, `color-texture-repeat` | `texture-offset`, `map-offset` | `texture-rotation`, `map-rotation` | `texture-strength`, `map-strength` |
-| Roughness map | `roughness-texture` | `roughness-texture-src` | `roughness-repeat`, `roughness-texture-repeat` | `texture-offset`, `roughness-texture-offset` | `texture-rotation`, `roughness-texture-rotation` | `texture-strength`, `roughness-texture-strength` |
-| Normal map | `normal-texture` | `normal-texture-src` | `normal-repeat`, `normal-texture-repeat` | `texture-offset`, `normal-texture-offset` | `texture-rotation`, `normal-texture-rotation` | `texture-strength`, `normal-texture-strength` |
-| Bump map | `bump-texture` | `bump-texture-src` | `bump-repeat`, `bump-texture-repeat` | `texture-offset`, `bump-texture-offset` | `texture-rotation`, `bump-texture-rotation` | `texture-strength`, `bump-texture-strength` |
-| Metalness map | `metalness-texture` | `metalness-texture-src` | `metalness-repeat`, `metalness-texture-repeat` | `texture-offset`, `metalness-texture-offset` | `texture-rotation`, `metalness-texture-rotation` | `texture-strength`, `metalness-texture-strength` |
-| Alpha map | `alpha-texture` | `alpha-texture-src` | `alpha-repeat`, `alpha-texture-repeat` | `texture-offset`, `alpha-texture-offset` | `texture-rotation`, `alpha-texture-rotation` | `texture-strength`, `alpha-texture-strength` |
-
-```txt
-"AllTextureChannels/+0+6/+0+2/+0+3" : "texture: wood.rings; roughness-texture: fabric.weave; normal-texture-src: /textures/panel-normal.png; bump-texture: bump.noise; metalness-texture: metal.brushed; alpha-texture-src: /textures/panel-alpha.png"
-```
-
-### Texture transforms and strength
-
-Texture transforms are optional and can be generic or channel-specific. `texture-repeat`, `texture-scale`, `texture-offset`, and `texture-rotation` apply to all currently declared texture channels, or create a color map transform when no texture channel exists yet. Strength is a `0..5` authoring scale used by procedural presets; image textures can carry it in the descriptor, but the current renderer only uses strength for procedural generation and bump scale.
-
-```txt
-"RepeatedWood/+0+6/+0+1/+0+3" : "material: wood; grain: oak; texture-scale: 4 1"
-"ChannelTransforms/+0+6/+2+1/+0+3" : "roughness-texture: fabric.weave; roughness-texture-repeat: 8 8; bump-texture: bump.noise; bump-texture-strength: 4; bump-texture-offset: 0.1 0.2; metalness-texture: metal.brushed; metalness-texture-rotation: 1.5708"
-```
-
-### Custom object templates with texture inheritance
-
-Texture descriptors inherit through namespace declarations and `ref`. Referencing instances can override individual descriptor fields, such as changing an inherited preset color map to a custom image while keeping the inherited bump map.
-
-```txt
-"WoodTable/" : "material-preset: wood.oak; texture-repeat: 3 1"
-"WoodTable/Top/+0+8/+4+1/+0+8" : ""
-"WoodTable/Leg/" : "geometry: cylinder; texture-repeat: 1 3"
-"WoodTable/Leg/+0+1/+0+4/+0+1" : ""
-"WoodTable/Leg/+7+1/+0+4/+7+1" : ""
-"CopiedTable/+10+8/+0+5/+0+8" : "ref: WoodTable/"
-"CustomPoster/+0+4/+2+3/+0+10c" : "texture-src: /textures/poster.png; texture-repeat: 1 1"
+"Table/" : "color: white; metalness: 0.8; roughness: 0.2"
+"Table/Top/+0+8/+4+1/+0+8" : ""
+"Table/Leg/+0+1/+0+5/+0+1" : "geometry: cylinder; roughness: 0.35"
+"CopiedTable/+10+8/+0+5/+0+8" : "ref: Table/"
 ```
 
 See [docs/implementation-plan.md](docs/implementation-plan.md) for architecture details and the feature roadmap.

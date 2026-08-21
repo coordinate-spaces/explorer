@@ -2,10 +2,9 @@ import { useMemo } from 'react';
 import { Edges } from '@react-three/drei';
 import type { ThreeEvent } from '@react-three/fiber';
 import { Brush, Evaluator, INTERSECTION, SUBTRACTION, ADDITION } from 'three-bvh-csg';
-import type { MeshStandardMaterialParameters } from 'three';
 import type { CsgExpression, CsgOperationNode } from '../model/csg';
 import type { SpatialNode } from '../model/SpatialNode';
-import { materialParameters, needsPhysicalMaterial } from './SpatialPrimitive';
+import { materialParameters } from './SpatialPrimitive';
 import { bufferGeometryForSpatialGeometry } from './primitiveGeometry';
 
 interface CsgPrimitiveProps {
@@ -69,11 +68,7 @@ export function CsgPrimitive({ expression, isSelected = false, onSelect }: CsgPr
       userData={{ spatialNodeId: expression.base.id, csgExpressionId: expression.id }}
     >
       {isSelected ? <Edges color="#facc15" /> : null}
-      {needsPhysicalMaterial(expression.base) ? (
-        <meshPhysicalMaterial {...material} />
-      ) : (
-        <meshStandardMaterial {...(material as MeshStandardMaterialParameters)} />
-      )}
+      <meshStandardMaterial {...material} />
     </mesh>
   );
 }

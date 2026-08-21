@@ -38,32 +38,10 @@ export interface XyzDslGeometrySpec {
 }
 
 
-export type XyzDslTextureChannel = 'map' | 'roughnessMap' | 'normalMap' | 'bumpMap' | 'metalnessMap' | 'alphaMap';
-
-export interface XyzDslTextureSpec {
-  preset?: string;
-  src?: string;
-  repeat?: [number, number];
-  rotation?: number;
-  offset?: [number, number];
-  strength?: number;
-}
-
 export interface XyzDslMaterialSpec {
-  materialPreset?: string;
-  semanticMaterial?: string;
-  materialVariant?: string;
-  materialPattern?: string;
-  materialFinish?: string;
-  textures?: Partial<Record<XyzDslTextureChannel, XyzDslTextureSpec>>;
   color?: string | number;
   metalness?: number;
   roughness?: number;
-  reflectivity?: number;
-  clearcoat?: number;
-  opacity?: number;
-  transmission?: number;
-  ior?: number;
   diagnostics: string[];
 }
 

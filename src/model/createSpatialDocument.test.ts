@@ -127,54 +127,22 @@ describe('createSpatialDocument namespaced spatial declarations', () => {
     expect(document.renderNodes[0].geometry['box-radius']).toBe(0);
   });
 
-  it('keeps unanchored nested coordinates definition-only while refs inherit texture properties', () => {
-    const document =
-      createSpatialDocument(`"Sofa/Cushion/" : "color: 0xf5f3ef; material-preset: upholstery.fabric; bump-texture-strength: 2; puff: 5"
+  it('keeps unanchored nested coordinates definition-only while refs inherit scalar materials', () => {
+    const document = createSpatialDocument(`"Sofa/Cushion/" : "color: 0xf5f3ef; metalness: 0; puff: 5"
 "Sofa/Cushion/+0+4/+0+1/+0+3" : "roughness: 0.92"
-"Copy/+6+4/+0+1/+0+3" : "ref: Sofa/Cushion/; bump-texture-strength: 1"`);
+"Copy/+6+4/+0+1/+0+3" : "ref: Sofa/Cushion/; roughness: 0.8"`);
 
     expect(document.diagnostics).toEqual([]);
     expect(document.renderNodes).toHaveLength(1);
 
-    const definition = document.nodes.find(
-      (node) => node.namespacePath === 'Sofa/Cushion/',
-    );
-    const copy = document.renderNodes.find(
-      (node) => node.namespacePath === 'Copy/',
-    );
+    const definition = document.nodes.find((node) => node.namespacePath === 'Sofa/Cushion/');
+    const copy = document.renderNodes.find((node) => node.namespacePath === 'Copy/');
 
     expect(definition?.renderable).toBe(false);
     expect(copy?.material.color).toBe(0xf5f3ef);
-    expect(copy?.material.materialPreset).toBe('upholstery.fabric');
-    expect(copy?.material.textures?.roughnessMap?.preset).toBe('fabric.weave');
-    expect(copy?.material.textures?.bumpMap?.strength).toBe(1);
+    expect(copy?.material.metalness).toBe(0);
+    expect(copy?.material.roughness).toBe(0.8);
     expect(copy?.geometry.puff).toBe(5);
-  });
-
-  it('inherits generic texture descriptors through namespaces and refs with local overrides', () => {
-    const document = createSpatialDocument(`"FabricThing/" : "material-preset: upholstery.fabric; texture: fabric.weave; texture-repeat: 4 5; bump-texture-strength: 4"
-"FabricThing/+0+4/+0+1/+0+3" : ""
-"Copy/+6+4/+0+1/+0+3" : "ref: FabricThing/; texture-src: /textures/custom.png; texture-repeat: 1 1"`);
-
-    expect(document.diagnostics).toEqual([]);
-    expect(document.renderNodes).toHaveLength(2);
-
-    const base = document.renderNodes.find((node) => node.namespacePath === 'FabricThing/');
-    const copy = document.renderNodes.find((node) => node.namespacePath === 'Copy/');
-
-    expect(base?.material.materialPreset).toBe('upholstery.fabric');
-    expect(base?.material.textures?.map).toEqual({
-      preset: 'fabric.weave',
-      repeat: [4, 5],
-    });
-    expect(base?.material.textures?.bumpMap?.strength).toBe(4);
-    expect(copy?.material.materialPreset).toBe('upholstery.fabric');
-    expect(copy?.material.textures?.map).toEqual({
-      preset: 'fabric.weave',
-      src: '/textures/custom.png',
-      repeat: [1, 1],
-    });
-    expect(copy?.material.textures?.bumpMap?.strength).toBe(4);
   });
 
   it('does not render nested local definitions without a concrete namespace anchor', () => {
