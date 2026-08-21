@@ -272,34 +272,27 @@ export function XyzDslDrawer({
           />
 
 
-          {document.diagnostics.length > 0 ? (
-            <details className="diagnostics" aria-label="Spatial declaration diagnostics">
-              <summary>Diagnostics</summary>
-              <ul>
-                {document.diagnostics.map((diagnostic, index) => (
-                  <li key={`${diagnostic.line}-${index}`}>
-                    <strong>Line {diagnostic.line}:</strong> {diagnostic.message}
-                  </li>
-                ))}
-              </ul>
-            </details>
-          ) : null}
-
-          {rejectedTransactions.length > 0 ? (
-            <details className="diagnostics" aria-label="Spatial transaction diagnostics">
-              <summary>Spatial transaction diagnostics</summary>
-              <ul>
-                {rejectedTransactions.map((rejection) => (
+          {document.diagnostics.length > 0 || rejectedTransactions.length > 0 ? (
+            <details className="diagnostics" aria-label="Workspace diagnostics">
+              <summary>
+                Diagnostics
+                <span>{document.diagnostics.length + rejectedTransactions.length}</span>
+              </summary>
+              {document.diagnostics.length > 0 ? <div className="diagnostic-group">
+                <h3>Declarations</h3>
+                <ul>{document.diagnostics.map((diagnostic, index) => (
+                  <li key={`${diagnostic.line}-${index}`}><strong>Line {diagnostic.line}:</strong> {diagnostic.message}</li>
+                ))}</ul>
+              </div> : null}
+              {rejectedTransactions.length > 0 ? <div className="diagnostic-group">
+                <h3>Transactions</h3>
+                <ul>{rejectedTransactions.map((rejection) => (
                   <li key={rejection.id}>
                     <strong>{rejection.id}:</strong> {rejection.memoPreview || '(empty memo)'}
-                    <ul>
-                      {rejection.reasons.map((reason) => (
-                        <li key={reason}>{reason}</li>
-                      ))}
-                    </ul>
+                    <ul>{rejection.reasons.map((reason) => <li key={reason}>{reason}</li>)}</ul>
                   </li>
-                ))}
-              </ul>
+                ))}</ul>
+              </div> : null}
             </details>
           ) : null}
 

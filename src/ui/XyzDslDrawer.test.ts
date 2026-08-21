@@ -22,4 +22,11 @@ describe('runtime secondary controls', () => {
     expect(drawerSource.match(/className="runtime-playback-controls"[\s\S]*?<SecondaryProjectionPanel/)?.[0])
       .toContain('<SecondaryProjectionPanel');
   });
+
+  it('presents declaration and transaction failures in one workspace diagnostics section', () => {
+    expect(drawerSource.match(/aria-label="Workspace diagnostics"/g)).toHaveLength(1);
+    expect(drawerSource).toContain('<h3>Declarations</h3>');
+    expect(drawerSource).toContain('<h3>Transactions</h3>');
+    expect(drawerSource).not.toContain('aria-label="Spatial transaction diagnostics"');
+  });
 });

@@ -23,7 +23,9 @@ body {
 }
 
 button,
-textarea {
+textarea,
+input,
+select {
   font: inherit;
 }
 
@@ -171,7 +173,7 @@ button {
   position: relative;
   display: flex;
   flex-direction: column;
-  width: min(27rem, calc(100vw - 2rem));
+  width: min(31rem, calc(100vw - 2rem));
   max-height: calc(100vh - 2rem);
   overflow: auto;
   border: 1px solid rgb(255 255 255 / 16%);
@@ -255,9 +257,29 @@ button {
 
 .workspace-tabs button[aria-selected='true'] { border-bottom-color: #60a5fa; color: #e2e8f0; }
 .workspace-primary { min-height: 10rem; }
-.workspace-properties { border-top: 1px solid rgb(148 163 184 / 20%); }
-.workspace-more { margin-top: 0.55rem; border-top: 1px solid rgb(148 163 184 / 20%); padding-top: 0.5rem; }
-.workspace-more > summary { cursor: pointer; color: #94a3b8; font-size: 0.72rem; font-weight: 700; }
+.workspace-primary,
+.workspace-properties,
+.workspace-more { min-width: 0; }
+
+.workspace-properties,
+.workspace-more {
+  margin-top: 0.65rem;
+  border: 1px solid rgb(148 163 184 / 18%);
+  border-radius: 0.65rem;
+  background: rgb(15 23 42 / 48%);
+}
+
+.workspace-properties { padding: 0.75rem; }
+.workspace-more { padding: 0; }
+.workspace-more > summary {
+  cursor: pointer;
+  padding: 0.7rem 0.75rem;
+  color: #cbd5e1;
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+.workspace-more[open] > summary { border-bottom: 1px solid rgb(148 163 184 / 18%); }
+.workspace-more > :not(summary) { margin: 0.75rem; }
 
 .drawer-panel h1,
 .drawer-panel h2,
@@ -289,6 +311,7 @@ button {
   gap: 0.45rem;
   color: #dbeafe;
   font-weight: 700;
+  min-width: 0;
 }
 
 .xyzdsl-editor small {
@@ -298,6 +321,8 @@ button {
 }
 
 .xyzdsl-editor textarea {
+  width: 100%;
+  max-width: 100%;
   min-height: 13rem;
   resize: vertical;
   border: 1px solid rgb(147 197 253 / 28%);
@@ -462,12 +487,12 @@ button {
 }
 
 .secondary-projections {
-  margin-top: 1rem;
-  border: 1px solid rgb(56 189 248 / 34%);
-  border-radius: 1rem;
+  margin-top: 0.75rem;
+  border: 1px solid rgb(96 165 250 / 24%);
+  border-radius: 0.65rem;
   padding: 0.85rem;
-  background: rgb(8 47 73 / 28%);
-  color: #bae6fd;
+  background: rgb(30 41 59 / 40%);
+  color: #dbeafe;
 }
 
 .secondary-projection-intro {
@@ -510,16 +535,34 @@ button {
 .secondary-projection-history { list-style: decimal; padding-left: 1.25rem; }
 
 .diagnostics {
-  margin-top: 1rem;
-  border-radius: 1rem;
+  margin-top: 0.75rem;
+  border-radius: 0.65rem;
   padding: 0.85rem;
   background: rgb(15 23 42 / 68%);
 }
 
 .diagnostics {
-  border: 1px solid rgb(251 191 36 / 42%);
-  color: #fde68a;
+  border: 1px solid rgb(251 191 36 / 30%);
+  color: #e2e8f0;
 }
+
+.diagnostics > summary {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.diagnostics > summary span {
+  border-radius: 999px;
+  padding: 0.05rem 0.4rem;
+  background: rgb(251 191 36 / 16%);
+  color: #fde68a;
+  font-size: 0.68rem;
+}
+
+.diagnostic-group { margin-top: 0.75rem; }
+.diagnostic-group + .diagnostic-group { border-top: 1px solid rgb(148 163 184 / 16%); padding-top: 0.75rem; }
+.diagnostic-group h3 { margin: 0 0 0.5rem; color: #fde68a; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.04em; }
 
 .diagnostics ul {
   display: grid;
@@ -744,7 +787,7 @@ button {
   gap: 0.75rem;
   margin-bottom: 1rem;
   border: 1px solid rgb(96 165 250 / 28%);
-  border-radius: 1rem;
+  border-radius: 0.65rem;
   padding: 0.85rem;
   background: rgb(15 23 42 / 68%);
 }
@@ -1053,12 +1096,12 @@ button {
 }
 
 .selected-node-inspector button {
-  border: 1px solid rgb(250 204 21 / 30%);
+  border: 1px solid rgb(147 197 253 / 24%);
   border-radius: 0.3rem;
   min-height: 1.65rem;
   padding: 0.2rem 0.4rem;
   background: rgb(30 41 59 / 82%);
-  color: #fde68a;
+  color: #dbeafe;
 }
 
 .selected-node-inspector button:disabled,
@@ -1083,7 +1126,7 @@ button {
 }
 
 .selected-node-inspector dt {
-  color: #fde68a;
+  color: #93c5fd;
   font-weight: 700;
 }
 
@@ -1209,9 +1252,9 @@ button {
 }
 
 .inspector-selection-path button[aria-current='true'] {
-  border-color: rgb(250 204 21 / 82%);
-  background: rgb(113 63 18 / 62%);
-  color: #fef3c7;
+  border-color: rgb(96 165 250 / 72%);
+  background: rgb(37 99 235 / 28%);
+  color: #dbeafe;
 }
 
 .inspector-child-list ul {
