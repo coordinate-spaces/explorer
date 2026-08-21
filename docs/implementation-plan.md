@@ -64,7 +64,7 @@ Namespaced declarations extend the quoted coordinate expression with slash-separ
 
 ```txt
 "Sofa/+7+4/+0+3/+0+2" : "color: brown"
-"Sofa/Cushion/" : "color: 0xf5f3ef; roughness: 0.88; fabric: 3; sheen: 4; bump: 2; puff: 5"
+"Sofa/Cushion/" : "color: 0xf5f3ef; metalness: 0; roughness: 0.88; puff: 5"
 "Seat/+3+5/+0+3/+0+15" : "ref: Sofa/"
 "Table/+18+8/+0+5/+4+8" : "color: white; metalness: 0.8; roughness: 0.2"
 "Table/Top/+0+8/+4+1/+0+8" : ""
@@ -82,7 +82,7 @@ Reference lookup is historical rather than retroactive. A `ref` resolves to the 
 
 References must point to a namespace that has already been declared or instantiated. A reference to a namespace with local descendants materializes those descendants below the referring instance. By default, the referring instance is an unscaled anchor transform, so referenced templates preserve their authored local dimensions and the referring box establishes only the world-space origin and rotation for the cloned local subtree. Authors can opt into fit-to-box scaling with `ref-scale: true`; in that mode, the referring box scales the referenced local subtree on X/Y/Z so the prototype root dimensions fit the referring box. References to namespaces without local descendants keep the previous primitive-copy behavior: the referring instance renders its own box with the target namespace properties. Child coordinates are local to the nearest concrete ancestor namespace, while anonymous and top-level named instances remain in world space. Concrete ancestor transforms compose onto descendants as group transforms; they are not inherited into each child primitive as local rotation defaults. Boolean composition declarations also use declaration order within the nearest concrete namespace scope before falling back to world-space overlap, so a later subtraction or union can refine an earlier local solid and the composed result can then participate with other world-space objects.
 
-Spatial transaction validation can cap each memo/properties payload at 100 bytes, but the parser, document model, and renderer treat that as an upstream transport limit rather than a scene-rendering limit. A spatial transaction is a remote transaction whose path and memo/properties payload map into one spatial declaration. The renderer consumes the fully resolved declaration graph and has no practical limit on how many inherited properties a node may receive. Spatial transaction authors can therefore spread compact declarations across multiple 100-byte fields and use namespace inheritance to amortize verbose shared settings: a parent namespace declaration can carry material or geometry defaults, child namespaces can add texture or deformation defaults, and concrete instances can rely on the accumulated properties while only spending bytes on coordinates or local overrides.
+Spatial transaction validation can cap each memo/properties payload at 100 bytes, but the parser, document model, and renderer treat that as an upstream transport limit rather than a scene-rendering limit. A spatial transaction is a remote transaction whose path and memo/properties payload map into one spatial declaration. The renderer consumes the fully resolved declaration graph and has no practical limit on how many inherited properties a node may receive. Spatial transaction authors can therefore spread compact declarations across multiple 100-byte fields and use namespace inheritance to amortize verbose shared settings: a parent namespace declaration can carry material or geometry defaults, child namespaces can add geometry or deformation defaults, and concrete instances can rely on the accumulated properties while only spending bytes on coordinates or local overrides.
 
 ## Coordinate system
 
@@ -178,40 +178,19 @@ src/
 
 The parser is independent from React and ThreeJS. It converts text declarations into typed spatial objects, captures diagnostics, and preserves source strings for future editing and object provenance.
 
-The object-property parser currently supports geometry plus material properties:
+The object-property parser currently supports geometry plus a deliberately minimal material model:
 
 - `geometry` (`box`, `cylinder`, `cone`, `sphere`)
 - `box-radius` (box-only rounded edge radius in project units)
 - `puff` (`0..5` box-only cushion deformation strength)
 - `color`
-- `metalness`
-- `roughness`
-- `fabric` (`0..5` procedural weave/material preset strength)
-- `sheen` (`0..5` fabric-like glancing-light strength)
-- `clearcoat` (`0..5` subtle glossy top-layer strength)
-- `bump` (`0..5` fake micro-relief strength)
+- `metalness` (`0..1`)
+- `roughness` (`0..1`)
 - `rotation` / `rotate` (X/Y/Z degree triple)
 - `ref` (namespace reference target)
 - `ref-scale` (`true`/`false`, defaults to `false`; scales referenced local descendants to fit the referring box when enabled)
 
-Unsupported object properties are ignored with diagnostics so future geometry and material features can be added without changing the scene renderer contract. Compact material and deformation values intentionally use a declaration-level `0..5` perceptual range; renderers should normalize that range to their native values instead of exposing renderer-specific units in the declaration language.
-
-## Material and deformation semantics
-
-The Spatial Declaration Language separates surface response from geometry changes:
-
-- `bump` is fake micro-relief. It changes light response through a procedural bump texture but does not alter bounds or collision.
-- `clearcoat` is a subtle glossy top layer. It maps to physical-material clearcoat in the ThreeJS renderer.
-- `sheen` is fabric-like glancing-light response. It maps to physical-material sheen in the ThreeJS renderer.
-- `fabric` is a compact material preset strength. It currently adds woven roughness/bump texture behavior and provides a default sheen contribution when explicit `sheen` is omitted.
-- `puff` is actual shape deformation for box cushions. It belongs to geometry, inherits like other geometry defaults, and is rendered as stronger rounded-box curvature.
-
-Important forward-compatibility rules:
-
-1. Treat `0..5` values as perceptual declaration strengths, not ThreeJS-native values. Exporters and future renderers should normalize them independently.
-2. Keep material properties and deformation properties separate so future collision, GLTF export, and non-Three renderers do not have to infer shape changes from material state.
-3. Cache generated texture presets by semantic key (`fabric:3`, `bump:2`, etc.) to avoid GPU memory churn.
-4. Add every new inherited field to the parser, supported-property set, resolver merge logic, model type, renderer mapping, and tests; the resolver intentionally merges fields explicitly so omissions are visible in code review.
+Unsupported object properties are ignored with diagnostics. Nonnumeric or out-of-range metalness and roughness declarations are rejected with diagnostics rather than silently clamped. Material state stays renderer-neutral and contains only base color plus metallic/roughness surface response; presets, transparency, and extended physical-material properties are intentionally outside the current scope.
 
 ## Spatial document model
 
@@ -237,7 +216,7 @@ Full boolean geometry merging is implemented through a ThreeJS-compatible CSG li
 
 ## Rendering architecture
 
-The renderer uses React Three Fiber and Drei. `SceneRoot` owns the canvas, camera, controls, lighting, default room, and spatial primitives. `CornerRoom` creates the default floor and two walls. `SpatialPrimitive` maps each spatial node into a ThreeJS mesh by dispatching on the derived geometry kind while sharing the same transform and union-highlight behavior for all primitives. Simple materials render with `meshStandardMaterial`; nodes that use `fabric`, `sheen`, or `clearcoat` switch to `meshPhysicalMaterial` because those effects require physical material features. `fabric` and `bump` create cached procedural `DataTexture` presets, avoiding per-render texture allocation. `puff` affects the actual box geometry by increasing rounded cushion curvature; collision bounds remain based on the declared transformed box, so the layout contract stays stable even as the silhouette softens.
+The renderer uses React Three Fiber and Drei. `SceneRoot` owns the canvas, camera, controls, lighting, default room, and spatial primitives. `CornerRoom` creates the default floor and two walls. `SpatialPrimitive` maps each spatial node into a ThreeJS mesh by dispatching on the derived geometry kind while sharing the same transform and union-highlight behavior for all primitives. All spatial primitives render with `meshStandardMaterial` using only color, metalness, and roughness. `puff` affects the actual box geometry by increasing rounded cushion curvature; collision bounds remain based on the declared transformed box, so the layout contract stays stable even as the silhouette softens.
 
 ## UI drawer workflow
 
@@ -256,6 +235,5 @@ The UI is a full-screen 3D canvas with a popup drawer. The drawer allows users t
 3. Add group nodes and nested transforms.
 4. Add fixture/furniture presets that compile to primitive geometry.
 5. Add wall-mounted anchors and relative positioning.
-6. Add texture presets, bevels, rounded edges, and material libraries.
 7. Extend boolean composition beyond the current CSG-backed operations for more collision and grouping cases.
 8. Add save/load, shareable URLs, JSON export, and GLTF export.

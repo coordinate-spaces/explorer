@@ -51,7 +51,7 @@ export function ContentPrimitive({ node, isSelected = false, onSelect }: Content
     >
       <mesh castShadow receiveShadow onClick={handleClick}>
         <boxGeometry args={[1, 1, 0.04]} />
-        <meshStandardMaterial color={node.content.kind === 'url' ? '#e7eef8' : '#f4ecd8'} roughness={0.86} metalness={0.02} />
+        <meshStandardMaterial color={node.content.kind === 'url' ? '#e7eef8' : '#f4ecd8'} roughness={0.86} metalness={0} />
         {isSelected ? <Edges color="#facc15" scale={1.04} /> : null}
       </mesh>
       {node.content.kind === 'text' ? (

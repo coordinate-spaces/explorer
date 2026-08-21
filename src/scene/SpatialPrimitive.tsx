@@ -1,11 +1,10 @@
 import { Edges, RoundedBoxGeometry } from '@react-three/drei';
 import type { ThreeEvent } from '@react-three/fiber';
-import type { MeshPhysicalMaterialParameters, MeshStandardMaterialParameters } from 'three';
+import type { MeshStandardMaterialParameters } from 'three';
 import type { SpatialGeometry } from '../model/geometry';
 import { normalizedXyzDslStrength, normalizedRoundedBoxRadius } from './primitiveGeometry';
 import type { SpatialNode } from '../model/SpatialNode';
 import { defaultBoxMaterial, unionHighlightMaterial } from './materials';
-import { resolveMaterialTextures } from './textureRegistry';
 
 interface SpatialPrimitiveProps {
   node: SpatialNode;
@@ -37,41 +36,14 @@ function PrimitiveGeometry({ geometry }: { geometry: SpatialGeometry }) {
   }
 }
 
-function textureBumpScale(node: SpatialNode): number | undefined {
-  const bumpStrength = normalizedXyzDslStrength(node.material.textures?.bumpMap?.strength);
-
-  return bumpStrength === undefined ? undefined : bumpStrength * 0.045;
-}
-
-export function materialParameters(node: SpatialNode): MeshPhysicalMaterialParameters {
-  const textureParameters = resolveMaterialTextures(node.material);
-  const bumpScale = textureBumpScale(node);
-
+export function materialParameters(node: SpatialNode): MeshStandardMaterialParameters {
   return {
     ...defaultBoxMaterial,
     color: node.material.color ?? defaultBoxMaterial.color,
     metalness: node.material.metalness ?? defaultBoxMaterial.metalness,
     roughness: node.material.roughness ?? defaultBoxMaterial.roughness,
-    reflectivity: node.material.reflectivity,
-    clearcoat: node.material.clearcoat,
-    opacity: node.material.opacity,
-    transmission: node.material.transmission,
-    ior: node.material.ior,
-    transparent: node.material.opacity !== undefined && node.material.opacity < 1,
-    ...textureParameters,
-    ...(textureParameters.bumpMap && bumpScale !== undefined ? { bumpScale } : {}),
     ...(node.unionGroupId ? unionHighlightMaterial : {}),
   };
-}
-
-export function needsPhysicalMaterial(node: SpatialNode): boolean {
-  return Boolean(
-    node.material.textures?.normalMap ||
-      node.material.reflectivity !== undefined ||
-      node.material.clearcoat !== undefined ||
-      node.material.transmission !== undefined ||
-      node.material.ior !== undefined,
-  );
 }
 
 export function SpatialPrimitive({ node, isSelected = false, onSelect }: SpatialPrimitiveProps) {
@@ -100,11 +72,7 @@ export function SpatialPrimitive({ node, isSelected = false, onSelect }: Spatial
     >
       <PrimitiveGeometry geometry={node.geometry} />
       {isSelected ? <Edges color="#facc15" scale={1.03} /> : null}
-      {needsPhysicalMaterial(node) ? (
-        <meshPhysicalMaterial {...material} />
-      ) : (
-        <meshStandardMaterial {...(material as MeshStandardMaterialParameters)} />
-      )}
+      <meshStandardMaterial {...material} />
     </mesh>
   );
 }
