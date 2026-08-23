@@ -105,21 +105,21 @@ describe('createSpatialDocument namespaced spatial declarations', () => {
 
   it('inherits box-radius through namespaces and refs', () => {
     const document =
-      createSpatialDocument(`"Cabinet/" : "box-radius: 0.2; color: orange"
+      createSpatialDocument(`"Cabinet/" : "box-radius: 0.02; color: orange"
 "Cabinet/+0d+4d/+0d+2d/+0d+3d" : ""
 "Copy/+6d+4d/+0d+2d/+0d+3d" : "ref: Cabinet/"`);
 
     expect(document.diagnostics).toEqual([]);
     expect(document.renderNodes).toHaveLength(2);
     expect(document.renderNodes[0].geometry.kind).toBe('box');
-    expect(document.renderNodes[0].geometry['box-radius']).toBe(0.2);
+    expect(document.renderNodes[0].geometry['box-radius']).toBe(0.02);
     expect(document.renderNodes[1].geometry.kind).toBe('box');
-    expect(document.renderNodes[1].geometry['box-radius']).toBe(0.2);
+    expect(document.renderNodes[1].geometry['box-radius']).toBe(0.02);
   });
 
   it('allows child boxes to override inherited box-radius with zero', () => {
     const document =
-      createSpatialDocument(`"Cabinet/" : "box-radius: 0.2; color: orange"
+      createSpatialDocument(`"Cabinet/" : "box-radius: 0.02; color: orange"
 "Cabinet/+0d+4d/+0d+2d/+0d+3d" : "box-radius: 0"`);
 
     expect(document.diagnostics).toEqual([]);
@@ -147,9 +147,9 @@ describe('createSpatialDocument namespaced spatial declarations', () => {
 
   it('does not render nested local definitions without a concrete namespace anchor', () => {
     const document =
-      createSpatialDocument(`"Sofa/" : "color: 0x2d3f4f; roughness: 0.92; box-radius: 0.16"
-"Sofa/Base/+0d+6d/+0d+40m/+0d+3d" : "box-radius: 0.1"
-"Sofa/Back/+0d+6d/+44m+180m/+0d+50m" : "box-radius: 0.18; rotation: -3.4,0,0"`);
+      createSpatialDocument(`"Sofa/" : "color: 0x2d3f4f; roughness: 0.92; box-radius: 0.016"
+"Sofa/Base/+0d+6d/+0d+40m/+0d+3d" : "box-radius: 0.01"
+"Sofa/Back/+0d+6d/+44m+180m/+0d+50m" : "box-radius: 0.018; rotation: -3.4,0,0"`);
 
     expect(document.diagnostics).toHaveLength(2);
     expect(document.diagnostics[0].message).toContain('has no concrete ancestor namespace anchor');
@@ -162,10 +162,10 @@ describe('createSpatialDocument namespaced spatial declarations', () => {
 
   it('renders nested local definitions when their namespace has a concrete world-space anchor', () => {
     const document =
-      createSpatialDocument(`"Sofa/" : "color: 0x2d3f4f; roughness: 0.92; box-radius: 0.16"
+      createSpatialDocument(`"Sofa/" : "color: 0x2d3f4f; roughness: 0.92; box-radius: 0.016"
 "Sofa/+10d+6d/+0d+2d/+0d+3d" : ""
-"Sofa/Base/+0d+6d/+0d+40m/+0d+3d" : "box-radius: 0.1"
-"Sofa/Back/+0d+6d/+44m+180m/+0d+50m" : "box-radius: 0.18; rotation: -3.4,0,0"`);
+"Sofa/Base/+0d+6d/+0d+40m/+0d+3d" : "box-radius: 0.01"
+"Sofa/Back/+0d+6d/+44m+180m/+0d+50m" : "box-radius: 0.018; rotation: -3.4,0,0"`);
 
     expect(document.diagnostics).toEqual([]);
     expect(document.renderNodes).toHaveLength(2);
@@ -179,9 +179,9 @@ describe('createSpatialDocument namespaced spatial declarations', () => {
 
   it('materializes referenced template descendants at the referring instance anchor', () => {
     const document =
-      createSpatialDocument(`"Sofa/" : "color: 0x2d3f4f; roughness: 0.92; box-radius: 0.16"
-"Sofa/Base/+0d+6d/+0d+40m/+0d+3d" : "box-radius: 0.1"
-"Sofa/Back/+0d+6d/+44m+180m/+0d+50m" : "box-radius: 0.18; rotation: -3.4,0,0"
+      createSpatialDocument(`"Sofa/" : "color: 0x2d3f4f; roughness: 0.92; box-radius: 0.016"
+"Sofa/Base/+0d+6d/+0d+40m/+0d+3d" : "box-radius: 0.01"
+"Sofa/Back/+0d+6d/+44m+180m/+0d+50m" : "box-radius: 0.018; rotation: -3.4,0,0"
 "Seat/+10d+6d/+0d+2d/+0d+3d" : "ref: Sofa/"`);
 
     expect(document.diagnostics).toEqual([]);
@@ -198,9 +198,9 @@ describe('createSpatialDocument namespaced spatial declarations', () => {
 
     expect(seat?.renderable).toBe(false);
     expect(base?.material.color).toBe(0x2d3f4f);
-    expect(base?.geometry['box-radius']).toBe(0.1);
+    expect(base?.geometry['box-radius']).toBe(0.01);
     expect(base?.transform.position).toEqual([1.3, 0.02, 0.15]);
-    expect(back?.geometry['box-radius']).toBe(0.18);
+    expect(back?.geometry['box-radius']).toBe(0.018);
     expect(back?.transform.position[0]).toBeCloseTo(1.3);
     expect(back?.transform.position[1]).toBeCloseTo(0.134);
     expect(back?.transform.position[2]).toBeCloseTo(0.025);
@@ -435,12 +435,12 @@ describe('createSpatialDocument namespaced spatial declarations', () => {
 
   it('allows puff-only child geometry declarations without dropping inherited box-radius', () => {
     const document =
-      createSpatialDocument(`"Cushion/" : "box-radius: 0.1; puff: 2"
+      createSpatialDocument(`"Cushion/" : "box-radius: 0.01; puff: 2"
 "Cushion/+0d+4d/+0d+1d/+0d+3d" : "puff: 5"`);
 
     expect(document.diagnostics).toEqual([]);
     expect(document.renderNodes).toHaveLength(1);
-    expect(document.renderNodes[0].geometry['box-radius']).toBe(0.1);
+    expect(document.renderNodes[0].geometry['box-radius']).toBe(0.01);
     expect(document.renderNodes[0].geometry.puff).toBe(5);
   });
 
@@ -479,8 +479,8 @@ describe('createSpatialDocument namespaced spatial declarations', () => {
     const document = createSpatialDocument(`"Mug/+0d+1d/+0d+1d/+0d+1d" : "color: white"
 "Mug/Body/+5d+2d/+1d+2d/+1d+2d" : "geometry: cylinder; color: 0xf5f3ef; roughness: 0.65"
 "Mug/Hollow/+530m+140m/+120m+190m/+130m+140m" : "geometry: cylinder; operation: subtraction"
-"Mug/Handle/+680m+110m/+155m+110m/+135m+130m" : "box-radius: 0.18; operation: union"
-"Mug/HandleHole/+700m+70m/+175m+70m/+155m+90m" : "box-radius: 0.12; operation: subtraction"`);
+"Mug/Handle/+680m+110m/+155m+110m/+135m+130m" : "box-radius: 0.018; operation: union"
+"Mug/HandleHole/+700m+70m/+175m+70m/+155m+90m" : "box-radius: 0.012; operation: subtraction"`);
 
     expect(document.diagnostics).toEqual([]);
     expect(document.csgExpressions).toHaveLength(1);

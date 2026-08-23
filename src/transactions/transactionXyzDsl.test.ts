@@ -106,6 +106,9 @@ describe('transactionsToXyzDslSource', () => {
     ['+2+4/+6+6/+4+300000000000000000000000000000000=', '+2+4/+6+6/+4+3'],
     ['+2+4/+6+6/+4+300', '+2+4/+6+6/+4+300'],
     ['+2+4/+6+6/+4+3=', '+2+4/+6+6/+4+3'],
+    ['+2d+4d/+6d+6d/+4d+3d000=', '+2d+4d/+6d+6d/+4d+3d'],
+    ['+2c+4c/+6c+6c/+4c+30c000=', '+2c+4c/+6c+6c/+4c+30c'],
+    ['+2m+4m/+6m+6m/+4m+300m000=', '+2m+4m/+6m+6m/+4m+300m'],
   ])('trims only terminal axis-size filler: %s', (path, expected) => {
     expect(trimTransactionPathFiller(path)).toBe(expected);
   });
@@ -116,6 +119,15 @@ describe('transactionsToXyzDslSource', () => {
     ]);
 
     expect(result.source).toBe('"+2+4/+6+6/+4+3" : "geometry: box"');
+    expect(result.rejected).toEqual([]);
+  });
+
+  it.each(['d', 'c', 'm'])('imports a %s-suffixed path with terminal transport filler', (unit) => {
+    const result = transactionsToXyzDslSource([
+      transaction('geometry: box', 0, `+0${unit}+1${unit}/+0${unit}+1${unit}/+0${unit}+1${unit}000=`),
+    ]);
+
+    expect(result.source).toBe(`"+0${unit}+1${unit}/+0${unit}+1${unit}/+0${unit}+1${unit}" : "geometry: box"`);
     expect(result.rejected).toEqual([]);
   });
 

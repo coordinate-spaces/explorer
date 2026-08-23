@@ -9,9 +9,9 @@ import {
 } from './selection';
 
 const OUTLET_XYZDSL = `"Outlet/+3d+4d/+0d+2d/+1d+20m":""
-"Outlet/Plate/+0d+2d/+0d+3d/+1d+15m" : "color: 0xf2f2ee; roughness: 0.7; box-radius: 0.12"
-"Outlet/SlotL/+65m+18m/+150m+75m/+90m+40m" : "box-radius: 0.03; operation: subtraction"
-"Outlet/SlotR/+117m+18m/+150m+75m/+90m+40m" : "box-radius: 0.03; operation: subtraction"
+"Outlet/Plate/+0d+2d/+0d+3d/+1d+15m" : "color: 0xf2f2ee; roughness: 0.7; box-radius: 0.012"
+"Outlet/SlotL/+65m+18m/+150m+75m/+90m+40m" : "box-radius: 0.003; operation: subtraction"
+"Outlet/SlotR/+117m+18m/+150m+75m/+90m+40m" : "box-radius: 0.003; operation: subtraction"
 "Outlet/ScrewTop/+85m+30m/+45m+30m/+90m+40m" : "geometry: cylinder; operation: subtraction"
 "Outlet/ScrewBottom/+85m+30m/+250m+30m/+90m+40m" : "geometry: cylinder; operation: subtraction"`;
 

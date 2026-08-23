@@ -216,12 +216,12 @@ describe('parseXyzDslDocument', () => {
 
   it('parses box-radius as a box geometry modifier', () => {
     const result = parseXyzDslDocument(
-      '"+0d+4d/+0d+2d/+0d+3d" : "box-radius: 0.15; color: orange"',
+      '"+0d+4d/+0d+2d/+0d+3d" : "box-radius: 0.015; color: orange"',
     );
 
     expect(result.ok).toBe(true);
     expect(result.value?.[0].geometry.kind).toBe('box');
-    expect(result.value?.[0].geometry['box-radius']).toBe(0.15);
+    expect(result.value?.[0].geometry['box-radius']).toBe(0.015);
     expect(result.value?.[0].geometry.declared).toBe(true);
   });
 
@@ -235,7 +235,7 @@ describe('parseXyzDslDocument', () => {
 
   it('reports box-radius on non-box geometry', () => {
     const result = parseXyzDslDocument(
-      '"+0d+4d/+0d+2d/+0d+3d" : "geometry: sphere; box-radius: 0.15"',
+      '"+0d+4d/+0d+2d/+0d+3d" : "geometry: sphere; box-radius: 0.015"',
     );
 
     expect(result.ok).toBe(false);

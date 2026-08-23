@@ -50,13 +50,13 @@ export function ContentPrimitive({ node, isSelected = false, onSelect }: Content
       }}
     >
       <mesh castShadow receiveShadow onClick={handleClick}>
-        <boxGeometry args={[1, 1, 0.004]} />
+        <boxGeometry args={[1, 1, 0.04]} />
         <meshStandardMaterial color={node.content.kind === 'url' ? '#e7eef8' : '#f4ecd8'} roughness={0.86} metalness={0} />
         {isSelected ? <Edges color="#facc15" scale={1.04} /> : null}
       </mesh>
       {node.content.kind === 'text' ? (
         <Text
-          position={[0, 0, 0.0031]}
+          position={[0, 0, 0.031]}
           color="#1f2937"
           anchorX="center"
           anchorY="middle"
@@ -68,7 +68,7 @@ export function ContentPrimitive({ node, isSelected = false, onSelect }: Content
           {displayedText(node.content.text)}
         </Text>
       ) : (
-        <Html transform position={[0, 0, 0.0033]} distanceFactor={0.4} occlude>
+        <Html transform position={[0, 0, 0.033]} distanceFactor={4} occlude>
           <div className="url-content-card" title={node.content.url}>
             <iframe
               src={node.content.url}

@@ -8,7 +8,7 @@ import type { XyzDslTransaction, PrimaryHistoricalBaselineXyzDsl, RejectedTransa
 // declaration path. Keep this path-scoped: memo/content values may legitimately
 // contain "=" and should not use this cleanup rule.
 const TRAILING_FILLER_PATTERN = /\/[0=]+$/;
-const TERMINAL_AXIS_SIZE_FILLER_PATTERN = /(?<prefix>\+\d+\+)(?<size>[1-9]\d*?)0*=$/;
+const TERMINAL_AXIS_SIZE_FILLER_PATTERN = /(?<prefix>\+\d+(?:[dcm])?\+)(?<size>[1-9]\d*?)(?<unit>[dcm])?0*=$/;
 const MAX_MEMO_PREVIEW_LENGTH = 120;
 
 function transactionFallbackId(transaction: XyzDslTransaction, index: number): string {
@@ -26,7 +26,7 @@ export function trimTransactionPathFiller(path: string): string {
   return path
     .trim()
     .replace(TRAILING_FILLER_PATTERN, '')
-    .replace(TERMINAL_AXIS_SIZE_FILLER_PATTERN, '$<prefix>$<size>');
+    .replace(TERMINAL_AXIS_SIZE_FILLER_PATTERN, '$<prefix>$<size>$<unit>');
 }
 
 export function trimTransactionMemoFiller(memo: string): string {

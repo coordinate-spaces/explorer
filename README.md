@@ -43,14 +43,14 @@ Boolean composition operations (`operation: union`, `operation: subtraction`, an
 "Mug/+0d+1d/+0d+1d/+0d+1d" : "color: 0xf5f3ef"
 "Mug/Body/+5d+2d/+1d+2d/+1d+2d" : "geometry: cylinder; roughness: 0.65"
 "Mug/Hollow/+530m+140m/+120m+190m/+130m+140m" : "geometry: cylinder; operation: subtraction"
-"Mug/Handle/+680m+110m/+155m+110m/+135m+130m" : "box-radius: 0.18; operation: union"
-"Mug/HandleHole/+700m+70m/+175m+70m/+155m+90m" : "box-radius: 0.12; operation: subtraction"
+"Mug/Handle/+680m+110m/+155m+110m/+135m+130m" : "box-radius: 0.018; operation: union"
+"Mug/HandleHole/+700m+70m/+175m+70m/+155m+90m" : "box-radius: 0.012; operation: subtraction"
 ```
 
 Spatial transaction validation may limit each memo/properties field to 100 bytes, but that is a transport constraint rather than a renderer limit. A spatial transaction is a remote transaction whose path and memo/properties payload map into one spatial declaration. Once declarations are loaded, the renderer consumes the resolved spatial document and does not impose a practical size limit on the inherited property set. Authors targeting the remote format can fit richer scenes into the 100-byte fields by putting shared material, geometry, and deformation properties on namespace declarations, then letting child instances inherit those defaults or add compact overrides across additional declarations.
 
 ```txt
-"+2d+4d/+0d+6d/+1d+3d" : "geometry: box; box-radius: 0.15; color: 0x333333; metalness: 0.8; roughness: 0.2"
+"+2d+4d/+0d+6d/+1d+3d" : "geometry: box; box-radius: 0.015; color: 0x333333; metalness: 0.8; roughness: 0.2"
 "Sofa/+7d+4d/+0d+3d/+0d+2d" : "color: brown; metalness: 0.2; roughness: 0.8"
 "Sofa/Cushion/" : "color: 0xf5f3ef; metalness: 0; roughness: 0.88; puff: 5"
 "Seat/+3d+5d/+0d+3d/+0d+15d" : "ref: Sofa/"

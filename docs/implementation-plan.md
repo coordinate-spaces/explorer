@@ -118,10 +118,10 @@ Boxes map these values directly to box dimensions. Boxes with `box-radius` set t
 ## Examples
 
 ```txt
-"+2d+4d/+0d+6d/+1d+3d" : "geometry: box; box-radius: 0.15; color: 0x333333; metalness: 0.8; roughness: 0.2"
+"+2d+4d/+0d+6d/+1d+3d" : "geometry: box; box-radius: 0.015; color: 0x333333; metalness: 0.8; roughness: 0.2"
 ```
 
-This renders a rounded box that is 4 dm wide, offset 2 dm from the X origin, rests on the floor, is 6 dm high, is 1 dm from the back wall, and is 3 dm deep. Its 0.15 m edge radius is clamped when required by the box dimensions.
+This renders a rounded box that is 4 dm wide, offset 2 dm from the X origin, rests on the floor, is 6 dm high, is 1 dm from the back wall, and is 3 dm deep. Its edge radius is 0.015 m (1.5 cm).
 
 ```txt
 "+2d+4d/+7d+6d/+0d+10m" : "geometry: cone; color: yellow; metalness: 0.2; roughness: 0.5"
