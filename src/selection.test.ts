@@ -8,12 +8,12 @@ import {
   selectionTargetForNodeId,
 } from './selection';
 
-const OUTLET_XYZDSL = `"Outlet/+3+4/+0+2/+1+20c":""
-"Outlet/Plate/+0+2/+0+3/+1+15c" : "color: 0xf2f2ee; roughness: 0.7; box-radius: 0.12"
-"Outlet/SlotL/+65c+18c/+150c+75c/+90c+40c" : "box-radius: 0.03; operation: subtraction"
-"Outlet/SlotR/+117c+18c/+150c+75c/+90c+40c" : "box-radius: 0.03; operation: subtraction"
-"Outlet/ScrewTop/+85c+30c/+45c+30c/+90c+40c" : "geometry: cylinder; operation: subtraction"
-"Outlet/ScrewBottom/+85c+30c/+250c+30c/+90c+40c" : "geometry: cylinder; operation: subtraction"`;
+const OUTLET_XYZDSL = `"Outlet/+3d+4d/+0d+2d/+1d+20m":""
+"Outlet/Plate/+0d+2d/+0d+3d/+1d+15m" : "color: 0xf2f2ee; roughness: 0.7; box-radius: 0.12"
+"Outlet/SlotL/+65m+18m/+150m+75m/+90m+40m" : "box-radius: 0.03; operation: subtraction"
+"Outlet/SlotR/+117m+18m/+150m+75m/+90m+40m" : "box-radius: 0.03; operation: subtraction"
+"Outlet/ScrewTop/+85m+30m/+45m+30m/+90m+40m" : "geometry: cylinder; operation: subtraction"
+"Outlet/ScrewBottom/+85m+30m/+250m+30m/+90m+40m" : "geometry: cylinder; operation: subtraction"`;
 
 describe('selectionTargetForNodeId', () => {
   it('promotes rendered compound children to their editable root anchor', () => {
@@ -49,7 +49,7 @@ describe('selectionTargetForNodeId', () => {
   });
 
   it('keeps standalone primitives selected when there is no container anchor', () => {
-    const document = createSpatialDocument('"+0+1/+0+1/+0+1" : "color: red"');
+    const document = createSpatialDocument('"+0d+1d/+0d+1d/+0d+1d" : "color: red"');
     const primitive = document.renderNodes[0];
     const target = selectionTargetForNodeId(document.nodes, primitive.id);
 

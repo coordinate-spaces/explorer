@@ -6,7 +6,7 @@ import { degreesToRadians, transformFromBox } from './transform';
 
 function box(overrides: Partial<XyzDslBoxSpec> = {}): XyzDslBoxSpec {
   return {
-    source: '+0+4/+0+2/+0+2',
+    source: '+0d+4d/+0d+2d/+0d+2d',
     x: 0,
     y: 0,
     z: 0,
@@ -70,7 +70,7 @@ describe('assignUnionGroups', () => {
   it('uses transformed bounds so rotated nodes can be union-grouped', () => {
     const grouped = assignUnionGroups([
       node('node-1', box(), [0, degreesToRadians(45), 0]),
-      node('node-2', box({ source: '+4+1/+0+2/+0+1', x: 4, width: 1, depth: 1 })),
+      node('node-2', box({ source: '+4d+1d/+0d+2d/+0d+1d', x: 4, width: 1, depth: 1 })),
     ]);
 
     expect(grouped[0].unionGroupId).toBe('union-1');

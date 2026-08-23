@@ -20,7 +20,7 @@ function describeAuthoringState(
   remoteBaselineChanged: boolean,
 ): string {
   if (!hasRemoteBaseline) {
-    return `Editing local spatial declarations. Use bare path numbers for units and a c suffix for centiunits (${UNIT_SCALE_DESCRIPTION}).`;
+    return `Editing local spatial declarations. Use bare path numbers for metres, or d, c, and m suffixes for decimetres, centimetres, and millimetres (${UNIT_SCALE_DESCRIPTION}).`;
   }
 
   if (remoteBaselineChanged && hasAuthoringEdits) {

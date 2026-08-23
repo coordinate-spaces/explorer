@@ -23,17 +23,17 @@ import { useRealtimePublicKeyTransactions } from './transactions/useRealtimePubl
 import { XyzDslDrawer } from './ui/XyzDslDrawer';
 import { usePersistentState } from './ui/usePersistentState';
 
-const INITIAL_XYZDSL = `"+2+4/+0+6/+1+3" : "geometry: cylinder; color: 0x333333; metalness: 0.8; roughness: 0.2"
-"+2+4/+7+6/+0+10c" : "geometry: cone; color: yellow; metalness: 0.2; roughness: 0.5"
-"+7+6/+0+15/+0+50c" : "geometry: sphere; color: blue; metalness: 0.1; roughness: 0.2"
+const INITIAL_XYZDSL = `"+2d+4d/+0d+6d/+1d+3d" : "geometry: cylinder; color: 0x333333; metalness: 0.8; roughness: 0.2"
+"+2d+4d/+7d+6d/+0d+10m" : "geometry: cone; color: yellow; metalness: 0.2; roughness: 0.5"
+"+7d+6d/+0d+15d/+0d+50m" : "geometry: sphere; color: blue; metalness: 0.1; roughness: 0.2"
 
-"Table/+18+8/+0+5/+4+8" : "color: white; metalness: 0.8; roughness: 0.2"
-"Table/Top/+0+8/+4+1/+0+8" : ""
+"Table/+18d+8d/+0d+5d/+4d+8d" : "color: white; metalness: 0.8; roughness: 0.2"
+"Table/Top/+0d+8d/+4d+1d/+0d+8d" : ""
 "Table/Leg/" : "geometry: cylinder"
-"Table/Leg/+0+1/+0+5/+0+1" : ""
-"Table/Leg/+7+1/+0+5/+0+1" : ""
-"Table/Leg/+0+1/+0+5/+7+1" : ""
-"Table/Leg/+7+1/+0+5/+7+1" : ""`;
+"Table/Leg/+0d+1d/+0d+5d/+0d+1d" : ""
+"Table/Leg/+7d+1d/+0d+5d/+0d+1d" : ""
+"Table/Leg/+0d+1d/+0d+5d/+7d+1d" : ""
+"Table/Leg/+7d+1d/+0d+5d/+7d+1d" : ""`;
 
 const DEFAULT_TRANSACTION_ENDPOINT = 'wss://sure-formerly-filly.ngrok-free.app/00000000e29a7850088d660489b7b9ae2da763bc3bd83324ecc54eee04840adb';
 const DEFAULT_SECONDARY_TRANSACTION_ENDPOINT = 'wss://ungallant-unimpeding-kade.ngrok-free.dev/000006913ccf73b5990eb4833e4cdbd5ef58061384481ff1f6cee3cb7f18b2cd';

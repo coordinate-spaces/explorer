@@ -3,7 +3,7 @@ import type { XyzDslBoxSpec, XyzDslGeometrySpec } from '../xyzdsl/types';
 import { geometryFromBox } from './geometry';
 
 const box: XyzDslBoxSpec = {
-  source: '+2+4/+7+6/+0+10c',
+  source: '+2d+4d/+7d+6d/+0d+10m',
   x: 2,
   y: 7,
   z: 0,

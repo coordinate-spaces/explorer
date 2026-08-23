@@ -27,7 +27,7 @@ export function parseXyzDslDeclaration(line: string, lineNumber = 1): ParseResul
         {
           line: lineNumber,
           source: line,
-          message: 'Declaration must look like "+2+4/+0+6/+1+3" : "geometry: box; color: blue; metalness: 0.1".',
+          message: 'Declaration must look like "+2d+4d/+0d+6d/+1d+3d" : "geometry: box; color: blue; metalness: 0.1".',
         },
       ],
     };

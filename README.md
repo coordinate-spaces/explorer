@@ -28,39 +28,39 @@ References are evaluated in declaration order. They use the newest matching targ
 
 ```txt
 "Sofa/" : "color: brown"
-"SeatA/+0+4/+0+2/+0+3" : "ref: Sofa/"
+"SeatA/+0d+4d/+0d+2d/+0d+3d" : "ref: Sofa/"
 "Sofa/" : "color: blue"
-"SeatB/+5+4/+0+2/+0+3" : "ref: Sofa/"
+"SeatB/+5d+4d/+0d+2d/+0d+3d" : "ref: Sofa/"
 ```
 
 Here `SeatA/` uses brown and `SeatB/` uses blue.
 
-Path coordinates use compact project units rather than literal walking strides: `1` bare unit is `10 cm`, and `1c` is one centiunit, or `1 mm`. The optional `c` suffix applies per number, so mixed axis values are valid: `+1+3c` means offset `1` unit (`10 cm`) and size `0.03` units (`3 mm`). For real-world mental scale, an adult walking pace of about `0.75 m` is `7.5` units, written exactly as `750c`. Decimal path notation is intentionally avoided; write `10c` instead of `0.1`.
+Path coordinates use metres: a bare integer is metres, while `d`, `c`, and `m` suffixes denote decimetres, centimetres, and millimetres. Suffixes apply independently to each number, so `+1d+3m` means a 1 dm offset and a 3 mm size. Decimal path notation is avoided; use an exact metric suffix instead.
 
 Boolean composition operations (`operation: union`, `operation: subtraction`, and `operation: intersection`) follow declaration order and are implemented with CSG internally. A later overlapping operator first targets earlier solids in the same namespace/local scope; if no local scoped target overlaps, it falls back to the earlier overlapping world-space solid. This lets compound objects be authored as local groups, but the group must still have a concrete namespace anchor to materialize its children:
 
 ```txt
-"Mug/+0+1/+0+1/+0+1" : "color: 0xf5f3ef"
-"Mug/Body/+5+2/+1+2/+1+2" : "geometry: cylinder; roughness: 0.65"
-"Mug/Hollow/+530c+140c/+120c+190c/+130c+140c" : "geometry: cylinder; operation: subtraction"
-"Mug/Handle/+680c+110c/+155c+110c/+135c+130c" : "box-radius: 0.18; operation: union"
-"Mug/HandleHole/+700c+70c/+175c+70c/+155c+90c" : "box-radius: 0.12; operation: subtraction"
+"Mug/+0d+1d/+0d+1d/+0d+1d" : "color: 0xf5f3ef"
+"Mug/Body/+5d+2d/+1d+2d/+1d+2d" : "geometry: cylinder; roughness: 0.65"
+"Mug/Hollow/+530m+140m/+120m+190m/+130m+140m" : "geometry: cylinder; operation: subtraction"
+"Mug/Handle/+680m+110m/+155m+110m/+135m+130m" : "box-radius: 0.18; operation: union"
+"Mug/HandleHole/+700m+70m/+175m+70m/+155m+90m" : "box-radius: 0.12; operation: subtraction"
 ```
 
 Spatial transaction validation may limit each memo/properties field to 100 bytes, but that is a transport constraint rather than a renderer limit. A spatial transaction is a remote transaction whose path and memo/properties payload map into one spatial declaration. Once declarations are loaded, the renderer consumes the resolved spatial document and does not impose a practical size limit on the inherited property set. Authors targeting the remote format can fit richer scenes into the 100-byte fields by putting shared material, geometry, and deformation properties on namespace declarations, then letting child instances inherit those defaults or add compact overrides across additional declarations.
 
 ```txt
-"+2+4/+0+6/+1+3" : "geometry: box; box-radius: 0.15; color: 0x333333; metalness: 0.8; roughness: 0.2"
-"Sofa/+7+4/+0+3/+0+2" : "color: brown; metalness: 0.2; roughness: 0.8"
+"+2d+4d/+0d+6d/+1d+3d" : "geometry: box; box-radius: 0.15; color: 0x333333; metalness: 0.8; roughness: 0.2"
+"Sofa/+7d+4d/+0d+3d/+0d+2d" : "color: brown; metalness: 0.2; roughness: 0.8"
 "Sofa/Cushion/" : "color: 0xf5f3ef; metalness: 0; roughness: 0.88; puff: 5"
-"Seat/+3+5/+0+3/+0+15" : "ref: Sofa/"
+"Seat/+3d+5d/+0d+3d/+0d+15d" : "ref: Sofa/"
 
-"Table/+18+8/+0+5/+4+8" : "color: white; metalness: 0.8; roughness: 0.2"
-"Table/Top/+0+8/+4+1/+0+8" : ""
-"Table/LegA/+0+1/+0+5/+0+1" : "geometry: cylinder"
-"Table/LegB/+7+1/+0+5/+0+1" : "geometry: cylinder"
-"Table/LegC/+0+1/+0+5/+7+1" : "geometry: cylinder"
-"Table/LegD/+7+1/+0+5/+7+1" : "geometry: cylinder"
+"Table/+18d+8d/+0d+5d/+4d+8d" : "color: white; metalness: 0.8; roughness: 0.2"
+"Table/Top/+0d+8d/+4d+1d/+0d+8d" : ""
+"Table/LegA/+0d+1d/+0d+5d/+0d+1d" : "geometry: cylinder"
+"Table/LegB/+7d+1d/+0d+5d/+0d+1d" : "geometry: cylinder"
+"Table/LegC/+0d+1d/+0d+5d/+7d+1d" : "geometry: cylinder"
+"Table/LegD/+7d+1d/+0d+5d/+7d+1d" : "geometry: cylinder"
 ```
 
 ## Spatial content cards
@@ -73,13 +73,13 @@ Spatial transaction memos can still contain ordinary declaration properties such
 Internally these content memos are normalized to explicit spatial declaration properties:
 
 ```txt
-"+0+4/+0+2/+0+1" : "content-kind: text; content-text-uri: Hello%20world"
-"+5+4/+0+3/+0+10c" : "content-kind: url; content-url-uri: https%3A%2F%2Fexample.com"
+"+0d+4d/+0d+2d/+0d+1d" : "content-kind: text; content-text-uri: Hello%20world"
+"+5d+4d/+0d+3d/+0d+10m" : "content-kind: url; content-url-uri: https%3A%2F%2Fexample.com"
 ```
 
 Manual spatial declarations can use `content-text`/`content-url` for simple values, or the URI-encoded `content-text-uri`/`content-url-uri` properties when values may contain semicolons, quotes, newlines, or other XYZDSL delimiters. URL content is limited to absolute `http` and `https` URLs and is embedded in a sandboxed iframe; some sites may block iframe embedding, in which case the card still shows an external "Open URL" link.
 
-Primitive dimensions are derived from the bounding box and use the same project-unit scale as paths (`1` = `10 cm`, `1c` = `1 mm`). For example, a cone or cylinder uses X/Z as its footprint and Y as its height. Non-square footprints are rendered as scaled elliptical primitives so every primitive fills the declared bounding box. `box-radius` applies only to box geometry and is measured in project units; omitted or zero radius renders a sharp box, and the renderer clamps positive radii to half of the smallest box dimension. `puff` is intentionally a geometry modifier, not a material setting, because it changes the rendered cushion shape.
+Primitive dimensions are derived from the bounding box and use the same project-unit scale as paths (`1` = `1 m`, `1d` = `1 dm`, `1c` = `1 cm`, `1m` = `1 mm`). For example, a cone or cylinder uses X/Z as its footprint and Y as its height. Non-square footprints are rendered as scaled elliptical primitives so every primitive fills the declared bounding box. `box-radius` applies only to box geometry and is measured in project units; omitted or zero radius renders a sharp box, and the renderer clamps positive radii to half of the smallest box dimension. `puff` is intentionally a geometry modifier, not a material setting, because it changes the rendered cushion shape.
 
 ## Material declaration reference
 
@@ -95,9 +95,9 @@ Spatial primitives intentionally expose only the basic scalar properties needed 
 
 ```txt
 "Table/" : "color: white; metalness: 0.8; roughness: 0.2"
-"Table/Top/+0+8/+4+1/+0+8" : ""
-"Table/Leg/+0+1/+0+5/+0+1" : "geometry: cylinder; roughness: 0.35"
-"CopiedTable/+10+8/+0+5/+0+8" : "ref: Table/"
+"Table/Top/+0d+8d/+4d+1d/+0d+8d" : ""
+"Table/Leg/+0d+1d/+0d+5d/+0d+1d" : "geometry: cylinder; roughness: 0.35"
+"CopiedTable/+10d+8d/+0d+5d/+0d+8d" : "ref: Table/"
 ```
 
 See [docs/implementation-plan.md](docs/implementation-plan.md) for architecture details and the feature roadmap.

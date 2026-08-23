@@ -1,7 +1,8 @@
 import { useMemo } from 'react';
 import { floorMaterial, wallMaterial } from './materials';
 
-const GRID_OFFSET = 0.015;
+// 1.5 mm prevents z-fighting without visibly lifting the grid.
+const GRID_OFFSET = 0.0015;
 
 interface CornerRoomProps {
   width: number;
