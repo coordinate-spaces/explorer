@@ -24,8 +24,8 @@ import { XyzDslDrawer } from './ui/XyzDslDrawer';
 import { usePersistentState } from './ui/usePersistentState';
 
 const INITIAL_XYZDSL = `"+2+4/+0+6/+1+3" : "geometry: cylinder; color: 0x333333; metalness: 0.8; roughness: 0.2"
-"+2+4/+7+6/+0+10c" : "geometry: cone; color: yellow; metalness: 0.2; roughness: 0.5"
-"+7+6/+0+15/+0+50c" : "geometry: sphere; color: blue; metalness: 0.1; roughness: 0.2"
+"+2+4/+7+6/+0+1c" : "geometry: cone; color: yellow; metalness: 0.2; roughness: 0.5"
+"+7+6/+0+15/+0+5c" : "geometry: sphere; color: blue; metalness: 0.1; roughness: 0.2"
 
 "Table/+18+8/+0+5/+4+8" : "color: white; metalness: 0.8; roughness: 0.2"
 "Table/Top/+0+8/+4+1/+0+8" : ""

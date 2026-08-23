@@ -148,8 +148,8 @@ describe('createSpatialDocument namespaced spatial declarations', () => {
   it('does not render nested local definitions without a concrete namespace anchor', () => {
     const document =
       createSpatialDocument(`"Sofa/" : "color: 0x2d3f4f; roughness: 0.92; box-radius: 0.16"
-"Sofa/Base/+0+6/+0+40c/+0+3" : "box-radius: 0.1"
-"Sofa/Back/+0+6/+44c+180c/+0+50c" : "box-radius: 0.18; rotation: -3.4,0,0"`);
+"Sofa/Base/+0+6/+0+4c/+0+3" : "box-radius: 0.1"
+"Sofa/Back/+0+6/+44m+18c/+0+5c" : "box-radius: 0.18; rotation: -3.4,0,0"`);
 
     expect(document.diagnostics).toHaveLength(2);
     expect(document.diagnostics[0].message).toContain('has no concrete ancestor namespace anchor');
@@ -164,8 +164,8 @@ describe('createSpatialDocument namespaced spatial declarations', () => {
     const document =
       createSpatialDocument(`"Sofa/" : "color: 0x2d3f4f; roughness: 0.92; box-radius: 0.16"
 "Sofa/+10+6/+0+2/+0+3" : ""
-"Sofa/Base/+0+6/+0+40c/+0+3" : "box-radius: 0.1"
-"Sofa/Back/+0+6/+44c+180c/+0+50c" : "box-radius: 0.18; rotation: -3.4,0,0"`);
+"Sofa/Base/+0+6/+0+4c/+0+3" : "box-radius: 0.1"
+"Sofa/Back/+0+6/+44m+18c/+0+5c" : "box-radius: 0.18; rotation: -3.4,0,0"`);
 
     expect(document.diagnostics).toEqual([]);
     expect(document.renderNodes).toHaveLength(2);
@@ -180,8 +180,8 @@ describe('createSpatialDocument namespaced spatial declarations', () => {
   it('materializes referenced template descendants at the referring instance anchor', () => {
     const document =
       createSpatialDocument(`"Sofa/" : "color: 0x2d3f4f; roughness: 0.92; box-radius: 0.16"
-"Sofa/Base/+0+6/+0+40c/+0+3" : "box-radius: 0.1"
-"Sofa/Back/+0+6/+44c+180c/+0+50c" : "box-radius: 0.18; rotation: -3.4,0,0"
+"Sofa/Base/+0+6/+0+4c/+0+3" : "box-radius: 0.1"
+"Sofa/Back/+0+6/+44m+18c/+0+5c" : "box-radius: 0.18; rotation: -3.4,0,0"
 "Seat/+10+6/+0+2/+0+3" : "ref: Sofa/"`);
 
     expect(document.diagnostics).toEqual([]);
@@ -330,7 +330,7 @@ describe('createSpatialDocument namespaced spatial declarations', () => {
 
   it('keeps repeated template ref materializations distinct', () => {
     const document = createSpatialDocument(`"Sofa/" : "color: brown"
-"Sofa/Base/+0+6/+0+40c/+0+3" : ""
+"Sofa/Base/+0+6/+0+4c/+0+3" : ""
 "SeatA/+0+6/+0+2/+0+3" : "ref: Sofa/"
 "SeatB/+10+6/+0+2/+0+3" : "ref: Sofa/"`);
 
@@ -473,9 +473,9 @@ describe('createSpatialDocument namespaced spatial declarations', () => {
   it('chains declaration-order boolean operations inside a concrete namespace scope', () => {
     const document = createSpatialDocument(`"Mug/+0+1/+0+1/+0+1" : "color: white"
 "Mug/Body/+5+2/+1+2/+1+2" : "geometry: cylinder; color: 0xf5f3ef; roughness: 0.65"
-"Mug/Hollow/+530c+140c/+120c+190c/+130c+140c" : "geometry: cylinder; operation: subtraction"
-"Mug/Handle/+680c+110c/+155c+110c/+135c+130c" : "box-radius: 0.18; operation: union"
-"Mug/HandleHole/+700c+70c/+175c+70c/+155c+90c" : "box-radius: 0.12; operation: subtraction"`);
+"Mug/Hollow/+53c+14c/+12c+19c/+13c+14c" : "geometry: cylinder; operation: subtraction"
+"Mug/Handle/+68c+11c/+155m+11c/+135m+13c" : "box-radius: 0.18; operation: union"
+"Mug/HandleHole/+70c+7c/+175m+7c/+155m+9c" : "box-radius: 0.12; operation: subtraction"`);
 
     expect(document.diagnostics).toEqual([]);
     expect(document.csgExpressions).toHaveLength(1);

@@ -2,39 +2,49 @@ import { describe, expect, it } from 'vitest';
 import { parseBoxSpec, parseCompactNumber, parseXyzDslDocument } from './parser';
 
 const EXAMPLE = `"+2+4/+0+6/+1+3" : "geometry: cylinder; color: 0x333333; metalness: 0.8; roughness: 0.2"
-"+2+4/+7+6/+0+10c" : "geometry: cone; color: yellow; metalness: 0.2; roughness: 0.5"
-"+7+6/+0+15/+0+50c" : "geometry: sphere; color: blue; metalness: 0.1; roughness: 0.2"`;
+"+2+4/+7+6/+0+1c" : "geometry: cone; color: yellow; metalness: 0.2; roughness: 0.5"
+"+7+6/+0+15/+0+5c" : "geometry: sphere; color: blue; metalness: 0.1; roughness: 0.2"`;
 
 describe('parseCompactNumber', () => {
-  it('parses unit integers and centiunit-suffixed values', () => {
+  it('parses unit integers and centimeter- or millimeter-suffixed values', () => {
     expect(parseCompactNumber('0')).toBe(0);
     expect(parseCompactNumber('2')).toBe(2);
     expect(parseCompactNumber('15')).toBe(15);
-    expect(parseCompactNumber('10c')).toBe(0.1);
-    expect(parseCompactNumber('1c')).toBe(0.01);
-    expect(parseCompactNumber('50c')).toBe(0.5);
+    expect(parseCompactNumber('1c')).toBe(0.1);
+    expect(parseCompactNumber('1m')).toBe(0.01);
+    expect(parseCompactNumber('5c')).toBe(0.5);
     expect(parseCompactNumber('10')).toBe(10);
+    expect(parseCompactNumber('1')).toBe(parseCompactNumber('10c'));
+    expect(parseCompactNumber('10c')).toBe(parseCompactNumber('100m'));
   });
 
-  it('rejects legacy p-decimal, leading-zero, and malformed centiunit values', () => {
+  it('rejects legacy p-decimal, leading-zero, and malformed metric-suffix values', () => {
     expect(() => parseCompactNumber('0p04')).toThrow(
-      'p-decimal path numbers are no longer supported; use "4c" instead of "0p04".',
+      'p-decimal path numbers are no longer supported; use "4m" instead of "0p04".',
     );
     expect(() => parseCompactNumber('0p001')).toThrow(
-      'p-decimal path numbers are no longer supported and "0p001" cannot be represented exactly as centiunits.',
+      'p-decimal path numbers are no longer supported and "0p001" cannot be represented exactly in centimeters or millimeters.',
     );
     expect(() => parseCompactNumber('004')).toThrow(
       'Leading-zero path numbers are no longer supported; use "4" instead of "004".',
     );
+    expect(() => parseCompactNumber('04c')).toThrow(
+      'Leading-zero path numbers are no longer supported; use "4c" instead of "04c".',
+    );
+    expect(() => parseCompactNumber('04m')).toThrow(
+      'Leading-zero path numbers are no longer supported; use "4m" instead of "04m".',
+    );
     expect(() => parseCompactNumber('p5')).toThrow(
-      'Expected a path number using digits with an optional centiunit suffix, received "p5".',
+      'Expected a path number using digits with an optional centimeter (c) or millimeter (m) suffix, received "p5".',
     );
     expect(() => parseCompactNumber('5p')).toThrow(
-      'Expected a path number using digits with an optional centiunit suffix, received "5p".',
+      'Expected a path number using digits with an optional centimeter (c) or millimeter (m) suffix, received "5p".',
     );
-    expect(() => parseCompactNumber('1cc')).toThrow(
-      'Expected a path number using digits with an optional centiunit suffix, received "1cc".',
-    );
+    for (const malformed of ['1cc', '1mm', '1cm', '1mc', '1x']) {
+      expect(() => parseCompactNumber(malformed)).toThrow(
+        `Expected a path number using digits with an optional centimeter (c) or millimeter (m) suffix, received "${malformed}".`,
+      );
+    }
   });
 });
 
@@ -51,9 +61,9 @@ describe('parseBoxSpec', () => {
     });
   });
 
-  it('allows mixed unit and centiunit values in the same axis segment', () => {
-    expect(parseBoxSpec('+1+3c/+0c+1c/+25c+50c')).toEqual({
-      source: '+1+3c/+0c+1c/+25c+50c',
+  it('allows mixed unit, centimeter, and millimeter values in the same axis segment', () => {
+    expect(parseBoxSpec('+1+3m/+0c+1m/+25m+5c')).toEqual({
+      source: '+1+3m/+0c+1m/+25m+5c',
       x: 1,
       y: 0,
       z: 0.25,

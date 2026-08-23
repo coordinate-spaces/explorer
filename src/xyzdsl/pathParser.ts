@@ -1,12 +1,12 @@
-import { CENTIUNITS_PER_UNIT } from '../model/units';
+import { CENTIMETERS_PER_UNIT, MILLIMETERS_PER_UNIT } from '../model/units';
 import type { AxisName, XyzDslAxisSpec, XyzDslBoxSpec, XyzDslPathSpec } from './types';
 
 const AXES = ['x', 'y', 'z'] as const;
-const PATH_NUMBER_PATTERN = /^(?:0|[1-9]\d*)(?:c)?$/;
-const LEGACY_LEADING_ZERO_PATTERN = /^0\d+(?:c)?$/;
+const PATH_NUMBER_PATTERN = /^(?:0|[1-9]\d*)(?:c|m)?$/;
+const LEGACY_LEADING_ZERO_PATTERN = /^0\d+(?:c|m)?$/;
 const LEGACY_P_DECIMAL_PATTERN = /^(?<whole>\d+)p(?<fraction>\d+)$/;
 const AXIS_PATTERN = /^\+(?<offset>[^+]+)\+(?<size>[^+]+)$/;
-const AXIS_NUMBER_CANDIDATE_PATTERN = /^(?:\d+(?:c)?|\d+p\d+)$/;
+const AXIS_NUMBER_CANDIDATE_PATTERN = /^(?:\d+(?:c|m)?|\d+p\d+)$/;
 const NAMESPACE_PATTERN = /^[A-Za-z0-9][A-Za-z0-9+]*$/;
 
 function isAxisSegment(segment: string): boolean {
@@ -19,7 +19,7 @@ function isAxisSegment(segment: string): boolean {
   );
 }
 
-function centiunitMigration(raw: string): string | undefined {
+function metricSuffixMigration(raw: string): string | undefined {
   const match = raw.match(LEGACY_P_DECIMAL_PATTERN);
 
   if (!match?.groups) {
@@ -37,34 +37,38 @@ function centiunitMigration(raw: string): string | undefined {
     return undefined;
   }
 
-  const centiunits = whole * CENTIUNITS_PER_UNIT + Number(fraction.padEnd(2, '0'));
+  const millimeters = whole * MILLIMETERS_PER_UNIT + Number(fraction.padEnd(2, '0'));
 
-  return `${centiunits}c`;
+  return millimeters % 10 === 0 ? `${millimeters / 10}c` : `${millimeters}m`;
 }
 
 export function parsePathNumber(raw: string): number {
-  const pDecimalMigration = centiunitMigration(raw);
+  const pDecimalMigration = metricSuffixMigration(raw);
 
   if (pDecimalMigration) {
     throw new Error(`p-decimal path numbers are no longer supported; use "${pDecimalMigration}" instead of "${raw}".`);
   }
 
   if (LEGACY_P_DECIMAL_PATTERN.test(raw)) {
-    throw new Error(`p-decimal path numbers are no longer supported and "${raw}" cannot be represented exactly as centiunits.`);
+    throw new Error(`p-decimal path numbers are no longer supported and "${raw}" cannot be represented exactly in centimeters or millimeters.`);
   }
 
   if (LEGACY_LEADING_ZERO_PATTERN.test(raw)) {
-    const suffix = raw.endsWith('c') ? 'c' : '';
+    const suffix = raw.endsWith('c') || raw.endsWith('m') ? raw.slice(-1) : '';
     const digits = suffix ? raw.slice(0, -1) : raw;
     throw new Error(`Leading-zero path numbers are no longer supported; use "${Number(digits)}${suffix}" instead of "${raw}".`);
   }
 
   if (!PATH_NUMBER_PATTERN.test(raw)) {
-    throw new Error(`Expected a path number using digits with an optional centiunit suffix, received "${raw}".`);
+    throw new Error(`Expected a path number using digits with an optional centimeter (c) or millimeter (m) suffix, received "${raw}".`);
   }
 
   if (raw.endsWith('c')) {
-    return Number(raw.slice(0, -1)) / CENTIUNITS_PER_UNIT;
+    return Number(raw.slice(0, -1)) / CENTIMETERS_PER_UNIT;
+  }
+
+  if (raw.endsWith('m')) {
+    return Number(raw.slice(0, -1)) / MILLIMETERS_PER_UNIT;
   }
 
   return Number(raw);

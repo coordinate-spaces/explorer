@@ -8,12 +8,12 @@ import {
   selectionTargetForNodeId,
 } from './selection';
 
-const OUTLET_XYZDSL = `"Outlet/+3+4/+0+2/+1+20c":""
-"Outlet/Plate/+0+2/+0+3/+1+15c" : "color: 0xf2f2ee; roughness: 0.7; box-radius: 0.12"
-"Outlet/SlotL/+65c+18c/+150c+75c/+90c+40c" : "box-radius: 0.03; operation: subtraction"
-"Outlet/SlotR/+117c+18c/+150c+75c/+90c+40c" : "box-radius: 0.03; operation: subtraction"
-"Outlet/ScrewTop/+85c+30c/+45c+30c/+90c+40c" : "geometry: cylinder; operation: subtraction"
-"Outlet/ScrewBottom/+85c+30c/+250c+30c/+90c+40c" : "geometry: cylinder; operation: subtraction"`;
+const OUTLET_XYZDSL = `"Outlet/+3+4/+0+2/+1+2c":""
+"Outlet/Plate/+0+2/+0+3/+1+15m" : "color: 0xf2f2ee; roughness: 0.7; box-radius: 0.12"
+"Outlet/SlotL/+65m+18m/+15c+75m/+9c+4c" : "box-radius: 0.03; operation: subtraction"
+"Outlet/SlotR/+117m+18m/+15c+75m/+9c+4c" : "box-radius: 0.03; operation: subtraction"
+"Outlet/ScrewTop/+85m+3c/+45m+3c/+9c+4c" : "geometry: cylinder; operation: subtraction"
+"Outlet/ScrewBottom/+85m+3c/+25c+3c/+9c+4c" : "geometry: cylinder; operation: subtraction"`;
 
 describe('selectionTargetForNodeId', () => {
   it('promotes rendered compound children to their editable root anchor', () => {

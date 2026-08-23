@@ -1,9 +1,9 @@
-import { CENTIUNITS_PER_UNIT } from '../model/units';
+import { CENTIMETERS_PER_UNIT, MILLIMETERS_PER_UNIT } from '../model/units';
 import { parseXyzDslDeclaration } from './parser';
 import type { AxisName } from './types';
 
 const DECLARATION_PATTERN = /^(?<indent>\s*)"(?<path>[^"]+)"(?<middle>\s*:\s*)"(?<properties>[^"]*)"(?<suffix>\s*)$/;
-const AXIS_PATTERN = /^\+(?<offset>\d+(?:c)?)\+(?<size>\d+(?:c)?)$/;
+const AXIS_PATTERN = /^\+(?<offset>\d+(?:c|m)?)\+(?<size>\d+(?:c|m)?)$/;
 const MIN_SIZE = 0.01;
 const ROTATION_PRECISION = 1000;
 
@@ -57,13 +57,29 @@ function formatDeclaration(parts: DeclarationParts): string {
 }
 
 function formatPathNumber(value: number): string {
-  const centiunits = Math.max(0, Math.round(value * CENTIUNITS_PER_UNIT));
+  const millimeters = Math.max(0, Math.round(value * MILLIMETERS_PER_UNIT));
 
-  if (centiunits % CENTIUNITS_PER_UNIT === 0) {
-    return String(centiunits / CENTIUNITS_PER_UNIT);
+  if (millimeters % MILLIMETERS_PER_UNIT === 0) {
+    return String(millimeters / MILLIMETERS_PER_UNIT);
   }
 
-  return `${centiunits}c`;
+  if (millimeters % 10 === 0) {
+    return `${millimeters / 10}c`;
+  }
+
+  return `${millimeters}m`;
+}
+
+function parseAxisNumber(raw: string): number {
+  if (raw.endsWith('c')) {
+    return Number(raw.slice(0, -1)) / CENTIMETERS_PER_UNIT;
+  }
+
+  if (raw.endsWith('m')) {
+    return Number(raw.slice(0, -1)) / MILLIMETERS_PER_UNIT;
+  }
+
+  return Number(raw);
 }
 
 function parseAxis(segment: string): AxisParts | undefined {
@@ -73,10 +89,7 @@ function parseAxis(segment: string): AxisParts | undefined {
     return undefined;
   }
 
-  const offset = match.groups.offset.endsWith('c') ? Number(match.groups.offset.slice(0, -1)) / CENTIUNITS_PER_UNIT : Number(match.groups.offset);
-  const size = match.groups.size.endsWith('c') ? Number(match.groups.size.slice(0, -1)) / CENTIUNITS_PER_UNIT : Number(match.groups.size);
-
-  return { offset, size };
+  return { offset: parseAxisNumber(match.groups.offset), size: parseAxisNumber(match.groups.size) };
 }
 
 function formatAxis(axis: AxisParts): string {

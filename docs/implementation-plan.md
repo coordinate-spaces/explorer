@@ -22,33 +22,27 @@ The long-term model is intentionally DOM-like: spatial declarations compile into
 
 ## Unit model
 
-- A project **unit** is a compact 10 cm authoring grid unit, not a literal adult walking stride.
+- A project **unit** is a compact 10 cm authoring grid unit.
 - `1` bare coordinate unit = `0.1 m` = `10 cm`.
-- A bare path integer is measured in project units:
-  - `0` = `0` units = `0 m`
-  - `2` = `2` units = `0.2 m`
-  - `15` = `15` units = `1.5 m`
-- A lowercase `c` suffix switches that individual path number to centiunits. One centiunit is `1/100` unit = `0.001 m` = `1 mm`, and `100c` equals `1` bare unit:
-  - `1c` = `0.01` unit = `1 mm`
-  - `10c` = `0.1` unit = `1 cm`
-  - `50c` = `0.5` unit = `5 cm`
-  - `125c` = `1.25` units = `12.5 cm`
-- Axis values may mix bare units and centiunits in the same `+offset+size` segment. For example, `+1+3c` means offset `1` unit (`10 cm`) and size `0.03` units (`3 mm`).
+- A bare path integer is measured in project units: `2` is `0.2 m`, and `15` is `1.5 m`.
+- A lowercase `c` suffix measures that individual number in centimeters. There are 10 centimeters per project unit: `1c` = `0.1` unit = `1 cm`, `5c` = `0.5` unit = `5 cm`, and `10c` = `1` unit.
+- A lowercase `m` suffix measures that individual number in millimeters. There are 100 millimeters per project unit: `1m` = `0.01` unit = `1 mm`, `50m` = `0.5` unit = `5 cm`, and `100m` = `1` unit.
+- Axis values may mix bare units, centimeters, and millimeters in the same `+offset+size` segment. For example, `+1c+3m` means offset `0.1` unit (`1 cm`) and size `0.03` unit (`3 mm`).
 - Path coordinates, object dimensions, `box-radius`, collision bounds, grid spacing, room dimensions, and room margins all share this project-unit scale. Renderer code may pass these numbers directly to ThreeJS, but they remain project units with the metric conversion above.
-- Numeric path values use Base64-safe digits with an optional lowercase `c` suffix. Decimal path markers such as `0p1` are no longer supported; use `10c` instead.
-- Integer values should not include extra leading zeroes. Leading-zero path values such as `004` are rejected so older documents fail loudly instead of changing geometry silently. Use `4` for units or `4c` for centiunits instead.
+- Numeric path values use digits with an optional lowercase `c` or `m` suffix. Decimal path markers such as `0p1` are retired; use `1c`, and use `4m` for a hundredths value such as `0p04`.
+- Integer values must not include extra leading zeroes. Values such as `004`, `04c`, and `04m` are rejected; use `4`, `4c`, or `4m` respectively.
 
 ### Authoring scale references
 
-- `1` = `10 cm`, a compact grid step.
-- `750c` = `7.5` units = `75 cm`, roughly one adult walking pace.
+- `1` = `10c` = `100m` = `10 cm`, a compact grid step.
+- `75c` = `750m` = `7.5` units = `75 cm`, roughly one adult walking pace.
 - `8` = `80 cm`, a useful table-height reference.
 - `20` = `2 m`, a useful doorway or person-height reference.
 - `30` = `3 m`, a useful small-room span reference.
 
 ### Unit-scale compatibility
 
-Existing documents rely on bare `1` meaning one 10 cm project unit. Do not silently redefine bare coordinates to mean a real-world pace or any other larger metric distance, because that would rescale authored scenes without warning. Future real-world shorthand should be additive, versioned, or expressed with existing exact centiunit notation such as `750c` for an approximately 0.75 m walking pace.
+Bare integer coordinates retain the established 10 cm project-unit scale. The explicit `c` and `m` suffixes provide exact centimeter and millimeter authoring without changing the physical dimensions of bare-coordinate documents.
 
 ## Spatial declaration grammar
 
@@ -58,7 +52,7 @@ A primitive declaration has a quoted coordinate expression followed by a quoted 
 "+xOffset+width/+yOffset+height/+zOffset+depth" : "geometry: cone; color: blue; metalness: 0.1; roughness: 0.2"
 ```
 
-Each axis segment uses `+offset+size` syntax. Axis order is always X, Y, then Z. Axis numeric values use the grammar `digits` or `digits` + `c`; the `c` suffix changes only that number from units to centiunits. Namespace identifiers are parsed separately, so they may still contain the letter `c` as a normal identifier character. Namespace segments may contain only unpadded Base64 characters other than the `/` path delimiter: `A-Z`, `a-z`, `0-9`, and `+`; each namespace segment must start with a letter or number so leading `+` remains reserved for coordinate axis segments. Padding belongs to remote transport validation and is intentionally excluded from renderer spatial declaration namespaces. The optional `geometry` property defaults to `box` and supports `box`, `cylinder`, `cone`, and `sphere`. The optional `box-radius` property applies only to box geometry and rounds box edges in project units when set to a positive value. The optional `puff` property is a compact `0..5` box-geometry deformation control for cushion-like silhouettes; it is intentionally modeled as shape data instead of material data. The optional `rotation` property accepts an X/Y/Z degree triple, for example `rotation: 0,45,0`.
+Each axis segment uses `+offset+size` syntax. Axis order is always X, Y, then Z. Axis numeric values use the grammar `digits`, `digits` + `c`, or `digits` + `m`; the suffix changes only that number to centimeters or millimeters. Namespace identifiers are parsed separately, so they may still contain the letter `c` as a normal identifier character. Namespace segments may contain only unpadded Base64 characters other than the `/` path delimiter: `A-Z`, `a-z`, `0-9`, and `+`; each namespace segment must start with a letter or number so leading `+` remains reserved for coordinate axis segments. Padding belongs to remote transport validation and is intentionally excluded from renderer spatial declaration namespaces. The optional `geometry` property defaults to `box` and supports `box`, `cylinder`, `cone`, and `sphere`. The optional `box-radius` property applies only to box geometry and rounds box edges in project units when set to a positive value. The optional `puff` property is a compact `0..5` box-geometry deformation control for cushion-like silhouettes; it is intentionally modeled as shape data instead of material data. The optional `rotation` property accepts an X/Y/Z degree triple, for example `rotation: 0,45,0`.
 
 Namespaced declarations extend the quoted coordinate expression with slash-separated identifiers before the coordinate segments:
 
@@ -74,7 +68,7 @@ Namespaced declarations extend the quoted coordinate expression with slash-separ
 "Table/LegD/+7+1/+0+5/+7+1" : "geometry: cylinder"
 ```
 
-A spatial instance path ends with exactly three X/Y/Z axis segments. A namespace declaration ends in `/`, does not render, and supplies inherited defaults to matching child namespaces. Nested coordinates are definitions in the local space of their parent namespace until that parent namespace is materialized. In other words, `Sofa/Base/+0+6/+0+40c/+0+3` defines `Base` inside `Sofa`; it does not render in world space unless `Sofa` has an explicit concrete instance such as `Sofa/+10+6/+0+2/+0+3` or another concrete instance references `Sofa/`.
+A spatial instance path ends with exactly three X/Y/Z axis segments. A namespace declaration ends in `/`, does not render, and supplies inherited defaults to matching child namespaces. Nested coordinates are definitions in the local space of their parent namespace until that parent namespace is materialized. In other words, `Sofa/Base/+0+6/+0+4c/+0+3` defines `Base` inside `Sofa`; it does not render in world space unless `Sofa` has an explicit concrete instance such as `Sofa/+10+6/+0+2/+0+3` or another concrete instance references `Sofa/`.
 
 The canonical overwrite key is every namespace segment before the XYZ axes. Within each kind of named entry, a newer entry with the same key replaces rather than merges with the older entry: omitted properties do not carry forward, namespace declarations replace earlier namespace declarations, and concrete spatial instances replace earlier concrete instances even if their XYZ boxes differ. Declaration-only defaults and concrete instances at the same namespace coexist so inheritance continues to work. Authors who need several sibling primitives must give them distinct namespaces, such as `Table/LegA/...` and `Table/LegB/...`. Coordinate-only anonymous declarations have no namespace key, are exempt from replacement, and remain independent in source order.
 
@@ -138,13 +132,13 @@ Boxes map these values directly to box dimensions. Boxes with `box-radius` set t
 This renders a rounded box that is 4 project units (`40 cm`) wide, offset 2 units (`20 cm`) from the X origin, rests on the floor at Y = 0, is 6 units (`60 cm`) high, is 1 unit (`10 cm`) away from the back wall, and is 3 units (`30 cm`) deep. Its edge radius is 0.15 project units (`1.5 cm`).
 
 ```txt
-"+2+4/+7+6/+0+10c" : "geometry: cone; color: yellow; metalness: 0.2; roughness: 0.5"
+"+2+4/+7+6/+0+1c" : "geometry: cone; color: yellow; metalness: 0.2; roughness: 0.5"
 ```
 
 This renders a cone above the first box with a 4 × 0.1 project-unit footprint (`40 cm × 1 cm`) and a height of 6 units (`60 cm`).
 
 ```txt
-"+7+6/+0+15/+0+50c" : "geometry: sphere; color: blue; metalness: 0.1; roughness: 0.2"
+"+7+6/+0+15/+0+5c" : "geometry: sphere; color: blue; metalness: 0.1; roughness: 0.2"
 ```
 
 This renders a right-side scaled sphere inside a 6 × 15 × 0.5 bounding box.

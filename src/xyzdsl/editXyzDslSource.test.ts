@@ -29,14 +29,15 @@ describe('editXyzDslSource', () => {
     expect(updateDeclarationProperty(SOURCE, 2, 'geometry', 'cylinder')).toContain('"geometry: cylinder"');
   });
 
-  it('moves and resizes path axes using unit and centiunit notation', () => {
+  it('moves and resizes path axes using unit, centimeter, and millimeter notation', () => {
     expect(moveDeclarationPath(SOURCE, 1, 'x', 1)).toContain('"Table/+19+8/+0+5/+4+8"');
-    expect(moveDeclarationPath(SOURCE, 1, 'x', -0.01)).toContain('"Table/+1799c+8/+0+5/+4+8"');
-    expect(moveDeclarationPath(SOURCE, 1, 'z', 0.01)).toContain('"Table/+18+8/+0+5/+401c+8"');
+    expect(moveDeclarationPath(SOURCE, 1, 'x', -0.01)).toContain('"Table/+1799m+8/+0+5/+4+8"');
+    expect(moveDeclarationPath(SOURCE, 1, 'z', 0.01)).toContain('"Table/+18+8/+0+5/+401m+8"');
+    expect(moveDeclarationPath(SOURCE, 1, 'z', -3.9)).toContain('"Table/+18+8/+0+5/+1c+8"');
     expect(resizeDeclarationPath(SOURCE, 1, 'y', -1)).toContain('"Table/+18+8/+0+4/+4+8"');
-    expect(resizeDeclarationPath(SOURCE, 1, 'y', 0.01)).toContain('"Table/+18+8/+0+501c/+4+8"');
-    expect(resizeDeclarationPath(SOURCE, 1, 'y', -0.01)).toContain('"Table/+18+8/+0+499c/+4+8"');
-    expect(resizeDeclarationPath(SOURCE, 2, 'y', -2)).toContain('"Table/Top/+0+8/+4+1c/+0+8"');
+    expect(resizeDeclarationPath(SOURCE, 1, 'y', 0.01)).toContain('"Table/+18+8/+0+501m/+4+8"');
+    expect(resizeDeclarationPath(SOURCE, 1, 'y', -0.01)).toContain('"Table/+18+8/+0+499m/+4+8"');
+    expect(resizeDeclarationPath(SOURCE, 2, 'y', -2)).toContain('"Table/Top/+0+8/+4+1m/+0+8"');
   });
 
   it('adds and updates rotation properties by axis in degrees', () => {
