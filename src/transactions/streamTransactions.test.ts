@@ -21,7 +21,7 @@ function transaction(overrides: Partial<XyzDslTransaction> = {}): XyzDslTransact
     series: 1,
     nonce: 7,
     from: 'sender-key',
-    to: '+0+1/+0+1/+0+1',
+    to: '+0d+1d/+0d+1d/+0d+1d',
     amount: 1,
     fee: 0,
     memo: 'geometry: box',

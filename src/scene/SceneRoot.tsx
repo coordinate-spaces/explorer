@@ -17,7 +17,7 @@ interface SceneRootProps {
   onSelectNode?: (id: string | undefined) => void;
 }
 
-const DEFAULT_ORBIT_TARGET: [number, number, number] = [6, 5, 4];
+const DEFAULT_ORBIT_TARGET: [number, number, number] = [0.6, 0.5, 0.4];
 
 function selectedOrbitNode(spatialDocument: SpatialDocument, selectedNodeId?: string): SpatialNode | undefined {
   if (!selectedNodeId) {
@@ -48,7 +48,7 @@ export function SceneRoot({ document: spatialDocument, selectedNodeId, onSelectN
       }}
     >
       <color attach="background" args={['#151820']} />
-      <PerspectiveCamera makeDefault position={[14, 11, 18]} fov={45} />
+      <PerspectiveCamera makeDefault position={[1.4, 1.1, 1.8]} fov={45} />
       <Lighting />
       <CornerRoom {...roomDimensions} />
       {spatialDocument.csgExpressions.map((expression) => (

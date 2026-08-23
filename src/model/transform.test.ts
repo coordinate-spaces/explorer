@@ -4,7 +4,7 @@ import type { SpatialTransform } from './transform';
 import { composeTransforms, degreesToRadians, transformFromBox } from './transform';
 
 const box: XyzDslBoxSpec = {
-  source: '+2+4/+7+6/+1+3',
+  source: '+2d+4d/+7d+6d/+1d+3d',
   x: 2,
   y: 7,
   z: 1,

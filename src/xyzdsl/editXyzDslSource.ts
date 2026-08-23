@@ -1,10 +1,11 @@
-import { CENTIUNITS_PER_UNIT } from '../model/units';
+import { parsePathNumber } from './pathParser';
 import { parseXyzDslDeclaration } from './parser';
 import type { AxisName } from './types';
 
 const DECLARATION_PATTERN = /^(?<indent>\s*)"(?<path>[^"]+)"(?<middle>\s*:\s*)"(?<properties>[^"]*)"(?<suffix>\s*)$/;
-const AXIS_PATTERN = /^\+(?<offset>\d+(?:c)?)\+(?<size>\d+(?:c)?)$/;
-const MIN_SIZE = 0.01;
+const AXIS_PATTERN = /^\+(?<offset>\d+(?:[dcm])?)\+(?<size>\d+(?:[dcm])?)$/;
+const MILLIMETRES_PER_UNIT = 1000;
+const MIN_SIZE = 0.001;
 const ROTATION_PRECISION = 1000;
 
 interface DeclarationParts {
@@ -57,13 +58,14 @@ function formatDeclaration(parts: DeclarationParts): string {
 }
 
 function formatPathNumber(value: number): string {
-  const centiunits = Math.max(0, Math.round(value * CENTIUNITS_PER_UNIT));
+  const millimetres = Math.max(0, Math.round(value * MILLIMETRES_PER_UNIT));
 
-  if (centiunits % CENTIUNITS_PER_UNIT === 0) {
-    return String(centiunits / CENTIUNITS_PER_UNIT);
+  if (millimetres % 1000 === 0) {
+    return String(millimetres / 1000);
   }
-
-  return `${centiunits}c`;
+  if (millimetres % 100 === 0) return `${millimetres / 100}d`;
+  if (millimetres % 10 === 0) return `${millimetres / 10}c`;
+  return `${millimetres}m`;
 }
 
 function parseAxis(segment: string): AxisParts | undefined {
@@ -73,8 +75,8 @@ function parseAxis(segment: string): AxisParts | undefined {
     return undefined;
   }
 
-  const offset = match.groups.offset.endsWith('c') ? Number(match.groups.offset.slice(0, -1)) / CENTIUNITS_PER_UNIT : Number(match.groups.offset);
-  const size = match.groups.size.endsWith('c') ? Number(match.groups.size.slice(0, -1)) / CENTIUNITS_PER_UNIT : Number(match.groups.size);
+  const offset = parsePathNumber(match.groups.offset);
+  const size = parsePathNumber(match.groups.size);
 
   return { offset, size };
 }

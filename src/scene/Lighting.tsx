@@ -6,12 +6,12 @@ export function Lighting() {
       <directionalLight
         castShadow
         intensity={2.1}
-        position={[10, 16, 9]}
+        position={[1, 1.6, 0.9]}
         shadow-mapSize={[2048, 2048]}
-        shadow-camera-left={-14}
-        shadow-camera-right={18}
-        shadow-camera-top={18}
-        shadow-camera-bottom={-12}
+        shadow-camera-left={-1.4}
+        shadow-camera-right={1.8}
+        shadow-camera-top={1.8}
+        shadow-camera-bottom={-1.2}
       />
     </>
   );

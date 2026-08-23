@@ -7,20 +7,20 @@ export interface RoomDimensions {
 }
 
 export const DEFAULT_ROOM_DIMENSIONS: RoomDimensions = {
-  width: 40,
-  depth: 40,
-  height: 28,
+  width: 4,
+  depth: 4,
+  height: 2.8,
 };
 
-// Keep two project units of clearance around authored geometry (20 cm).
-export const ROOM_DIMENSION_MARGIN = 2;
+// Keep 20 cm of clearance around authored geometry.
+export const ROOM_DIMENSION_MARGIN = 0.2;
 
 function expandDimension(current: number, required: number): number {
   if (!Number.isFinite(required) || required <= current) {
     return current;
   }
 
-  return Math.ceil(required);
+  return Math.ceil(required * 10) / 10;
 }
 
 export function dimensionsFromNodes(nodes: SpatialNode[]): RoomDimensions {
