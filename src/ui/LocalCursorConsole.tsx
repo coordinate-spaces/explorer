@@ -21,11 +21,13 @@ interface Props {
   onCursorChange: (cursor: LocalCursorState) => void;
   onSettingsChange: (settings: CursorPreviewSettings) => void;
   onCommit: () => void;
+  declaration: string;
 }
 
-export function LocalCursorConsole({ cursor, settings, onCursorChange, onSettingsChange, onCommit }: Props) {
+export function LocalCursorConsole({ cursor, settings, onCursorChange, onSettingsChange, onCommit, declaration }: Props) {
   const [collapsed, setCollapsed] = useState(false);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
+  const [copied, setCopied] = useState(false);
   const drag = useRef<{ x: number; y: number; ox: number; oy: number } | undefined>(undefined);
   let nameError = '';
   if (settings.name.trim()) {
@@ -49,7 +51,11 @@ export function LocalCursorConsole({ cursor, settings, onCursorChange, onSetting
       <button type="button" aria-expanded={!collapsed} onPointerDown={(event) => event.stopPropagation()} onClick={() => setCollapsed((value) => !value)}>{collapsed ? 'Expand' : 'Collapse'}</button>
     </header>
     {!collapsed ? <div className="cursor-console-body">
-      <output className="cursor-coordinate-output" aria-label="XYZDSL cursor coordinates">{cursorCoordinatePath(cursor.position, settings.size)}</output>
+      <div className="cursor-declaration-preview">
+        <code aria-label="Full XYZDSL cursor declaration">{declaration}</code>
+        <button type="button" onClick={() => void navigator.clipboard.writeText(declaration).then(() => { setCopied(true); window.setTimeout(() => setCopied(false), 1400); })}>{copied ? 'Copied' : 'Copy XYZDSL'}</button>
+      </div>
+      <small className="cursor-coordinate-hint">Coordinates: {cursorCoordinatePath(cursor.position, settings.size)}</small>
       <dl className="cursor-axis-values">{(['X', 'Y', 'Z'] as const).map((axis, index) => <div key={axis}><dt>{axis}</dt><dd>{cursor.position[index].toFixed(3)} m</dd></div>)}</dl>
       <div className="cursor-console-row">
         <label>Unit<select value={cursor.unit} onChange={(event) => onCursorChange({ ...cursor, unit: event.target.value as LocalCursorState['unit'] })}>{Object.entries(SPATIAL_UNITS).map(([unit, detail]) => <option value={unit} key={unit}>{detail.label} ({unit})</option>)}</select></label>

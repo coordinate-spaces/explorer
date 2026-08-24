@@ -9,6 +9,7 @@ import { defaultBoxMaterial, unionHighlightMaterial } from './materials';
 interface SpatialPrimitiveProps {
   node: SpatialNode;
   isSelected?: boolean;
+  isPreview?: boolean;
   onSelect?: (id: string) => void;
 }
 
@@ -46,7 +47,7 @@ export function materialParameters(node: SpatialNode): MeshStandardMaterialParam
   };
 }
 
-export function SpatialPrimitive({ node, isSelected = false, onSelect }: SpatialPrimitiveProps) {
+export function SpatialPrimitive({ node, isSelected = false, isPreview = false, onSelect }: SpatialPrimitiveProps) {
   const { position, rotation, scale } = node.transform;
   const material = materialParameters(node);
 
@@ -57,8 +58,8 @@ export function SpatialPrimitive({ node, isSelected = false, onSelect }: Spatial
 
   return (
     <mesh
-      castShadow
-      receiveShadow
+      castShadow={!isPreview}
+      receiveShadow={!isPreview}
       position={position}
       rotation={rotation}
       scale={scale}
@@ -71,8 +72,8 @@ export function SpatialPrimitive({ node, isSelected = false, onSelect }: Spatial
       }}
     >
       <PrimitiveGeometry geometry={node.geometry} />
-      {isSelected ? <Edges color="#facc15" scale={1.03} /> : null}
-      <meshStandardMaterial {...material} />
+      {isSelected || isPreview ? <Edges color={isPreview ? '#67e8f9' : '#facc15'} scale={1.03} /> : null}
+      <meshStandardMaterial {...material} transparent={isPreview} opacity={isPreview ? 0.48 : 1} depthWrite={!isPreview} />
     </mesh>
   );
 }

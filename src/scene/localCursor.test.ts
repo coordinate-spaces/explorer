@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createCursorDeclaration } from '../xyzdsl/editXyzDslSource';
 import { cursorCoordinatePath, INITIAL_LOCAL_CURSOR, moveLocalCursor } from './localCursor';
+import { createSpatialDocument } from '../model/createSpatialDocument';
 
 describe('local cursor', () => {
   it('moves in the selected XYZDSL unit and respects the scene boundary', () => {
@@ -19,5 +20,21 @@ describe('local cursor', () => {
       namespace: 'Room/Probe',
       properties: { geometry: 'sphere', color: 'blue' },
     })).toBe('"Room/Probe/+1+1d/+2d+1d/+3m+1d" : "geometry: sphere; color: blue"');
+  });
+
+  it('feeds the full declaration through the normal resolved scene model', () => {
+    const declaration = createCursorDeclaration({
+      position: [0.2, 0.3, 0.4],
+      size: [0.1, 0.2, 0.3],
+      properties: { geometry: 'sphere', color: '#38bdf8', metalness: 0.25 },
+    });
+    const preview = createSpatialDocument(declaration);
+
+    expect(preview.diagnostics).toEqual([]);
+    expect(preview.renderNodes).toHaveLength(1);
+    expect(preview.renderNodes[0]).toMatchObject({
+      geometry: { kind: 'sphere' },
+      material: { color: '#38bdf8', metalness: 0.25 },
+    });
   });
 });

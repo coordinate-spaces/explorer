@@ -12,16 +12,13 @@ import { SpatialPrimitive } from './SpatialPrimitive';
 import { nodesForRoomSizing } from './roomSizing';
 import { LocalSpatialCursor } from './LocalSpatialCursor';
 import type { LocalCursorState } from './localCursor';
-import type { XyzDslGeometryKind } from '../xyzdsl/types';
 
 interface SceneRootProps {
   document: SpatialDocument;
   selectedNodeId?: string;
   onSelectNode?: (id: string | undefined) => void;
   cursor: LocalCursorState;
-  cursorSize: [number, number, number];
-  cursorColor: string;
-  cursorGeometry: XyzDslGeometryKind;
+  previewDocument: SpatialDocument;
   onCursorPositionChange: (position: [number, number, number]) => void;
 }
 
@@ -38,7 +35,7 @@ function selectedOrbitNode(spatialDocument: SpatialDocument, selectedNodeId?: st
   );
 }
 
-export function SceneRoot({ document: spatialDocument, selectedNodeId, onSelectNode, cursor, cursorSize, cursorColor, cursorGeometry, onCursorPositionChange }: SceneRootProps) {
+export function SceneRoot({ document: spatialDocument, selectedNodeId, onSelectNode, cursor, previewDocument, onCursorPositionChange }: SceneRootProps) {
   const roomDimensions = dimensionsFromNodes(nodesForRoomSizing(spatialDocument));
   const orbitTarget = useMemo(() => {
     const selectedNode = selectedOrbitNode(spatialDocument, selectedNodeId);
@@ -59,7 +56,8 @@ export function SceneRoot({ document: spatialDocument, selectedNodeId, onSelectN
       <PerspectiveCamera makeDefault position={[1.4, 1.1, 1.8]} fov={45} near={0.001} />
       <Lighting />
       <CornerRoom {...roomDimensions} />
-      <LocalSpatialCursor cursor={cursor} size={cursorSize} color={cursorColor} geometry={cursorGeometry} onPositionChange={onCursorPositionChange} />
+      <LocalSpatialCursor cursor={cursor} onPositionChange={onCursorPositionChange} />
+      {previewDocument.renderNodes.map((node) => <SpatialPrimitive key={`cursor-preview-${node.id}`} node={node} isPreview />)}
       {spatialDocument.csgExpressions.map((expression) => (
         <CsgPrimitive
           key={expression.id}

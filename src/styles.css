@@ -121,6 +121,10 @@ button {
 .cursor-console-body input,
 .cursor-console-body select { min-width: 0; border: 1px solid rgb(125 211 252 / 25%); border-radius: .5rem; padding: .42rem; background: rgb(2 6 23 / 72%); color: #f0f9ff; }
 .cursor-coordinate-output { overflow-x: auto; border-radius: .5rem; padding: .5rem; background: rgb(2 6 23 / 72%); color: #67e8f9; font-family: ui-monospace, monospace; font-size: .72rem; white-space: nowrap; }
+.cursor-declaration-preview { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: .5rem; align-items: start; border-radius: .55rem; padding: .55rem; background: rgb(2 6 23 / 82%); }
+.cursor-declaration-preview code { overflow-wrap: anywhere; color: #67e8f9; font-family: ui-monospace, monospace; font-size: .72rem; line-height: 1.45; user-select: all; }
+.cursor-declaration-preview button { border: 1px solid rgb(125 211 252 / 35%); border-radius: 999px; padding: .3rem .5rem; background: rgb(14 116 144 / 35%); color: #e0f2fe; font-size: .68rem; white-space: nowrap; }
+.cursor-coordinate-hint { overflow-wrap: anywhere; color: #94a3b8; font-family: ui-monospace, monospace; }
 .cursor-axis-values { display: grid; grid-template-columns: repeat(3, 1fr); gap: .4rem; margin: 0; }
 .cursor-axis-values div { border-radius: .45rem; padding: .4rem; background: rgb(30 41 59 / 65%); }
 .cursor-axis-values dt { color: #7dd3fc; font-size: .65rem; font-weight: 800; }

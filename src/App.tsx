@@ -523,6 +523,21 @@ export default function App() {
     [authoringSource, secondaryTransactionOverlayStreams],
   );
   const document = useMemo(() => createSpatialDocument(renderedSource), [renderedSource]);
+  const cursorDeclaration = useMemo(() => createCursorDeclaration({
+    position: localCursor.position,
+    size: cursorSettings.size,
+    namespace: cursorSettings.name,
+    properties: {
+      geometry: cursorSettings.geometry,
+      color: cursorSettings.color,
+      roughness: cursorSettings.roughness,
+      metalness: cursorSettings.metalness,
+      rotation: localCursor.rotation.some(Boolean)
+        ? localCursor.rotation.map((value) => Number((value * 180 / Math.PI).toFixed(3))).join(', ')
+        : undefined,
+    },
+  }), [cursorSettings, localCursor.position, localCursor.rotation]);
+  const cursorPreviewDocument = useMemo(() => createSpatialDocument(cursorDeclaration), [cursorDeclaration]);
   const selectedNode = useMemo(
     () => findNodeById(document.nodes, selectedNodeId) ?? findNodeByLineNumber(document.nodes, selectedLineNumber),
     [document.nodes, selectedLineNumber, selectedNodeId],
@@ -804,14 +819,8 @@ export default function App() {
   }, [hasAuthoringEdits, hasRemoteBaseline, remoteBaselineSource]);
 
   const addCursorDeclaration = useCallback(() => {
-    const declaration = createCursorDeclaration({
-      position: localCursor.position,
-      size: cursorSettings.size,
-      namespace: cursorSettings.name,
-      properties: { geometry: cursorSettings.geometry, color: cursorSettings.color, roughness: cursorSettings.roughness, metalness: cursorSettings.metalness, rotation: localCursor.rotation.some(Boolean) ? localCursor.rotation.map((value) => Number((value * 180 / Math.PI).toFixed(3))).join(', ') : undefined },
-    });
-    setAuthoringSource((source) => `${source.trimEnd()}\n${declaration}`);
-  }, [cursorSettings, localCursor]);
+    setAuthoringSource((source) => `${source.trimEnd()}\n${cursorDeclaration}`);
+  }, [cursorDeclaration]);
 
   return (
     <main className="app-shell">
@@ -829,12 +838,10 @@ export default function App() {
         selectedNodeId={selectedSceneNodeId}
         onSelectNode={handleSelectNode}
         cursor={localCursor}
-        cursorSize={cursorSettings.size}
-        cursorColor={cursorSettings.color}
-        cursorGeometry={cursorSettings.geometry}
+        previewDocument={cursorPreviewDocument}
         onCursorPositionChange={(position) => setLocalCursor((cursor) => ({ ...cursor, position }))}
       />
-      <LocalCursorConsole cursor={localCursor} settings={cursorSettings} onCursorChange={setLocalCursor} onSettingsChange={setCursorSettings} onCommit={addCursorDeclaration} />
+      <LocalCursorConsole cursor={localCursor} settings={cursorSettings} declaration={cursorDeclaration} onCursorChange={setLocalCursor} onSettingsChange={setCursorSettings} onCommit={addCursorDeclaration} />
       <XyzDslDrawer
         document={document}
         isOpen={drawerOpen}

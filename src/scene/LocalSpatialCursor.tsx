@@ -1,19 +1,15 @@
 import { useEffect, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import type { LocalCursorState } from './localCursor';
-import type { XyzDslGeometryKind } from '../xyzdsl/types';
 
 interface Props {
   cursor: LocalCursorState;
-  size: [number, number, number];
-  color: string;
-  geometry: XyzDslGeometryKind;
   onPositionChange: (position: [number, number, number]) => void;
 }
 
 const EDITABLE = 'input, textarea, select, button, [contenteditable="true"]';
 
-export function LocalSpatialCursor({ cursor, size, color, geometry, onPositionChange }: Props) {
+export function LocalSpatialCursor({ cursor, onPositionChange }: Props) {
   const keys = useRef(new Set<string>());
   const position = useRef(cursor.position);
   const { camera } = useThree();
@@ -57,14 +53,7 @@ export function LocalSpatialCursor({ cursor, size, color, geometry, onPositionCh
 
   return (
     <group position={cursor.position} rotation={cursor.rotation}>
-      <mesh position={[size[0] / 2, size[1] / 2, size[2] / 2]}>
-        {geometry === 'sphere' ? <sphereGeometry args={[Math.max(...size) / 2, 24, 16]} /> : null}
-        {geometry === 'cylinder' ? <cylinderGeometry args={[size[0] / 2, size[0] / 2, size[1], 24]} /> : null}
-        {geometry === 'cone' ? <coneGeometry args={[size[0] / 2, size[1], 24]} /> : null}
-        {geometry === 'box' ? <boxGeometry args={size} /> : null}
-        <meshStandardMaterial color={color} transparent opacity={0.28} depthWrite={false} />
-      </mesh>
-      <axesHelper args={[Math.max(0.12, ...size)]} />
+      <axesHelper args={[0.12]} />
       <mesh><sphereGeometry args={[0.012, 12, 12]} /><meshBasicMaterial color="#ffffff" /></mesh>
     </group>
   );
