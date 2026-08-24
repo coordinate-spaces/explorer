@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { canEditDeclarationLine, moveDeclarationPath, resizeDeclarationPath, rotateDeclarationPath, updateDeclarationProperty } from './xyzdsl/editXyzDslSource';
+import { applyDeclarationPose, canEditDeclarationLine, moveDeclarationPath, resizeDeclarationPath, rotateDeclarationPath, updateDeclarationProperty } from './xyzdsl/editXyzDslSource';
+import type { CursorPose } from './scene/useSpatialCursorControls';
 import type { AxisName } from './xyzdsl/types';
 import { createSpatialDocument } from './model/createSpatialDocument';
 import type { SpatialNode } from './model/SpatialNode';
@@ -182,6 +183,8 @@ export default function App() {
   const [selectedLeafNodeId, setSelectedLeafNodeId] = useState<string | undefined>();
   const [selectedSceneHighlightNodeId, setSelectedSceneHighlightNodeId] = useState<string | undefined>();
   const [selectedLineNumber, setSelectedLineNumber] = useState<number | undefined>();
+  const [cursorMode, setCursorMode] = useState(false);
+  const [cursorPose, setCursorPose] = useState<CursorPose>();
   const [transactionPublicKey, setTransactionPublicKey] = usePersistentState(
     'xyzdsl-transaction-public-key',
     '',
@@ -532,6 +535,13 @@ export default function App() {
   const selectedSceneNodeId = selectedSceneHighlightNodeId ?? sceneHighlightIdForNode(document.nodes, selectedNode) ?? selectedNodeId;
   const selectedNodeCanEdit = selectedNodeLineNumber !== undefined && canEditDeclarationLine(authoringSource, selectedNodeLineNumber);
 
+  const sourcePose = useMemo<CursorPose | undefined>(() => {
+    const transform = selectedNode?.localTransform ?? selectedNode?.transform;
+    return transform ? { position: [...transform.position], rotation: [...transform.rotation] } : undefined;
+  }, [selectedNode?.id, selectedNode?.source, selectedNode?.localTransform, selectedNode?.transform]);
+  useEffect(() => { setCursorPose(sourcePose); }, [sourcePose]);
+  useEffect(() => { if (appMode !== 'editor' || !selectedNodeCanEdit) setCursorMode(false); }, [appMode, selectedNodeCanEdit]);
+
   const handleSecondaryReplay = useCallback((publicKey: string) => {
     const reference = secondaryKeyReferences.find((candidate) => candidate.publicKey === publicKey);
     if (!reference) return;
@@ -790,6 +800,11 @@ export default function App() {
     editSelectedDeclaration((source, lineNumber) => updateDeclarationProperty(source, lineNumber, key, value));
   }, [editSelectedDeclaration]);
 
+  const commitCursorPose = useCallback((pose: CursorPose) => {
+    setCursorPose(pose);
+    editSelectedDeclaration((source, lineNumber) => applyDeclarationPose(source, lineNumber, pose));
+  }, [editSelectedDeclaration]);
+
   const resetAuthoringToRemote = useCallback(() => {
     if (!hasRemoteBaseline) {
       return;
@@ -818,7 +833,19 @@ export default function App() {
         document={document}
         selectedNodeId={selectedSceneNodeId}
         onSelectNode={handleSelectNode}
+        cursorPose={cursorPose}
+        cursorEnabled={appMode === 'editor' && selectedNodeCanEdit && cursorMode}
+        onCursorPreview={setCursorPose}
+        onCursorCommit={commitCursorPose}
+        onCursorCancel={() => setCursorPose(sourcePose)}
       />
+      {appMode === 'editor' && selectedNodeCanEdit && cursorPose ? (
+        <section className="cursor-controls" aria-label="Local spatial cursor controls">
+          <button type="button" aria-pressed={cursorMode} onClick={() => setCursorMode((active) => !active)}>{cursorMode ? 'Disable cursor' : 'Enable cursor'}</button>
+          <span>A/D X · Q/E Y · W/S Z · drag yaw/pitch · Shift+drag roll · Esc cancel</span>
+          <button type="button" onClick={() => commitCursorPose(cursorPose)}>Apply</button>
+        </section>
+      ) : null}
       <XyzDslDrawer
         appMode={appMode}
         document={document}

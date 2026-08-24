@@ -263,3 +263,35 @@ export function canEditDeclarationLine(source: string, lineNumber: number): bool
 
   return parseXyzDslDeclaration(line, lineNumber).ok;
 }
+
+export interface DeclarationPose {
+  /** Rendered local center, not the path's lower-edge offset. */
+  position: [number, number, number];
+  /** Local XYZ Euler rotation in radians. */
+  rotation: [number, number, number];
+}
+
+/** Atomically writes a cursor pose while retaining the declaration's path namespaces and property key choice. */
+export function applyDeclarationPose(source: string, lineNumber: number, pose: DeclarationPose): string {
+  const line = splitLines(source)[lineNumber - 1];
+  const parts = line === undefined ? undefined : declarationParts(line);
+  if (!parts || !parseXyzDslDeclaration(line, lineNumber).ok) return source;
+
+  const segments = parts.path.split('/');
+  const axisStart = segments.findIndex((segment) => AXIS_PATTERN.test(segment));
+  if (axisStart < 0 || segments.length - axisStart !== 3) return source;
+  const axes = segments.slice(axisStart).map(parseAxis);
+  if (axes.some((axis) => !axis)) return source;
+  const nextSegments = [...segments];
+  axes.forEach((axis, index) => {
+    const value = axis as AxisParts;
+    nextSegments[axisStart + index] = formatAxis({ ...value, offset: Math.max(0, pose.position[index] - value.size / 2) });
+  });
+
+  const properties = parseProperties(parts.properties);
+  const rotation = properties.find((property) => property.key === 'rotation' || property.key === 'rotate');
+  const value = pose.rotation.map((radian) => formatRotationDegrees(radian * 180 / Math.PI)).join(', ');
+  if (rotation) rotation.value = value;
+  else properties.push({ key: 'rotation', value });
+  return replaceLine(source, lineNumber, formatDeclaration({ ...parts, path: nextSegments.join('/'), properties: formatProperties(properties) }));
+}

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  applyDeclarationPose,
   moveDeclarationPath,
   replaceDeclarationPath,
   replaceDeclarationProperties,
@@ -12,6 +13,19 @@ const SOURCE = `"Table/+18d+8d/+0d+5d/+4d+8d" : "color: white; metalness: 0.8"
 "Table/Top/+0d+8d/+4d+1d/+0d+8d" : ""`;
 
 describe('editXyzDslSource', () => {
+  it('atomically commits rendered-center position and rotation while preserving declaration text', () => {
+    const source = `  "Room/Chair/+1+2/+2+4/+3+6" : "color: red; rotate: 1, 2, 3; custom: yes"  `;
+    expect(applyDeclarationPose(source, 1, { position: [2.2346, 3, 4], rotation: [0, Math.PI / 2, -Math.PI / 4] })).toBe(
+      `  "Room/Chair/+1235m+2/+1+4/+1+6" : "color: red; rotate: 0, 90, -45; custom: yes"  `,
+    );
+  });
+
+  it('clamps lower edges, adds an explicit inherited pose, and rejects unsupported lines', () => {
+    const source = `"Parent/Child/+1+2/+1+2/+1+2" : "color: blue"`;
+    expect(applyDeclarationPose(source, 1, { position: [-5, 0.25, 0.0004], rotation: [Math.PI / 6, 0, 0] }))
+      .toBe(`"Parent/Child/+0+2/+0+2/+0+2" : "color: blue; rotation: 30, 0, 0"`);
+    expect(applyDeclarationPose('not a declaration', 1, { position: [1, 1, 1], rotation: [0, 0, 0] })).toBe('not a declaration');
+  });
   it('replaces declaration paths and properties without changing surrounding lines', () => {
     expect(replaceDeclarationPath(SOURCE, 2, 'Table/Top/+1d+8d/+4d+1d/+0d+8d')).toBe(
       `"Table/+18d+8d/+0d+5d/+4d+8d" : "color: white; metalness: 0.8"

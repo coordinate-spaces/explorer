@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { OrbitControls, PerspectiveCamera } from '@react-three/drei';
 import { Canvas } from '@react-three/fiber';
 import type { SpatialDocument } from '../model/SpatialDocument';
@@ -10,11 +10,18 @@ import { ContentPrimitive } from './ContentPrimitive';
 import { CsgPrimitive } from './CsgPrimitive';
 import { SpatialPrimitive } from './SpatialPrimitive';
 import { nodesForRoomSizing } from './roomSizing';
+import { SpatialCursor } from './SpatialCursor';
+import type { CursorPose } from './useSpatialCursorControls';
 
 interface SceneRootProps {
   document: SpatialDocument;
   selectedNodeId?: string;
   onSelectNode?: (id: string | undefined) => void;
+  cursorPose?: CursorPose;
+  cursorEnabled?: boolean;
+  onCursorPreview?: (pose: CursorPose) => void;
+  onCursorCommit?: (pose: CursorPose) => void;
+  onCursorCancel?: () => void;
 }
 
 const DEFAULT_ORBIT_TARGET: [number, number, number] = [0.6, 0.5, 0.4];
@@ -30,7 +37,8 @@ function selectedOrbitNode(spatialDocument: SpatialDocument, selectedNodeId?: st
   );
 }
 
-export function SceneRoot({ document: spatialDocument, selectedNodeId, onSelectNode }: SceneRootProps) {
+export function SceneRoot({ document: spatialDocument, selectedNodeId, onSelectNode, cursorPose, cursorEnabled = false, onCursorPreview, onCursorCommit, onCursorCancel }: SceneRootProps) {
+  const [cursorMouseCaptured, setCursorMouseCaptured] = useState(false);
   const roomDimensions = dimensionsFromNodes(nodesForRoomSizing(spatialDocument));
   const orbitTarget = useMemo(() => {
     const selectedNode = selectedOrbitNode(spatialDocument, selectedNodeId);
@@ -66,7 +74,8 @@ export function SceneRoot({ document: spatialDocument, selectedNodeId, onSelectN
           <SpatialPrimitive key={node.id} isSelected={node.id === selectedNodeId} node={node} onSelect={onSelectNode} />
         )
       ))}
-      <OrbitControls target={orbitTarget} maxPolarAngle={Math.PI} />
+      {cursorPose && onCursorPreview && onCursorCommit && onCursorCancel ? <SpatialCursor pose={cursorPose} enabled={cursorEnabled} onPreview={onCursorPreview} onCommit={onCursorCommit} onCancel={onCursorCancel} onMouseCaptureChange={setCursorMouseCaptured} /> : null}
+      <OrbitControls target={orbitTarget} maxPolarAngle={Math.PI} enabled={!cursorMouseCaptured} />
     </Canvas>
   );
 }

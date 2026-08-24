@@ -101,3 +101,8 @@ Spatial primitives intentionally expose only the basic scalar properties needed 
 ```
 
 See [docs/implementation-plan.md](docs/implementation-plan.md) for architecture details and the feature roadmap.
+# Local spatial cursor
+
+The local spatial cursor is available only in **Editor mode** for a selected declaration that can be edited. Enable it with the visible cursor toggle. Use **A/D** for local X, **Q/E** for Y, and **W/S** for Z. Drag the primary mouse button over the scene for yaw and pitch; hold **Shift** while dragging to adjust roll.
+
+Keyboard and pointer input update a lightweight preview without rebuilding the spatial document. The pose is committed after keyboard input becomes idle, when a drag or pointer-lock session ends, or with **Apply**. **Escape** cancels the preview and restores the pose currently represented by source. Browsers also use Escape to leave pointer lock; pointer-lock exit commits the current preview and restores camera orbiting.

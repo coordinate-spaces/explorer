@@ -37,6 +37,24 @@ button {
   height: 100vh;
 }
 
+.cursor-controls {
+  position: fixed;
+  z-index: 9;
+  right: 1rem;
+  bottom: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  max-width: calc(100vw - 2rem);
+  padding: 0.65rem 0.8rem;
+  border: 1px solid rgb(255 255 255 / 20%);
+  border-radius: 0.8rem;
+  background: rgb(13 17 23 / 88%);
+  font-size: 0.78rem;
+}
+
+.cursor-controls button { border: 1px solid #60a5fa; border-radius: 0.45rem; padding: 0.4rem 0.6rem; background: #1d4ed8; color: white; }
+
 .xyzdsl-drawer {
   pointer-events: none;
   position: fixed;
