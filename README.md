@@ -9,6 +9,14 @@ npm install
 npm run dev
 ```
 
+## Spatial cursor and workspace
+
+The scene includes an independent, locally persisted spatial cursor for drafting both anonymous and named declarations. Use **W/A/S/D** for horizontal movement and **Q/E** for vertical movement; hold **Shift** for fine movement. Right-click the scene to capture the pointer and rotate the draft with the mouse, then press **Escape** to release it.
+
+The floating cursor console configures dimensions, naming, geometry, material, movement speed, and coordinate space while position and rotation remain direct-manipulation values. Cursor changes are previews only until **Insert** or **Replace selected** is used. **Load selected** copies an existing object into the cursor without tying subsequent cursor movement to scene selection.
+
+Source, objects, transaction data, and diagnostics live in a collapsible workspace. Opening or closing the workspace does not switch application modes or disable the spatial scene.
+
 
 ## Deploy to GitHub Pages
 

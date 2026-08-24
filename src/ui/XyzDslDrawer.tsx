@@ -88,7 +88,6 @@ function renderAuthoringStatus(
 }
 
 interface XyzDslDrawerProps {
-  appMode: 'viewer' | 'editor';
   document: SpatialDocument;
   isOpen: boolean;
   source: string;
@@ -111,7 +110,7 @@ interface XyzDslDrawerProps {
   remoteBaselineChanged: boolean;
   authoringChangeSummary: { added: number; removed: number };
   onChange: (source: string) => void;
-  onModeChange: (mode: 'viewer' | 'editor') => void;
+  onOpenChange: (open: boolean) => void;
   onResetToRemote: () => void;
   onTransactionPublicKeyChange: (publicKey: string) => void;
   onTransactionRangeChange: (range: TransactionRange) => void;
@@ -136,7 +135,6 @@ interface XyzDslDrawerProps {
 }
 
 export function XyzDslDrawer({
-  appMode,
   document,
   isOpen,
   source,
@@ -159,7 +157,7 @@ export function XyzDslDrawer({
   remoteBaselineChanged,
   authoringChangeSummary,
   onChange,
-  onModeChange,
+  onOpenChange,
   onResetToRemote,
   onTransactionPublicKeyChange,
   onTransactionRangeChange,
@@ -182,7 +180,6 @@ export function XyzDslDrawer({
   onPathNodeSelect,
   onNodePropertyChange,
 }: XyzDslDrawerProps) {
-  const isEditorMode = appMode === 'editor';
   const [activeTab, setActiveTab] = usePersistentState<DrawerTab>('xyzdsl-drawer-active-tab', 'objects');
   const problemCount = document.diagnostics.length + rejectedTransactions.length;
   const tabs: { id: DrawerTab; label: string; count?: number }[] = [
@@ -192,25 +189,26 @@ export function XyzDslDrawer({
     { id: 'problems', label: 'Problems', count: problemCount },
   ];
   return (
-    <aside className={`xyzdsl-drawer xyzdsl-drawer--${appMode} ${isOpen ? 'is-open' : ''}`}>
-      <div className="mode-controls" aria-label="Application mode">
+    <aside className={`xyzdsl-drawer ${isOpen ? 'is-open' : ''}`}>
+      <div className="mode-controls" aria-label="Workspace controls">
         <button
           className="mode-toggle"
           type="button"
-          aria-pressed={isEditorMode}
-          onClick={() => onModeChange(isEditorMode ? 'viewer' : 'editor')}
+          aria-expanded={isOpen}
+          aria-controls="xyzdsl-workspace-panel"
+          onClick={() => onOpenChange(!isOpen)}
         >
-          {isEditorMode ? 'Viewer mode' : 'Editor mode'}
+          {isOpen ? 'Close workspace' : 'Open workspace'}
         </button>
 
       </div>
 
-      {isEditorMode && isOpen ? (
-        <div className="drawer-panel">
+      {isOpen ? (
+        <div className="drawer-panel" id="xyzdsl-workspace-panel">
           <header className="drawer-titlebar">
             <strong>Candid Spaces</strong>
             <span>Workspace</span>
-            <button className="drawer-close-button" type="button" aria-label="Close workspace and return to viewer mode" title="Close workspace" onClick={() => onModeChange('viewer')}>×</button>
+            <button className="drawer-close-button" type="button" aria-label="Close workspace" title="Close workspace" onClick={() => onOpenChange(false)}>×</button>
           </header>
 
           <nav className="drawer-tabs" aria-label="Workspace panels">

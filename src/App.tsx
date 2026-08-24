@@ -22,6 +22,9 @@ import { usePublicKeyTransactions } from './transactions/usePublicKeyTransaction
 import { useRealtimePublicKeyTransactions } from './transactions/useRealtimePublicKeyTransactions';
 import { XyzDslDrawer } from './ui/XyzDslDrawer';
 import { usePersistentState } from './ui/usePersistentState';
+import { usePersistentSpatialCursor } from './cursor/usePersistentSpatialCursor';
+import { createXyzDslDeclaration } from './xyzdsl/createXyzDslDeclaration';
+import { SpatialCursorConsole } from './ui/SpatialCursorConsole';
 
 const INITIAL_XYZDSL = `"+2d+4d/+0d+6d/+1d+3d" : "geometry: cylinder; color: 0x333333; metalness: 0.8; roughness: 0.2"
 "+2d+4d/+7d+6d/+0d+10m" : "geometry: cone; color: yellow; metalness: 0.2; roughness: 0.5"
@@ -176,8 +179,8 @@ export default function App() {
   const [authoringSource, setAuthoringSource] = useState(INITIAL_XYZDSL);
   const [remoteBaselineAppliedToEditor, setRemoteBaselineAppliedToEditor] = useState('');
   const latestRemoteBaselineRef = useRef('');
-  const [appMode, setAppMode] = useState<'viewer' | 'editor'>('viewer');
-  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [workspaceOpen, setWorkspaceOpen] = usePersistentState('xyzdsl-workspace-open', false);
+  const [cursor, setCursor] = usePersistentSpatialCursor();
   const [selectedNodeId, setSelectedNodeId] = useState<string | undefined>();
   const [selectedLeafNodeId, setSelectedLeafNodeId] = useState<string | undefined>();
   const [selectedSceneHighlightNodeId, setSelectedSceneHighlightNodeId] = useState<string | undefined>();
@@ -275,11 +278,6 @@ export default function App() {
 
   useEffect(() => loadTipHeight(), [loadTipHeight]);
 
-  useEffect(() => {
-    if (appMode === 'viewer') {
-      setDrawerOpen(false);
-    }
-  }, [appMode]);
 
   const transactionXyzDsl = useMemo(
     () => transactionsToXyzDslSource(transactions, {
@@ -722,14 +720,6 @@ export default function App() {
     setAuthoringSource(nextSource);
   }, []);
 
-  const handleModeChange = useCallback((mode: 'viewer' | 'editor') => {
-    setAppMode(mode);
-
-    if (mode === 'editor') {
-      setDrawerOpen(true);
-    }
-  }, []);
-
   const handleSelectNode = useCallback((id: string | undefined) => {
     if (id === undefined) {
       setSelectedNodeId(undefined);
@@ -803,8 +793,39 @@ export default function App() {
     setRemoteBaselineAppliedToEditor(remoteBaselineSource);
   }, [hasAuthoringEdits, hasRemoteBaseline, remoteBaselineSource]);
 
+  const cursorDeclaration = useMemo(() => createXyzDslDeclaration(cursor), [cursor]);
+  const insertCursorDeclaration = useCallback(() => {
+    setAuthoringSource((source) => `${source}${source.endsWith('\n') || source.length === 0 ? '' : '\n'}${cursorDeclaration}`);
+  }, [cursorDeclaration]);
+  const replaceSelectedWithCursor = useCallback(() => {
+    if (!selectedNodeCanEdit || selectedNodeLineNumber === undefined) return;
+    setAuthoringSource((source) => {
+      const lines = source.split('\n');
+      lines[selectedNodeLineNumber - 1] = cursorDeclaration;
+      return lines.join('\n');
+    });
+  }, [cursorDeclaration, selectedNodeCanEdit, selectedNodeLineNumber]);
+  const loadSelectedIntoCursor = useCallback(() => {
+    if (!selectedNode) return;
+    const rotation = selectedNode.localTransform?.rotation ?? selectedNode.transform.rotation;
+    setCursor((current) => ({
+      ...current,
+      position: [selectedNode.box.x, selectedNode.box.y, selectedNode.box.z],
+      rotation: [...rotation],
+      dimensions: [selectedNode.box.width, selectedNode.box.height, selectedNode.box.depth],
+      named: Boolean(selectedNode.namespacePath),
+      namespace: selectedNode.namespacePath?.replace(/\/$/, '') ?? current.namespace,
+      geometry: selectedNode.geometry.kind,
+      color: String(selectedNode.material.color ?? current.color),
+      metalness: selectedNode.material.metalness ?? current.metalness,
+      roughness: selectedNode.material.roughness ?? current.roughness,
+      boxRadius: selectedNode.geometry['box-radius'] ?? 0,
+      puff: selectedNode.geometry.puff ?? 0,
+    }));
+  }, [selectedNode, setCursor]);
+
   return (
-    <main className={`app-shell app-shell--${appMode}`}>
+    <main className="app-shell">
       {validSecondaryKeyReferences.map((reference) => (
         <SecondaryRealtimeSubscription
           key={streamKeyForSecondaryReference(reference)}
@@ -818,11 +839,21 @@ export default function App() {
         document={document}
         selectedNodeId={selectedSceneNodeId}
         onSelectNode={handleSelectNode}
+        cursor={cursor}
+        onCursorChange={setCursor}
+      />
+      <SpatialCursorConsole
+        cursor={cursor}
+        setCursor={setCursor}
+        onInsert={insertCursorDeclaration}
+        onReplace={replaceSelectedWithCursor}
+        onLoadSelected={loadSelectedIntoCursor}
+        canReplace={selectedNodeCanEdit}
+        hasSelection={Boolean(selectedNode)}
       />
       <XyzDslDrawer
-        appMode={appMode}
         document={document}
-        isOpen={drawerOpen}
+        isOpen={workspaceOpen}
         source={authoringSource}
         selectedLineNumber={selectedNodeLineNumber}
         transactionPublicKey={transactionPublicKey}
@@ -843,7 +874,7 @@ export default function App() {
         remoteBaselineChanged={remoteBaselineChanged}
         authoringChangeSummary={authoringChangeSummary}
         onChange={handleAuthoringSourceChange}
-        onModeChange={handleModeChange}
+        onOpenChange={setWorkspaceOpen}
         onResetToRemote={resetAuthoringToRemote}
         onTransactionPublicKeyChange={setTransactionPublicKey}
         onTransactionRangeChange={setTransactionRange}
