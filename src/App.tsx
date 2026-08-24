@@ -834,7 +834,7 @@ export default function App() {
   }, [cursorDeclaration]);
 
   return (
-    <main className="app-shell">
+    <main className={`app-shell app-shell--${drawerOpen ? 'editor' : 'viewer'}`}>
       {validSecondaryKeyReferences.map((reference) => (
         <SecondaryRealtimeSubscription
           key={streamKeyForSecondaryReference(reference)}

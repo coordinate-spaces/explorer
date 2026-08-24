@@ -29,6 +29,7 @@ export function LocalCursorConsole({ cursor, settings, onCursorChange, onSetting
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const [copied, setCopied] = useState(false);
   const drag = useRef<{ x: number; y: number; ox: number; oy: number } | undefined>(undefined);
+  const consoleRef = useRef<HTMLElement>(null);
   let nameError = '';
   if (settings.name.trim()) {
     try { parseXyzDslPath(`${settings.name.trim()}/`); } catch (error) { nameError = error instanceof Error ? error.message : 'Invalid name.'; }
@@ -39,14 +40,23 @@ export function LocalCursorConsole({ cursor, settings, onCursorChange, onSetting
     event.currentTarget.setPointerCapture(event.pointerId);
   };
   const moveDrag = (event: ReactPointerEvent) => {
-    if (!drag.current) return;
-    const x = Math.max(-window.innerWidth + 240, Math.min(window.innerWidth - 240, drag.current.ox + event.clientX - drag.current.x));
-    const y = Math.max(-20, Math.min(window.innerHeight - 100, drag.current.oy + event.clientY - drag.current.y));
+    if (!drag.current || !consoleRef.current) return;
+    const consoleRect = consoleRef.current.getBoundingClientRect();
+    const headerRect = event.currentTarget.getBoundingClientRect();
+    const viewportPadding = 8;
+    const requestedX = drag.current.ox + event.clientX - drag.current.x;
+    const requestedY = drag.current.oy + event.clientY - drag.current.y;
+    const baseConsoleLeft = consoleRect.left - offset.x;
+    const baseConsoleRight = consoleRect.right - offset.x;
+    const baseHeaderTop = headerRect.top - offset.y;
+    const baseHeaderBottom = headerRect.bottom - offset.y;
+    const x = Math.max(viewportPadding - baseConsoleLeft, Math.min(window.innerWidth - viewportPadding - baseConsoleRight, requestedX));
+    const y = Math.max(viewportPadding - baseHeaderTop, Math.min(window.innerHeight - viewportPadding - baseHeaderBottom, requestedY));
     setOffset({ x, y });
   };
 
-  return <section className="local-cursor-console" style={{ transform: `translate(${offset.x}px, ${offset.y}px)` }} aria-label="Local cursor settings">
-    <header className="cursor-console-title" onPointerDown={startDrag} onPointerMove={moveDrag} onPointerUp={() => { drag.current = undefined; }}>
+  return <section ref={consoleRef} className="local-cursor-console" style={{ transform: `translate(${offset.x}px, ${offset.y}px)` }} aria-label="Local cursor settings">
+    <header className="cursor-console-title" onPointerDown={startDrag} onPointerMove={moveDrag} onPointerUp={() => { drag.current = undefined; }} onPointerCancel={() => { drag.current = undefined; }}>
       <span><strong>Local cursor</strong><small>WASD · Q/E vertical</small></span>
       <button type="button" aria-expanded={!collapsed} onPointerDown={(event) => event.stopPropagation()} onClick={() => setCollapsed((value) => !value)}>{collapsed ? 'Expand' : 'Collapse'}</button>
     </header>
