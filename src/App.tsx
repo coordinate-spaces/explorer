@@ -537,7 +537,18 @@ export default function App() {
         : undefined,
     },
   }), [cursorSettings, localCursor.position, localCursor.rotation]);
-  const cursorPreviewDocument = useMemo(() => createSpatialDocument(cursorDeclaration), [cursorDeclaration]);
+  const cursorPreviewDocument = useMemo(() => {
+    // Resolve the prospective line in the same declaration context as the
+    // scene. Named instances can then inherit geometry and material from a
+    // preceding namespace declaration, just as they will after being added.
+    const resolvedPreview = createSpatialDocument(`${renderedSource.trimEnd()}\n${cursorDeclaration}`);
+
+    return {
+      ...resolvedPreview,
+      renderNodes: resolvedPreview.renderNodes.filter((node) => node.source === cursorDeclaration),
+      csgExpressions: resolvedPreview.csgExpressions.filter((expression) => expression.base.source === cursorDeclaration),
+    };
+  }, [cursorDeclaration, renderedSource]);
   const selectedNode = useMemo(
     () => findNodeById(document.nodes, selectedNodeId) ?? findNodeByLineNumber(document.nodes, selectedLineNumber),
     [document.nodes, selectedLineNumber, selectedNodeId],

@@ -37,4 +37,21 @@ describe('local cursor', () => {
       material: { color: '#38bdf8', metalness: 0.25 },
     });
   });
+
+  it('resolves a named cursor instance against its namespace declaration', () => {
+    const declaration = createCursorDeclaration({
+      position: [0.2, 0.3, 0.4],
+      size: [0.1, 0.2, 0.3],
+      namespace: 'PreviewShape',
+    });
+    const preview = createSpatialDocument(`"PreviewShape/" : "geometry: sphere; color: orange; roughness: 0.2"\n${declaration}`);
+    const cursorNode = preview.renderNodes.find((node) => node.source === declaration);
+
+    expect(preview.diagnostics).toEqual([]);
+    expect(cursorNode).toMatchObject({
+      namespacePath: 'PreviewShape/',
+      geometry: { kind: 'sphere' },
+      material: { color: 'orange', roughness: 0.2 },
+    });
+  });
 });

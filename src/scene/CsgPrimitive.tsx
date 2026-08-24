@@ -10,6 +10,7 @@ import { bufferGeometryForSpatialGeometry } from './primitiveGeometry';
 interface CsgPrimitiveProps {
   expression: CsgExpression;
   isSelected?: boolean;
+  isPreview?: boolean;
   onSelect?: (id: string) => void;
 }
 
@@ -40,7 +41,7 @@ function csgOperation({ op }: CsgOperationNode) {
   }
 }
 
-export function CsgPrimitive({ expression, isSelected = false, onSelect }: CsgPrimitiveProps) {
+export function CsgPrimitive({ expression, isSelected = false, isPreview = false, onSelect }: CsgPrimitiveProps) {
   const geometry = useMemo(() => {
     const evaluator = new Evaluator();
     evaluator.attributes = ['position', 'normal', 'uv'];
@@ -61,14 +62,14 @@ export function CsgPrimitive({ expression, isSelected = false, onSelect }: CsgPr
 
   return (
     <mesh
-      castShadow
-      receiveShadow
+      castShadow={!isPreview}
+      receiveShadow={!isPreview}
       geometry={geometry}
       onClick={handleClick}
       userData={{ spatialNodeId: expression.base.id, csgExpressionId: expression.id }}
     >
-      {isSelected ? <Edges color="#facc15" /> : null}
-      <meshStandardMaterial {...material} />
+      {isSelected || isPreview ? <Edges color={isPreview ? '#67e8f9' : '#facc15'} /> : null}
+      <meshStandardMaterial {...material} transparent={isPreview} opacity={isPreview ? 0.48 : 1} depthWrite={!isPreview} />
     </mesh>
   );
 }
