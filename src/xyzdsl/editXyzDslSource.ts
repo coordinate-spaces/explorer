@@ -57,7 +57,7 @@ function formatDeclaration(parts: DeclarationParts): string {
   return `${parts.indent}"${parts.path}"${parts.middle}"${parts.properties}"${parts.suffix}`;
 }
 
-function formatPathNumber(value: number): string {
+export function formatPathNumber(value: number): string {
   const millimetres = Math.max(0, Math.round(value * MILLIMETRES_PER_UNIT));
 
   if (millimetres % 1000 === 0) {
@@ -66,6 +66,23 @@ function formatPathNumber(value: number): string {
   if (millimetres % 100 === 0) return `${millimetres / 100}d`;
   if (millimetres % 10 === 0) return `${millimetres / 10}c`;
   return `${millimetres}m`;
+}
+
+export interface CursorDeclarationOptions {
+  position: [number, number, number];
+  size: [number, number, number];
+  namespace?: string;
+  properties?: Record<string, string | number | undefined>;
+}
+
+export function createCursorDeclaration({ position, size, namespace, properties = {} }: CursorDeclarationOptions): string {
+  const prefix = namespace?.trim() ? `${namespace.trim().replace(/^\/+|\/+$/g, '')}/` : '';
+  const axes = position.map((offset, index) => `+${formatPathNumber(offset)}+${formatPathNumber(size[index])}`).join('/');
+  const declarations = Object.entries(properties)
+    .filter(([, value]) => value !== undefined && String(value).trim() !== '')
+    .map(([key, value]) => `${key}: ${String(value).trim()}`)
+    .join('; ');
+  return `"${prefix}${axes}" : "${declarations}"`;
 }
 
 function parseAxis(segment: string): AxisParts | undefined {
