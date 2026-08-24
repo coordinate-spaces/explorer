@@ -10,11 +10,16 @@ import { ContentPrimitive } from './ContentPrimitive';
 import { CsgPrimitive } from './CsgPrimitive';
 import { SpatialPrimitive } from './SpatialPrimitive';
 import { nodesForRoomSizing } from './roomSizing';
+import { LocalSpatialCursor } from './LocalSpatialCursor';
+import type { LocalCursorState } from './localCursor';
 
 interface SceneRootProps {
   document: SpatialDocument;
   selectedNodeId?: string;
   onSelectNode?: (id: string | undefined) => void;
+  cursor: LocalCursorState;
+  previewDocument: SpatialDocument;
+  onCursorPositionChange: (position: [number, number, number]) => void;
 }
 
 const DEFAULT_ORBIT_TARGET: [number, number, number] = [0.6, 0.5, 0.4];
@@ -30,7 +35,7 @@ function selectedOrbitNode(spatialDocument: SpatialDocument, selectedNodeId?: st
   );
 }
 
-export function SceneRoot({ document: spatialDocument, selectedNodeId, onSelectNode }: SceneRootProps) {
+export function SceneRoot({ document: spatialDocument, selectedNodeId, onSelectNode, cursor, previewDocument, onCursorPositionChange }: SceneRootProps) {
   const roomDimensions = dimensionsFromNodes(nodesForRoomSizing(spatialDocument));
   const orbitTarget = useMemo(() => {
     const selectedNode = selectedOrbitNode(spatialDocument, selectedNodeId);
@@ -48,9 +53,12 @@ export function SceneRoot({ document: spatialDocument, selectedNodeId, onSelectN
       }}
     >
       <color attach="background" args={['#151820']} />
-      <PerspectiveCamera makeDefault position={[1.4, 1.1, 1.8]} fov={45} />
+      <PerspectiveCamera makeDefault position={[1.4, 1.1, 1.8]} fov={45} near={0.001} />
       <Lighting />
       <CornerRoom {...roomDimensions} />
+      <LocalSpatialCursor cursor={cursor} onPositionChange={onCursorPositionChange} />
+      {previewDocument.csgExpressions.map((expression) => <CsgPrimitive key={`cursor-preview-${expression.id}`} expression={expression} isPreview />)}
+      {previewDocument.renderNodes.map((node) => <SpatialPrimitive key={`cursor-preview-${node.id}`} node={node} isPreview />)}
       {spatialDocument.csgExpressions.map((expression) => (
         <CsgPrimitive
           key={expression.id}
@@ -66,7 +74,7 @@ export function SceneRoot({ document: spatialDocument, selectedNodeId, onSelectN
           <SpatialPrimitive key={node.id} isSelected={node.id === selectedNodeId} node={node} onSelect={onSelectNode} />
         )
       ))}
-      <OrbitControls target={orbitTarget} maxPolarAngle={Math.PI} />
+      <OrbitControls enabled={!cursor.mouseLook && !cursor.pov} target={orbitTarget} maxPolarAngle={Math.PI} />
     </Canvas>
   );
 }
