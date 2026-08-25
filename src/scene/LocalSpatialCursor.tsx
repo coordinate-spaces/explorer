@@ -1,15 +1,17 @@
 import { useEffect, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
+import { Edges } from '@react-three/drei';
 import type { LocalCursorState } from './localCursor';
 
 interface Props {
   cursor: LocalCursorState;
   onPositionChange: (position: [number, number, number]) => void;
+  size: [number, number, number];
 }
 
 const EDITABLE = 'input, textarea, select, button, [contenteditable="true"]';
 
-export function LocalSpatialCursor({ cursor, onPositionChange }: Props) {
+export function LocalSpatialCursor({ cursor, onPositionChange, size }: Props) {
   const keys = useRef(new Set<string>());
   const position = useRef(cursor.position);
   const { camera } = useThree();
@@ -54,7 +56,11 @@ export function LocalSpatialCursor({ cursor, onPositionChange }: Props) {
   return (
     <group position={cursor.position} rotation={cursor.rotation}>
       <axesHelper args={[0.12]} />
-      <mesh><sphereGeometry args={[0.012, 12, 12]} /><meshBasicMaterial color="#ffffff" /></mesh>
+      <mesh position={[size[0] / 2, size[1] / 2, size[2] / 2]} scale={size}>
+        <boxGeometry args={[1, 1, 1]} />
+        <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+        <Edges color="#ffffff" />
+      </mesh>
     </group>
   );
 }

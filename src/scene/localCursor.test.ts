@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
+import { Vector3 } from 'three';
 import { createCursorDeclaration } from '../xyzdsl/editXyzDslSource';
 import { cursorCoordinatePath, INITIAL_LOCAL_CURSOR, moveLocalCursor } from './localCursor';
 import { createSpatialDocument } from '../model/createSpatialDocument';
+import { createCursorPreviewDocument, cursorClippingPlanes } from './cursorPreview';
 
 describe('local cursor', () => {
   it('moves in the selected XYZDSL unit and respects the scene boundary', () => {
@@ -53,5 +55,33 @@ describe('local cursor', () => {
       geometry: { kind: 'sphere' },
       material: { color: 'orange', roughness: 0.2 },
     });
+  });
+
+  it('includes inherited namespace descendants in the cursor preview', () => {
+    const source = `"Table/" : "color: brown"
+"Table/Top/+0+1/+0+1d/+0+1" : ""
+"Table/Leg/+0+1d/+0+1/+0+1d" : "geometry: cylinder"`;
+    const declaration = createCursorDeclaration({
+      position: [1, 0, 0],
+      size: [0.8, 0.5, 0.8],
+      namespace: 'Table',
+    });
+    const preview = createCursorPreviewDocument(source, declaration);
+
+    expect(preview.renderNodes.map((node) => node.namespacePath)).toEqual([
+      'Table/Top/',
+      'Table/Leg/',
+    ]);
+    expect(preview.renderNodes.every((node) => node.source !== declaration)).toBe(true);
+  });
+
+  it('creates six inward-facing clipping planes for the cursor box', () => {
+    const planes = cursorClippingPlanes([1, 2, 3], [0, 0, 0], [2, 4, 6]);
+    const inside = new Vector3(2, 4, 6);
+
+    expect(planes).toHaveLength(6);
+    expect(planes.every((plane) => plane.distanceToPoint(inside) >= 0)).toBe(true);
+    expect(planes[0].distanceToPoint(new Vector3(0, 4, 6))).toBeLessThan(0);
+    expect(planes[1].distanceToPoint(new Vector3(4, 4, 6))).toBeLessThan(0);
   });
 });

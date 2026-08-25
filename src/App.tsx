@@ -26,6 +26,7 @@ import { INITIAL_LOCAL_CURSOR } from './scene/localCursor';
 import type { LocalCursorState } from './scene/localCursor';
 import { LocalCursorConsole } from './ui/LocalCursorConsole';
 import type { CursorPreviewSettings } from './ui/LocalCursorConsole';
+import { createCursorPreviewDocument } from './scene/cursorPreview';
 
 const INITIAL_XYZDSL = `"+2d+4d/+0d+6d/+1d+3d" : "geometry: cylinder; color: 0x333333; metalness: 0.8; roughness: 0.2"
 "+2d+4d/+7d+6d/+0d+10m" : "geometry: cone; color: yellow; metalness: 0.2; roughness: 0.5"
@@ -541,13 +542,7 @@ export default function App() {
     // Resolve the prospective line in the same declaration context as the
     // scene. Named instances can then inherit geometry and material from a
     // preceding namespace declaration, just as they will after being added.
-    const resolvedPreview = createSpatialDocument(`${renderedSource.trimEnd()}\n${cursorDeclaration}`);
-
-    return {
-      ...resolvedPreview,
-      renderNodes: resolvedPreview.renderNodes.filter((node) => node.source === cursorDeclaration),
-      csgExpressions: resolvedPreview.csgExpressions.filter((expression) => expression.base.source === cursorDeclaration),
-    };
+    return createCursorPreviewDocument(renderedSource, cursorDeclaration);
   }, [cursorDeclaration, renderedSource]);
   const selectedNode = useMemo(
     () => findNodeById(document.nodes, selectedNodeId) ?? findNodeByLineNumber(document.nodes, selectedLineNumber),
@@ -849,6 +844,7 @@ export default function App() {
         selectedNodeId={selectedSceneNodeId}
         onSelectNode={handleSelectNode}
         cursor={localCursor}
+        cursorSize={cursorSettings.size}
         previewDocument={cursorPreviewDocument}
         onCursorPositionChange={(position) => setLocalCursor((cursor) => ({ ...cursor, position }))}
       />

@@ -12,6 +12,7 @@ import { SpatialPrimitive } from './SpatialPrimitive';
 import { nodesForRoomSizing } from './roomSizing';
 import { LocalSpatialCursor } from './LocalSpatialCursor';
 import type { LocalCursorState } from './localCursor';
+import { cursorClippingPlanes } from './cursorPreview';
 
 interface SceneRootProps {
   document: SpatialDocument;
@@ -20,6 +21,7 @@ interface SceneRootProps {
   cursor: LocalCursorState;
   previewDocument: SpatialDocument;
   onCursorPositionChange: (position: [number, number, number]) => void;
+  cursorSize: [number, number, number];
 }
 
 const DEFAULT_ORBIT_TARGET: [number, number, number] = [0.6, 0.5, 0.4];
@@ -35,19 +37,24 @@ function selectedOrbitNode(spatialDocument: SpatialDocument, selectedNodeId?: st
   );
 }
 
-export function SceneRoot({ document: spatialDocument, selectedNodeId, onSelectNode, cursor, previewDocument, onCursorPositionChange }: SceneRootProps) {
+export function SceneRoot({ document: spatialDocument, selectedNodeId, onSelectNode, cursor, cursorSize, previewDocument, onCursorPositionChange }: SceneRootProps) {
   const roomDimensions = dimensionsFromNodes(nodesForRoomSizing(spatialDocument));
   const orbitTarget = useMemo(() => {
     const selectedNode = selectedOrbitNode(spatialDocument, selectedNodeId);
 
     return selectedNode?.transform.position ?? DEFAULT_ORBIT_TARGET;
   }, [selectedNodeId, spatialDocument]);
+  const previewClippingPlanes = useMemo(
+    () => cursorClippingPlanes(cursor.position, cursor.rotation, cursorSize),
+    [cursor.position, cursor.rotation, cursorSize],
+  );
 
   return (
     <Canvas
       className="scene-canvas"
       shadows
       gl={{ antialias: true }}
+      onCreated={({ gl }) => { gl.localClippingEnabled = true; }}
       onPointerMissed={() => {
         onSelectNode?.(undefined);
       }}
@@ -56,9 +63,9 @@ export function SceneRoot({ document: spatialDocument, selectedNodeId, onSelectN
       <PerspectiveCamera makeDefault position={[1.4, 1.1, 1.8]} fov={45} near={0.001} />
       <Lighting />
       <CornerRoom {...roomDimensions} />
-      <LocalSpatialCursor cursor={cursor} onPositionChange={onCursorPositionChange} />
-      {previewDocument.csgExpressions.map((expression) => <CsgPrimitive key={`cursor-preview-${expression.id}`} expression={expression} isPreview />)}
-      {previewDocument.renderNodes.map((node) => <SpatialPrimitive key={`cursor-preview-${node.id}`} node={node} isPreview />)}
+      <LocalSpatialCursor cursor={cursor} size={cursorSize} onPositionChange={onCursorPositionChange} />
+      {previewDocument.csgExpressions.map((expression) => <CsgPrimitive key={`cursor-preview-${expression.id}`} expression={expression} isPreview clippingPlanes={previewClippingPlanes} />)}
+      {previewDocument.renderNodes.map((node) => <SpatialPrimitive key={`cursor-preview-${node.id}`} node={node} isPreview clippingPlanes={previewClippingPlanes} />)}
       {spatialDocument.csgExpressions.map((expression) => (
         <CsgPrimitive
           key={expression.id}

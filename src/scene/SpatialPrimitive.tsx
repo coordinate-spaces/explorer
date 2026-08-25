@@ -1,6 +1,7 @@
 import { Edges, RoundedBoxGeometry } from '@react-three/drei';
 import type { ThreeEvent } from '@react-three/fiber';
 import type { MeshStandardMaterialParameters } from 'three';
+import type { Plane } from 'three';
 import type { SpatialGeometry } from '../model/geometry';
 import { normalizedXyzDslStrength, normalizedRoundedBoxRadius } from './primitiveGeometry';
 import type { SpatialNode } from '../model/SpatialNode';
@@ -11,6 +12,7 @@ interface SpatialPrimitiveProps {
   isSelected?: boolean;
   isPreview?: boolean;
   onSelect?: (id: string) => void;
+  clippingPlanes?: Plane[];
 }
 
 function PrimitiveGeometry({ geometry }: { geometry: SpatialGeometry }) {
@@ -47,7 +49,7 @@ export function materialParameters(node: SpatialNode): MeshStandardMaterialParam
   };
 }
 
-export function SpatialPrimitive({ node, isSelected = false, isPreview = false, onSelect }: SpatialPrimitiveProps) {
+export function SpatialPrimitive({ node, isSelected = false, isPreview = false, onSelect, clippingPlanes }: SpatialPrimitiveProps) {
   const { position, rotation, scale } = node.transform;
   const material = materialParameters(node);
 
@@ -72,8 +74,8 @@ export function SpatialPrimitive({ node, isSelected = false, isPreview = false, 
       }}
     >
       <PrimitiveGeometry geometry={node.geometry} />
-      {isSelected || isPreview ? <Edges color={isPreview ? '#67e8f9' : '#facc15'} scale={1.03} /> : null}
-      <meshStandardMaterial {...material} transparent={isPreview} opacity={isPreview ? 0.48 : 1} depthWrite={!isPreview} />
+      {isSelected || isPreview ? <Edges color={isPreview ? '#67e8f9' : '#facc15'} clippingPlanes={clippingPlanes} scale={1.03} /> : null}
+      <meshStandardMaterial {...material} clippingPlanes={clippingPlanes} transparent={isPreview} opacity={isPreview ? 0.48 : 1} depthWrite={!isPreview} />
     </mesh>
   );
 }

@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { Edges } from '@react-three/drei';
 import type { ThreeEvent } from '@react-three/fiber';
+import type { Plane } from 'three';
 import { Brush, Evaluator, INTERSECTION, SUBTRACTION, ADDITION } from 'three-bvh-csg';
 import type { CsgExpression, CsgOperationNode } from '../model/csg';
 import type { SpatialNode } from '../model/SpatialNode';
@@ -12,6 +13,7 @@ interface CsgPrimitiveProps {
   isSelected?: boolean;
   isPreview?: boolean;
   onSelect?: (id: string) => void;
+  clippingPlanes?: Plane[];
 }
 
 function brushFor(node: SpatialNode): Brush {
@@ -41,7 +43,7 @@ function csgOperation({ op }: CsgOperationNode) {
   }
 }
 
-export function CsgPrimitive({ expression, isSelected = false, isPreview = false, onSelect }: CsgPrimitiveProps) {
+export function CsgPrimitive({ expression, isSelected = false, isPreview = false, onSelect, clippingPlanes }: CsgPrimitiveProps) {
   const geometry = useMemo(() => {
     const evaluator = new Evaluator();
     evaluator.attributes = ['position', 'normal', 'uv'];
@@ -68,8 +70,8 @@ export function CsgPrimitive({ expression, isSelected = false, isPreview = false
       onClick={handleClick}
       userData={{ spatialNodeId: expression.base.id, csgExpressionId: expression.id }}
     >
-      {isSelected || isPreview ? <Edges color={isPreview ? '#67e8f9' : '#facc15'} /> : null}
-      <meshStandardMaterial {...material} transparent={isPreview} opacity={isPreview ? 0.48 : 1} depthWrite={!isPreview} />
+      {isSelected || isPreview ? <Edges color={isPreview ? '#67e8f9' : '#facc15'} clippingPlanes={clippingPlanes} /> : null}
+      <meshStandardMaterial {...material} clippingPlanes={clippingPlanes} transparent={isPreview} opacity={isPreview ? 0.48 : 1} depthWrite={!isPreview} />
     </mesh>
   );
 }
