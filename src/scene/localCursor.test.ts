@@ -75,6 +75,23 @@ describe('local cursor', () => {
     expect(preview.renderNodes.every((node) => node.source !== declaration)).toBe(true);
   });
 
+  it('preserves content children in a compound namespace preview', () => {
+    const source = `"Sign/" : "color: white"
+"Sign/Message/+0+1/+0+1/+0+1c" : "content-kind: text; content-text: Preview message"`;
+    const declaration = createCursorDeclaration({
+      position: [0, 0, 0],
+      size: [1, 1, 0.1],
+      namespace: 'Sign',
+    });
+    const preview = createCursorPreviewDocument(source, declaration);
+
+    expect(preview.renderNodes).toHaveLength(1);
+    expect(preview.renderNodes[0]).toMatchObject({
+      namespacePath: 'Sign/Message/',
+      content: { kind: 'text', text: 'Preview message' },
+    });
+  });
+
   it('creates six inward-facing clipping planes for the cursor box', () => {
     const planes = cursorClippingPlanes([1, 2, 3], [0, 0, 0], [2, 4, 6]);
     const inside = new Vector3(2, 4, 6);

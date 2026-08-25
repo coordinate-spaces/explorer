@@ -65,7 +65,13 @@ export function SceneRoot({ document: spatialDocument, selectedNodeId, onSelectN
       <CornerRoom {...roomDimensions} />
       <LocalSpatialCursor cursor={cursor} size={cursorSize} onPositionChange={onCursorPositionChange} />
       {previewDocument.csgExpressions.map((expression) => <CsgPrimitive key={`cursor-preview-${expression.id}`} expression={expression} isPreview clippingPlanes={previewClippingPlanes} />)}
-      {previewDocument.renderNodes.map((node) => <SpatialPrimitive key={`cursor-preview-${node.id}`} node={node} isPreview clippingPlanes={previewClippingPlanes} />)}
+      {previewDocument.renderNodes.map((node) => (
+        node.content?.kind ? (
+          <ContentPrimitive key={`cursor-preview-${node.id}`} node={node} isPreview clippingPlanes={previewClippingPlanes} />
+        ) : (
+          <SpatialPrimitive key={`cursor-preview-${node.id}`} node={node} isPreview clippingPlanes={previewClippingPlanes} />
+        )
+      ))}
       {spatialDocument.csgExpressions.map((expression) => (
         <CsgPrimitive
           key={expression.id}

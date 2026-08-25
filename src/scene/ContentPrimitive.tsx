@@ -1,10 +1,13 @@
 import { Edges, Html, Text } from '@react-three/drei';
 import type { ThreeEvent } from '@react-three/fiber';
+import type { Plane } from 'three';
 import type { SpatialNode } from '../model/SpatialNode';
 
 interface ContentPrimitiveProps {
   node: SpatialNode;
   isSelected?: boolean;
+  isPreview?: boolean;
+  clippingPlanes?: Plane[];
   onSelect?: (id: string) => void;
 }
 
@@ -25,7 +28,7 @@ function contentLabel(node: SpatialNode): string {
   }
 }
 
-export function ContentPrimitive({ node, isSelected = false, onSelect }: ContentPrimitiveProps) {
+export function ContentPrimitive({ node, isSelected = false, isPreview = false, clippingPlanes, onSelect }: ContentPrimitiveProps) {
   if (!node.content?.kind) {
     return null;
   }
@@ -49,10 +52,20 @@ export function ContentPrimitive({ node, isSelected = false, onSelect }: Content
         label,
       }}
     >
-      <mesh castShadow receiveShadow onClick={handleClick}>
+      <mesh castShadow={!isPreview} receiveShadow={!isPreview} onClick={handleClick}>
         <boxGeometry args={[1, 1, 0.04]} />
-        <meshStandardMaterial color={node.content.kind === 'url' ? '#e7eef8' : '#f4ecd8'} roughness={0.86} metalness={0} />
-        {isSelected ? <Edges color="#facc15" scale={1.04} /> : null}
+        <meshStandardMaterial
+          color={node.content.kind === 'url' ? '#e7eef8' : '#f4ecd8'}
+          roughness={0.86}
+          metalness={0}
+          clippingPlanes={clippingPlanes}
+          transparent={isPreview}
+          opacity={isPreview ? 0.48 : 1}
+          depthWrite={!isPreview}
+        />
+        {isSelected || isPreview ? (
+          <Edges color={isPreview ? '#67e8f9' : '#facc15'} clippingPlanes={clippingPlanes} scale={1.04} />
+        ) : null}
       </mesh>
       {node.content.kind === 'text' ? (
         <Text
@@ -64,6 +77,12 @@ export function ContentPrimitive({ node, isSelected = false, onSelect }: Content
           fontSize={0.12}
           textAlign="center"
           overflowWrap="break-word"
+          onSync={(text) => {
+            text.material.clippingPlanes = clippingPlanes;
+            text.material.transparent = isPreview;
+            text.material.opacity = isPreview ? 0.72 : 1;
+            text.material.needsUpdate = true;
+          }}
         >
           {displayedText(node.content.text)}
         </Text>
