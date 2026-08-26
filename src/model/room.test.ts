@@ -32,7 +32,7 @@ function nodeWithBounds(bounds: Partial<SpatialNode['bounds']>): SpatialNode {
 
 describe('dimensionsFromNodes', () => {
   it('uses a realistic default room in project units', () => {
-    expect(DEFAULT_ROOM_DIMENSIONS).toEqual({ width: 4, depth: 4, height: 2.8 });
+    expect(DEFAULT_ROOM_DIMENSIONS).toEqual({ width: 4, depth: 4, height: 4 });
     expect(ROOM_DIMENSION_MARGIN).toBe(0.2);
   });
 
@@ -49,13 +49,31 @@ describe('dimensionsFromNodes', () => {
     expect(dimensions).toEqual(DEFAULT_ROOM_DIMENSIONS);
   });
 
-  it('expands dimensions to include nodes beyond the default perimeter with margin', () => {
+  it('expands overflowing dimensions to the next whole metre', () => {
     const dimensions = dimensionsFromNodes([nodeWithBounds({ maxX: 4.12, maxY: 3.04, maxZ: 4.21 })]);
 
     expect(dimensions).toEqual({
-      width: Math.ceil((4.12 + ROOM_DIMENSION_MARGIN) * 10) / 10,
-      depth: Math.ceil((4.21 + ROOM_DIMENSION_MARGIN) * 10) / 10,
-      height: Math.ceil((3.04 + ROOM_DIMENSION_MARGIN) * 10) / 10,
+      width: 5,
+      depth: 5,
+      height: 4,
     });
+  });
+
+  it('grows an axis when its required extent is just over four metres', () => {
+    const dimensions = dimensionsFromNodes([nodeWithBounds({ maxX: 3.81 })]);
+
+    expect(dimensions).toEqual({ width: 5, depth: 4, height: 4 });
+  });
+
+  it('does not add a metre for floating-point noise at a whole-metre boundary', () => {
+    const dimensions = dimensionsFromNodes([nodeWithBounds({ maxX: 4.800000000000001 })]);
+
+    expect(dimensions).toEqual({ width: 5, depth: 4, height: 4 });
+  });
+
+  it('still grows for an extent meaningfully beyond a whole-metre boundary', () => {
+    const dimensions = dimensionsFromNodes([nodeWithBounds({ maxX: 4.800001 })]);
+
+    expect(dimensions).toEqual({ width: 6, depth: 4, height: 4 });
   });
 });
