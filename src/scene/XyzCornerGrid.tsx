@@ -1,9 +1,10 @@
 import { useMemo } from 'react';
+import { DECIMETRES_PER_UNIT } from '../model/units';
 
 // Keep each plane just inside its axis so intersecting lines remain visible.
 const LINE_OFFSET = 0.0015;
 
-interface XyzCornerSpaceProps {
+interface XyzCornerGridProps {
   width: number;
   depth: number;
   height: number;
@@ -18,38 +19,44 @@ interface CornerLinesProps {
   height: number;
 }
 
-export function createCornerLinePositions({ plane, width, depth, height }: CornerLinesProps): Float32Array {
+export function createCornerGridLinePositions({ plane, width, depth, height }: CornerLinesProps): Float32Array {
   const positions: number[] = [];
-  const xMax = Math.ceil(width);
-  const yMax = Math.ceil(height);
-  const zMax = Math.ceil(depth);
+  const xMax = Math.ceil(width * DECIMETRES_PER_UNIT);
+  const yMax = Math.ceil(height * DECIMETRES_PER_UNIT);
+  const zMax = Math.ceil(depth * DECIMETRES_PER_UNIT);
 
   if (plane === 'floor') {
-    for (let x = 0; x <= xMax; x += 1) {
+    for (let step = 0; step <= xMax; step += 1) {
+      const x = step / DECIMETRES_PER_UNIT;
       positions.push(x, LINE_OFFSET, 0, x, LINE_OFFSET, depth);
     }
 
-    for (let z = 0; z <= zMax; z += 1) {
+    for (let step = 0; step <= zMax; step += 1) {
+      const z = step / DECIMETRES_PER_UNIT;
       positions.push(0, LINE_OFFSET, z, width, LINE_OFFSET, z);
     }
   }
 
   if (plane === 'backWall') {
-    for (let x = 0; x <= xMax; x += 1) {
+    for (let step = 0; step <= xMax; step += 1) {
+      const x = step / DECIMETRES_PER_UNIT;
       positions.push(x, 0, LINE_OFFSET, x, height, LINE_OFFSET);
     }
 
-    for (let y = 0; y <= yMax; y += 1) {
+    for (let step = 0; step <= yMax; step += 1) {
+      const y = step / DECIMETRES_PER_UNIT;
       positions.push(0, y, LINE_OFFSET, width, y, LINE_OFFSET);
     }
   }
 
   if (plane === 'sideWall') {
-    for (let z = 0; z <= zMax; z += 1) {
+    for (let step = 0; step <= zMax; step += 1) {
+      const z = step / DECIMETRES_PER_UNIT;
       positions.push(LINE_OFFSET, 0, z, LINE_OFFSET, height, z);
     }
 
-    for (let y = 0; y <= yMax; y += 1) {
+    for (let step = 0; step <= yMax; step += 1) {
+      const y = step / DECIMETRES_PER_UNIT;
       positions.push(LINE_OFFSET, y, 0, LINE_OFFSET, y, depth);
     }
   }
@@ -58,7 +65,7 @@ export function createCornerLinePositions({ plane, width, depth, height }: Corne
 }
 
 function CornerLines(props: CornerLinesProps) {
-  const positions = useMemo(() => createCornerLinePositions(props), [props.plane, props.width, props.depth, props.height]);
+  const positions = useMemo(() => createCornerGridLinePositions(props), [props.plane, props.width, props.depth, props.height]);
 
   return (
     <lineSegments renderOrder={1}>
@@ -70,7 +77,7 @@ function CornerLines(props: CornerLinesProps) {
   );
 }
 
-export function XyzCornerSpace({ width, depth, height }: XyzCornerSpaceProps) {
+export function XyzCornerGrid({ width, depth, height }: XyzCornerGridProps) {
   return (
     <group>
       <CornerLines plane="floor" width={width} depth={depth} height={height} />
