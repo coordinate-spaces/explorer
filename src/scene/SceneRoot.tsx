@@ -4,7 +4,7 @@ import { Canvas } from '@react-three/fiber';
 import type { SpatialDocument } from '../model/SpatialDocument';
 import type { SpatialNode } from '../model/SpatialNode';
 import { dimensionsFromNodes } from '../model/room';
-import { CornerRoom } from './CornerRoom';
+import { XyzCornerSpace } from './XyzCornerSpace';
 import { Lighting } from './Lighting';
 import { ContentPrimitive } from './ContentPrimitive';
 import { CsgPrimitive } from './CsgPrimitive';
@@ -50,7 +50,7 @@ export function SceneRoot({ document: spatialDocument, selectedNodeId, onSelectN
       <color attach="background" args={['#151820']} />
       <PerspectiveCamera makeDefault position={[1.4, 1.1, 1.8]} fov={45} />
       <Lighting />
-      <CornerRoom {...roomDimensions} />
+      <XyzCornerSpace {...roomDimensions} />
       {spatialDocument.csgExpressions.map((expression) => (
         <CsgPrimitive
           key={expression.id}
