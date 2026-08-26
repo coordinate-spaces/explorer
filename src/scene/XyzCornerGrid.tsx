@@ -86,28 +86,28 @@ export function createMetreCornerGridLinePositions({ plane, width, depth, height
   };
 
   if (plane === 'floor') {
-    for (let x = 0; x <= Math.ceil(width); x += 1) {
+    for (let x = 0; x <= Math.floor(width); x += 1) {
       addDoubleLine([x, LINE_OFFSET * 2, 0], [x, LINE_OFFSET * 2, depth], 0);
     }
-    for (let z = 0; z <= Math.ceil(depth); z += 1) {
+    for (let z = 0; z <= Math.floor(depth); z += 1) {
       addDoubleLine([0, LINE_OFFSET * 2, z], [width, LINE_OFFSET * 2, z], 2);
     }
   }
 
   if (plane === 'backWall') {
-    for (let x = 0; x <= Math.ceil(width); x += 1) {
+    for (let x = 0; x <= Math.floor(width); x += 1) {
       addDoubleLine([x, 0, LINE_OFFSET * 2], [x, height, LINE_OFFSET * 2], 0);
     }
-    for (let y = 0; y <= Math.ceil(height); y += 1) {
+    for (let y = 0; y <= Math.floor(height); y += 1) {
       addDoubleLine([0, y, LINE_OFFSET * 2], [width, y, LINE_OFFSET * 2], 1);
     }
   }
 
   if (plane === 'sideWall') {
-    for (let z = 0; z <= Math.ceil(depth); z += 1) {
+    for (let z = 0; z <= Math.floor(depth); z += 1) {
       addDoubleLine([LINE_OFFSET * 2, 0, z], [LINE_OFFSET * 2, height, z], 2);
     }
-    for (let y = 0; y <= Math.ceil(height); y += 1) {
+    for (let y = 0; y <= Math.floor(height); y += 1) {
       addDoubleLine([LINE_OFFSET * 2, y, 0], [LINE_OFFSET * 2, y, depth], 1);
     }
   }

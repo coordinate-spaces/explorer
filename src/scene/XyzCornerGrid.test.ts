@@ -36,4 +36,14 @@ describe('createMetreCornerGridLinePositions', () => {
     expect(positions[6]).toBeCloseTo(0.006);
     expect(positions[0] + positions[6]).toBeCloseTo(0);
   });
+
+  it.each([
+    ['floor', 108],
+    ['backWall', 96],
+    ['sideWall', 84],
+  ] as const)('does not add a metre mark beyond fractional %s bounds', (plane, coordinateCount) => {
+    const positions = createMetreCornerGridLinePositions({ plane, width: 4.1, depth: 3.2, height: 2.3 });
+
+    expect(positions).toHaveLength(coordinateCount);
+  });
 });
