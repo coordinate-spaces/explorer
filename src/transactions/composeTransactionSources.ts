@@ -41,6 +41,11 @@ function primaryDeclarationNamespaces(primaryXyzDslSource: string): Set<string> 
   return namespaces;
 }
 
+function primaryDeclarationPaths(primaryXyzDslSource: string): Set<string> {
+  const parsed = parseXyzDslDocument(primaryXyzDslSource);
+  return new Set((parsed.value ?? []).map((object) => object.path.canonicalPath));
+}
+
 function namespaceIsPrimaryConsumer(namespace: readonly string[], primaryNamespaces: ReadonlySet<string>): boolean {
   if (namespace.length === 0) {
     return true;
@@ -74,6 +79,7 @@ export function composeTransactionSources(
 ): string {
   const primary = primaryXyzDslSource;
   const primaryNamespaces = primaryDeclarationNamespaces(primaryXyzDslSource);
+  const occupiedPaths = primaryDeclarationPaths(primaryXyzDslSource);
   const policy = options.namespacePolicy ?? 'consume-primary-namespaces';
   const composedSecondarySources = secondaryStreams.flatMap((stream) => {
     const lines = declarationSources(stream.declarations);
@@ -84,7 +90,15 @@ export function composeTransactionSources(
       return visibleLines;
     }
 
-    return visibleLines.flatMap((line) => secondaryConsumerLine(line, primaryNamespaces) ?? []);
+    return visibleLines.flatMap((line) => {
+      const accepted = secondaryConsumerLine(line, primaryNamespaces);
+      if (!accepted) return [];
+
+      const declaration = parseXyzDslDeclaration(accepted).value;
+      if (!declaration || occupiedPaths.has(declaration.path.canonicalPath)) return [];
+      occupiedPaths.add(declaration.path.canonicalPath);
+      return [accepted];
+    });
   });
 
   return [primary, composedSecondarySources.join('\n')]

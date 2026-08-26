@@ -36,8 +36,6 @@ export interface RejectedTransaction {
   reasons: string[];
 }
 
-export type SecondaryRealtimeStatus = 'connecting' | 'connected' | 'closed' | 'error';
-
 /** A secondary public key discovered in a primary transaction. */
 export interface DiscoveredSecondaryPublicKeyReference extends Pick<TransactionPublicKeyEndpoint, 'publicKey'> {
   endpoint: string;
@@ -45,22 +43,22 @@ export interface DiscoveredSecondaryPublicKeyReference extends Pick<TransactionP
   memoPreview: string;
 }
 
-export interface ActiveSecondaryTransactionStream extends TransactionPublicKeyEndpoint {
-  realtimeStatus: SecondaryRealtimeStatus;
+export interface ActiveSecondaryTenant extends TransactionPublicKeyEndpoint {
+  enabled: boolean;
   streamError?: string;
   transactions: XyzDslTransaction[];
   playbackIndex: number;
   playbackSpeed: number;
   replaying: boolean;
   historyLoading?: boolean;
-  /** Diagnostics for the transaction selected by this stream's playback cursor. */
-  currentTransactionRejectedDiagnostics: RejectedTransaction[];
+  /** Diagnostics accumulated through this tenant's playback cursor. */
+  rejectedDiagnostics: RejectedTransaction[];
 }
 
 export type SecondaryKeyReference = DiscoveredSecondaryPublicKeyReference;
 
-/** A subscribed source projected into the primary spatial document. */
-export interface SecondaryProjection extends ActiveSecondaryTransactionStream {
+/** A historical tenant document composed into the primary spatial document. */
+export interface SecondaryTenant extends ActiveSecondaryTenant {
   /** Every primary transaction that discovered this unique key. */
   references: SecondaryKeyReference[];
   /** Secondary declarations only render when they consume a primary namespace. */

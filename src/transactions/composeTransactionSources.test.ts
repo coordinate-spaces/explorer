@@ -62,4 +62,22 @@ describe('composeTransactionSources', () => {
 
     expect(result).toBe('"+0d+1d/+0d+1d/+0d+1d" : ""');
   });
+
+  it('gives the baseline precedence over colliding tenant declarations', () => {
+    const result = composeTransactionSources(primary, [
+      { declarations: '"Table/+0d+1d/+0d+1d/+0d+1d" : "color: red"\n"Table/+2d+1d/+0d+1d/+0d+1d" : "color: blue"' },
+    ]);
+
+    expect(result).toBe(`${primary}\n"Table/+2d+1d/+0d+1d/+0d+1d" : "color: blue"`);
+  });
+
+  it('uses deterministic first-tenant precedence for tenant collisions', () => {
+    const path = '"Table/+2d+1d/+0d+1d/+0d+1d"';
+    const result = composeTransactionSources(primary, [
+      { declarations: `${path} : "color: red"` },
+      { declarations: `${path} : "color: blue"` },
+    ]);
+
+    expect(result).toBe(`${primary}\n${path} : "color: red"`);
+  });
 });

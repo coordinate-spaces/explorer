@@ -336,7 +336,7 @@ button {
   font-size: 0.78rem;
 }
 
-.secondary-projections {
+.secondary-tenants {
   margin-top: 1rem;
   border: 1px solid rgb(56 189 248 / 34%);
   border-radius: 1rem;
@@ -345,15 +345,15 @@ button {
   color: #bae6fd;
 }
 
-.secondary-projection-intro {
+.secondary-tenant-intro {
   margin: 0.5rem 0 0;
   color: #e0f2fe;
   font-size: 0.78rem;
 }
 
-.secondary-projection-list,
-.secondary-projection-list ul,
-.secondary-projection-history {
+.secondary-tenant-list,
+.secondary-tenant-list ul,
+.secondary-tenant-history {
   display: grid;
   gap: 0.6rem;
   margin: 0.75rem 0 0;
@@ -361,28 +361,28 @@ button {
   list-style: none;
 }
 
-.secondary-projection-list > li {
+.secondary-tenant-list > li {
   border: 1px solid rgb(125 211 252 / 24%);
   border-radius: 0.7rem;
   padding: 0.65rem;
 }
 
-.secondary-projection-list > li.has-error { border-color: rgb(248 113 113 / 60%); }
-.secondary-projection-list summary { cursor: pointer; }
-.secondary-projection-key, .secondary-projection-status { display: block; overflow-wrap: anywhere; }
-.secondary-projection-key, .secondary-projection-facts dd, .secondary-projection-history time { font-family: ui-monospace, "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", monospace; }
-.secondary-projection-status { margin-top: 0.25rem; color: #7dd3fc; font-size: 0.78rem; }
-.secondary-projection-facts { display: grid; gap: 0.45rem; margin: 0.75rem 0; font-size: 0.78rem; }
-.secondary-projection-facts div { display: grid; gap: 0.15rem; }
-.secondary-projection-facts dt { color: #7dd3fc; font-weight: 700; }
-.secondary-projection-facts dd { margin: 0; overflow-wrap: anywhere; color: #e0f2fe; }
-.secondary-projection-primary-actions, .secondary-projection-controls { display: flex; flex-wrap: wrap; gap: 0.45rem; align-items: center; }
-.secondary-projection-primary-actions button, .secondary-projection-controls button { border: 1px solid rgb(125 211 252 / 42%); border-radius: 999px; padding: 0.25rem 0.55rem; background: rgb(14 165 233 / 18%); color: #e0f2fe; }
-.secondary-projection-controls label { display: grid; gap: 0.2rem; color: #e0f2fe; font-size: 0.75rem; }
-.secondary-projection-details { margin-top: 0.75rem; color: #e0f2fe; font-size: 0.78rem; }
-.secondary-projection-details > ul { padding-left: 1.25rem; list-style: disc; }
-.secondary-projection-details li { display: grid; gap: 0.2rem; overflow-wrap: anywhere; }
-.secondary-projection-history { list-style: decimal; padding-left: 1.25rem; }
+.secondary-tenant-list > li.has-error { border-color: rgb(248 113 113 / 60%); }
+.secondary-tenant-list summary { cursor: pointer; }
+.secondary-tenant-key, .secondary-tenant-status { display: block; overflow-wrap: anywhere; }
+.secondary-tenant-key, .secondary-tenant-facts dd, .secondary-tenant-history time { font-family: ui-monospace, "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", monospace; }
+.secondary-tenant-status { margin-top: 0.25rem; color: #7dd3fc; font-size: 0.78rem; }
+.secondary-tenant-facts { display: grid; gap: 0.45rem; margin: 0.75rem 0; font-size: 0.78rem; }
+.secondary-tenant-facts div { display: grid; gap: 0.15rem; }
+.secondary-tenant-facts dt { color: #7dd3fc; font-weight: 700; }
+.secondary-tenant-facts dd { margin: 0; overflow-wrap: anywhere; color: #e0f2fe; }
+.secondary-tenant-primary-actions, .secondary-tenant-controls { display: flex; flex-wrap: wrap; gap: 0.45rem; align-items: center; }
+.secondary-tenant-primary-actions button, .secondary-tenant-controls button { border: 1px solid rgb(125 211 252 / 42%); border-radius: 999px; padding: 0.25rem 0.55rem; background: rgb(14 165 233 / 18%); color: #e0f2fe; }
+.secondary-tenant-controls label { display: grid; gap: 0.2rem; color: #e0f2fe; font-size: 0.75rem; }
+.secondary-tenant-details { margin-top: 0.75rem; color: #e0f2fe; font-size: 0.78rem; }
+.secondary-tenant-details > ul { padding-left: 1.25rem; list-style: disc; }
+.secondary-tenant-details li { display: grid; gap: 0.2rem; overflow-wrap: anywhere; }
+.secondary-tenant-history { list-style: decimal; padding-left: 1.25rem; }
 
 .diagnostics {
   margin-top: 1rem;
