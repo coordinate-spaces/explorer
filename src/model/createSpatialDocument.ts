@@ -97,6 +97,7 @@ export function createSpatialDocument(source: string): SpatialDocument {
         box: object.box,
         material: object.material,
         content: object.content,
+        model: object.model.source ? object.model : undefined,
         geometry: geometryFromBox(object.box, object.geometry),
         localTransform,
         worldTransform,

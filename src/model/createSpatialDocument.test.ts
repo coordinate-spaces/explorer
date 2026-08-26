@@ -2,6 +2,14 @@ import { describe, expect, it } from 'vitest';
 import { createSpatialDocument } from './createSpatialDocument';
 
 describe('createSpatialDocument namespaced spatial declarations', () => {
+  it('carries imported model settings into a renderable spatial node', () => {
+    const document = createSpatialDocument(
+      '"Chair/+1+4/+2+4/+2+4" : "model: modern_chair.glb; model-align: floor; rotation: 5,10,5"',
+    );
+    expect(document.diagnostics).toEqual([]);
+    expect(document.renderNodes[0].model).toMatchObject({ source: 'modern_chair.glb', fit: 'contain', align: 'floor' });
+  });
+
   it('resolves namespace inheritance and renders composed children in parent-local space', () => {
     const document =
       createSpatialDocument(`"Table/+3d+8d/+0d+5d/+0d+8d" : "color: 0x333333; metalness: 0.8; roughness: 0.2"

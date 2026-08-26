@@ -4,6 +4,7 @@ import { parseMaterialDeclaration, SUPPORTED_MATERIAL_KEYS } from './materialPar
 import { parsePropertyDeclarations } from './propertyParser';
 import { parseReferenceDeclaration } from './referenceParser';
 import { parseTransformDeclaration } from './transformParser';
+import { parseModelDeclaration } from './modelParser';
 import type {
   XyzDslContentSpec,
   XyzDslGeometrySpec,
@@ -27,6 +28,9 @@ const SUPPORTED_OBJECT_PROPERTIES = new Set([
   'content-text-uri',
   'content-url',
   'content-url-uri',
+  'model',
+  'model-fit',
+  'model-align',
 ]);
 
 export interface XyzDslObjectPropertiesSpec {
@@ -35,6 +39,7 @@ export interface XyzDslObjectPropertiesSpec {
   transform: XyzDslTransformSpec;
   reference: XyzDslReferenceSpec;
   content: XyzDslContentSpec;
+  model: import('./types').XyzDslModelSpec;
   diagnostics: string[];
 }
 
@@ -45,6 +50,11 @@ export function parseObjectProperties(source: string): XyzDslObjectPropertiesSpe
   const transform = parseTransformDeclaration(declarations);
   const reference = parseReferenceDeclaration(declarations);
   const content = parseContentDeclaration(declarations);
+  const model = parseModelDeclaration(declarations);
+  if (model.source && geometry.operation) {
+    model.diagnostics.push('CSG operations are not supported for imported models.');
+    geometry.operation = undefined;
+  }
   const unsupportedDiagnostics = declarations
     .filter(({ property }) => !SUPPORTED_OBJECT_PROPERTIES.has(property))
     .map(
@@ -57,6 +67,7 @@ export function parseObjectProperties(source: string): XyzDslObjectPropertiesSpe
     transform,
     reference,
     content,
+    model,
     diagnostics: [
       ...diagnostics,
       ...material.diagnostics,
@@ -64,6 +75,7 @@ export function parseObjectProperties(source: string): XyzDslObjectPropertiesSpe
       ...transform.diagnostics,
       ...reference.diagnostics,
       ...content.diagnostics,
+      ...model.diagnostics,
       ...unsupportedDiagnostics,
     ],
   };

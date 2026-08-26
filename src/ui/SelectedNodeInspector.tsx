@@ -75,7 +75,7 @@ export function SelectedNodeInspector({
       </div>
 
       <div className="inspector-facts">
-        <span>{node.renderable ? node.geometry.kind : 'group'}</span>
+        <span>{node.renderable ? (node.model?.source ? 'model' : node.geometry.kind) : 'group'}</span>
         <span>line {lineNumber ?? 'unknown'}</span>
         {!canEdit ? <span>read only</span> : null}
       </div>
@@ -141,6 +141,7 @@ export function SelectedNodeInspector({
 
       <div className="inspector-section-heading"><strong>Appearance</strong></div>
       <div className="inspector-fields">
+        {node.model?.source ? <label>Model<input disabled type="text" value={node.model.source} /></label> : null}
         <label>Geometry<select disabled={!canEdit} value={node.geometry.kind} onChange={(event) => onPropertyChange('geometry', event.target.value)}>{GEOMETRY_OPTIONS.map((kind) => <option key={kind} value={kind}>{kind}</option>)}</select></label>
         <label>Color<input disabled={!canEdit} type="text" value={String(node.material.color ?? '')} placeholder="blue or 0x3366ff" onChange={(event) => onPropertyChange('color', event.target.value)} /></label>
         <label>Roughness<input disabled={!canEdit} type="number" step="0.05" min="0" max="1" value={node.material.roughness ?? ''} onChange={(event) => onPropertyChange('roughness', event.target.value)} /></label>

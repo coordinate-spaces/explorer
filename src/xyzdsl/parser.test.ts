@@ -55,6 +55,23 @@ describe('parseBoxSpec', () => {
 });
 
 describe('parseXyzDslDocument', () => {
+  it('parses a store-relative GLB model with fitting, alignment, and rotation', () => {
+    const result = parseXyzDslDocument(
+      '"+1+4/+2+4/+2+4" : "model: modern_chair.glb; model-fit: contain; model-align: floor; rotation: 5,10,5"',
+    );
+    expect(result.ok).toBe(true);
+    expect(result.value?.[0].model).toMatchObject({ source: 'modern_chair.glb', fit: 'contain', align: 'floor' });
+    expect(result.value?.[0].transform.declared).toBe(true);
+  });
+
+  it('reports unsafe and unsupported model declarations', () => {
+    const unsafe = parseXyzDslDocument('"+1+1/+2+1/+2+1" : "model: ../chair.glb"');
+    const operation = parseXyzDslDocument('"+1+1/+2+1/+2+1" : "model: chair.glb; operation: union"');
+    expect(unsafe.ok).toBe(false);
+    expect(unsafe.diagnostics[0].message).toContain('safe MODEL_STORE-relative path');
+    expect(operation.ok).toBe(false);
+    expect(operation.value?.[0].geometry.operation).toBeUndefined();
+  });
   it('parses composed object declarations with geometry and material properties', () => {
     const result = parseXyzDslDocument(EXAMPLE);
 

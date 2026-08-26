@@ -51,6 +51,17 @@ export interface XyzDslTransformSpec {
   declared?: boolean;
 }
 
+export type XyzDslModelFit = 'contain' | 'stretch';
+export type XyzDslModelAlign = 'center' | 'floor';
+
+export interface XyzDslModelSpec {
+  source?: string;
+  fit: XyzDslModelFit;
+  align: XyzDslModelAlign;
+  declared?: boolean;
+  diagnostics: string[];
+}
+
 export type XyzDslContentSpec =
   | { kind?: undefined; diagnostics: string[] }
   | { kind: 'text'; text: string; diagnostics: string[] }
@@ -73,6 +84,7 @@ export interface SpatialObject {
   transform: XyzDslTransformSpec;
   reference: XyzDslReferenceSpec;
   content: XyzDslContentSpec;
+  model: XyzDslModelSpec;
   declarationOnly: boolean;
   lineNumber: number;
   unionGroupId?: string;

@@ -4,6 +4,7 @@ import type {
   XyzDslGeometrySpec,
   XyzDslMaterialSpec,
   XyzDslTransformSpec,
+  XyzDslModelSpec,
   ParseDiagnostic,
   SpatialObject,
 } from './types';
@@ -15,6 +16,7 @@ export interface ResolvedSpatialObject extends SpatialObject {
   geometry: XyzDslGeometrySpec;
   transform: XyzDslTransformSpec;
   content: XyzDslContentSpec;
+  model: XyzDslModelSpec;
   namespacePath: string;
   parentNamespacePath: string;
   renderable: boolean;
@@ -27,6 +29,7 @@ interface ResolvedProperties {
   geometry: XyzDslGeometrySpec;
   transform: XyzDslTransformSpec;
   content: XyzDslContentSpec;
+  model: XyzDslModelSpec;
 }
 
 const DEFAULT_PROPERTIES: ResolvedProperties = {
@@ -34,6 +37,7 @@ const DEFAULT_PROPERTIES: ResolvedProperties = {
   geometry: { kind: 'box', diagnostics: [] },
   transform: { rotation: [0, 0, 0], diagnostics: [] },
   content: { diagnostics: [] },
+  model: { fit: 'contain', align: 'center', diagnostics: [] },
 };
 
 function mergeGeometry(
@@ -110,6 +114,7 @@ function mergeProperties(
     },
     geometry: mergeGeometry(base.geometry, overrideGeometry),
     content: mergeContent(base.content, override.content),
+    model: override.model.declared ? { ...override.model, diagnostics: [] } : { ...base.model, diagnostics: [] },
     transform:
       includeTransform && overrideTransform.declared
         ? { ...overrideTransform, diagnostics: [] }
@@ -427,6 +432,7 @@ export function resolveXyzDslDocument(objects: SpatialObject[]): {
       geometry: properties.geometry,
       transform: properties.transform,
       content: properties.content,
+      model: properties.model,
       materializedFrom: options.materializedFrom,
     };
   };
@@ -512,12 +518,14 @@ export function resolveXyzDslDocument(objects: SpatialObject[]): {
           geometry: object.geometry,
           transform: object.transform,
           content: object.content,
+          model: object.model,
         },
         {
           material: resolvedDescendant.material,
           geometry: resolvedDescendant.geometry,
           transform: resolvedDescendant.transform,
           content: resolvedDescendant.content,
+          model: resolvedDescendant.model,
         },
       );
 
@@ -531,6 +539,7 @@ export function resolveXyzDslDocument(objects: SpatialObject[]): {
         geometry: properties.geometry,
         transform: properties.transform,
         content: properties.content,
+        model: properties.model,
         reference: { diagnostics: [] },
         materializedFrom: object.reference.targetPath,
         renderable: false,
