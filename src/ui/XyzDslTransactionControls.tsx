@@ -13,7 +13,7 @@ interface XyzDslTransactionControlsProps {
   transactionCount: number;
   acceptedCount: number;
   rejectedCount: number;
-  secondaryProjectionCount: number;
+  secondaryTenantCount: number;
   onPublicKeyChange: (publicKey: string) => void;
   onRangeChange: (range: TransactionRange) => void;
   onReload: () => void;
@@ -41,7 +41,7 @@ export function XyzDslTransactionControls({
   transactionCount,
   acceptedCount,
   rejectedCount,
-  secondaryProjectionCount,
+  secondaryTenantCount,
   onPublicKeyChange,
   onRangeChange,
   onReload,
@@ -278,7 +278,7 @@ export function XyzDslTransactionControls({
       </details>
 
       <p className="transaction-status">
-        {transactionCount} fetched · {acceptedCount} mapped · {secondaryProjectionCount} secondary key projection{secondaryProjectionCount === 1 ? '' : 's'} · {rejectedCount} rejected
+        {transactionCount} fetched · {acceptedCount} mapped · {secondaryTenantCount} secondary tenant{secondaryTenantCount === 1 ? '' : 's'} · {rejectedCount} rejected
       </p>
       {error ? <p className="transaction-error">{error}</p> : null}
       {tipError ? <p className="transaction-error">{tipError}</p> : null}

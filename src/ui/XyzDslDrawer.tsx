@@ -3,11 +3,11 @@ import type { SpatialDocument } from '../model/SpatialDocument';
 import type { SpatialNode } from '../model/SpatialNode';
 import type { AxisName } from '../xyzdsl/types';
 import { UNIT_SCALE_DESCRIPTION } from '../model/units';
-import type { RejectedTransaction, SecondaryProjection, TransactionRange } from '../transactions/types';
+import type { RejectedTransaction, SecondaryTenant, TransactionRange } from '../transactions/types';
 import { normalizeXyzDslTransaction } from '../transactions/transactionXyzDsl';
 import { XyzDslEditor } from './XyzDslEditor';
 import { XyzDslTransactionControls } from './XyzDslTransactionControls';
-import { SecondaryProjectionPanel } from './SecondaryProjectionPanel';
+import { SecondaryTenantPanel } from './SecondaryTenantPanel';
 import { XyzDslTreeView } from './XyzDslTreeView';
 import { SelectedNodeInspector } from './SelectedNodeInspector';
 import { usePersistentState } from './usePersistentState';
@@ -105,7 +105,7 @@ interface XyzDslDrawerProps {
   acceptedTransactionCount: number;
   mappedTransactionSource: string;
   rejectedTransactions: RejectedTransaction[];
-  secondaryProjections: SecondaryProjection[];
+  secondaryTenants: SecondaryTenant[];
   hasRemoteBaseline: boolean;
   hasAuthoringEdits: boolean;
   remoteBaselineChanged: boolean;
@@ -122,6 +122,8 @@ interface XyzDslDrawerProps {
   onSecondaryPlaybackSpeedChange: (publicKey: string, playbackSpeed: number) => void;
   onSecondaryPlaybackSeek: (publicKey: string, playbackIndex: number) => void;
   onLoadSecondaryHistory: (publicKey: string) => void;
+  onSecondaryEnabledChange: (publicKey: string, enabled: boolean) => void;
+  onSecondaryRangeChange: (publicKey: string, range: TransactionRange) => void;
   selectedNodeId?: string;
   onSelectNode?: (id: string) => void;
   selectedNode?: SpatialNode;
@@ -153,7 +155,7 @@ export function XyzDslDrawer({
   acceptedTransactionCount,
   mappedTransactionSource,
   rejectedTransactions,
-  secondaryProjections,
+  secondaryTenants,
   hasRemoteBaseline,
   hasAuthoringEdits,
   remoteBaselineChanged,
@@ -170,6 +172,8 @@ export function XyzDslDrawer({
   onSecondaryPlaybackSpeedChange,
   onSecondaryPlaybackSeek,
   onLoadSecondaryHistory,
+  onSecondaryEnabledChange,
+  onSecondaryRangeChange,
   selectedNodeId,
   onSelectNode,
   selectedNode,
@@ -252,19 +256,21 @@ export function XyzDslDrawer({
             transactionCount={transactionCount}
             acceptedCount={acceptedTransactionCount}
             rejectedCount={rejectedTransactions.length}
-            secondaryProjectionCount={secondaryProjections.length}
+            secondaryTenantCount={secondaryTenants.length}
             onPublicKeyChange={onTransactionPublicKeyChange}
             onRangeChange={onTransactionRangeChange}
             onReload={onReloadTransactions}
             onUseTip={onUseTransactionTip}
           />
-          <SecondaryProjectionPanel
-            projections={secondaryProjections}
+          <SecondaryTenantPanel
+            tenants={secondaryTenants}
             onReplay={onSecondaryReplay}
             onPlaybackToggle={onSecondaryPlaybackToggle}
             onPlaybackSpeedChange={onSecondaryPlaybackSpeedChange}
             onPlaybackSeek={onSecondaryPlaybackSeek}
             onLoadHistory={onLoadSecondaryHistory}
+            onEnabledChange={onSecondaryEnabledChange}
+            onRangeChange={onSecondaryRangeChange}
           /></div> : null}
 
           {activeTab === 'source' ? <div className="drawer-tool-section"><XyzDslEditor
