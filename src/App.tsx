@@ -49,6 +49,8 @@ interface ActiveSecondaryTransactions {
   reference: SecondaryKeyReference;
   enabled: boolean;
   transactionRange: TransactionRange;
+  /** True while migrating persisted tenants that predate per-tenant ranges. */
+  rangeNeedsTip?: boolean;
   transactions: XyzDslTransaction[];
   playbackIndex: number;
   playbackSpeed?: number;
@@ -100,7 +102,6 @@ function referencesBySecondaryTenant(
 function normalizeActiveSecondaryStream(
   stream: ActiveSecondaryTransactions | undefined,
   reference: SecondaryKeyReference,
-  defaultRange: TransactionRange,
 ): ActiveSecondaryTransactions {
   const transactions = outgoingTransactionsForPublicKey(
     normalizeXyzDslTransactions(stream?.transactions ?? []),
@@ -111,7 +112,8 @@ function normalizeActiveSecondaryStream(
 
   return {
     reference,
-    transactionRange: stream?.transactionRange ?? defaultRange,
+    transactionRange: stream?.transactionRange ?? DEFAULT_TRANSACTION_RANGE,
+    rangeNeedsTip: stream?.rangeNeedsTip ?? (stream?.transactionRange === undefined),
     transactions,
     playbackIndex,
     playbackSpeed: normalizePlaybackSpeed(stream?.playbackSpeed),
@@ -290,13 +292,13 @@ export default function App() {
       secondaryKeyReferences.forEach((reference) => {
         const key = streamKeyForSecondaryReference(reference);
         const validationError = endpointValidationError(reference.endpoint);
-        const current = normalizeActiveSecondaryStream(tenants[key], reference, transactionRange);
+        const current = normalizeActiveSecondaryStream(tenants[key], reference);
         nextTenants[key] = validationError ? { ...current, streamError: validationError } : current;
       });
 
       return nextTenants;
     });
-  }, [secondaryKeyReferences, setActiveSecondaryTransactions, transactionPublicKey, transactionRange]);
+  }, [secondaryKeyReferences, setActiveSecondaryTransactions, transactionPublicKey]);
 
   useEffect(() => {
     const replayingStreams = Object.values(activeSecondaryTransactions).filter((stream) => stream.replaying);
@@ -577,7 +579,9 @@ export default function App() {
     const reference = secondaryKeyReferences.find((candidate) => candidate.publicKey === publicKey);
     if (!reference) return;
     const streamKey = streamKeyForSecondaryReference(reference);
-    const tenantRange = rangeOverride ?? activeSecondaryTransactionsRef.current[streamKey]?.transactionRange ?? DEFAULT_TRANSACTION_RANGE;
+    const tenant = activeSecondaryTransactionsRef.current[streamKey];
+    const tenantRange = rangeOverride ?? tenant?.transactionRange ?? DEFAULT_TRANSACTION_RANGE;
+    const rangeNeedsTip = tenant?.rangeNeedsTip ?? (tenant?.transactionRange === undefined);
     secondaryHistoryControllersRef.current.get(streamKey)?.abort();
     const controller = new AbortController();
     secondaryHistoryControllersRef.current.set(streamKey, controller);
@@ -595,7 +599,25 @@ export default function App() {
       } : streams;
     });
 
-    fetchPublicKeyTransactions({ endpoint: reference.endpoint, publicKey, range: tenantRange, signal: controller.signal })
+    const resolvedRange = rangeOverride || !rangeNeedsTip
+      ? Promise.resolve(tenantRange)
+      : fetchTipHeight(reference.endpoint, controller.signal).then((tipHeight) => ({
+        startHeight: tipHeight,
+        endHeight: 0,
+        limit: DEFAULT_TRANSACTION_RANGE.limit,
+      }));
+
+    resolvedRange
+      .then((range) => {
+        setActiveSecondaryTransactions((streams) => {
+          const stream = streams[streamKey];
+          return stream ? {
+            ...streams,
+            [streamKey]: { ...stream, transactionRange: range, rangeNeedsTip: false },
+          } : streams;
+        });
+        return fetchPublicKeyTransactions({ endpoint: reference.endpoint, publicKey, range, signal: controller.signal });
+      })
       .then((historicalTransactions) => {
         setActiveSecondaryTransactions((streams) => {
           const stream = streams[streamKey];
@@ -672,7 +694,7 @@ export default function App() {
   const handleSecondaryRangeChange = useCallback((publicKey: string, range: TransactionRange) => {
     setActiveSecondaryTransactions((tenants) => Object.fromEntries(Object.entries(tenants).map(([key, tenant]) => [
       key,
-      tenant.reference.publicKey === publicKey ? { ...tenant, transactionRange: range } : tenant,
+      tenant.reference.publicKey === publicKey ? { ...tenant, transactionRange: range, rangeNeedsTip: false } : tenant,
     ])));
     handleLoadSecondaryHistory(publicKey, range);
   }, [handleLoadSecondaryHistory, setActiveSecondaryTransactions]);
