@@ -2,10 +2,10 @@ import { Component, Suspense, useMemo, type ErrorInfo, type ReactNode } from 're
 import { Edges, useGLTF } from '@react-three/drei';
 import type { ThreeEvent } from '@react-three/fiber';
 import { SkeletonUtils } from 'three-stdlib';
-import { Color, type Material, type Mesh } from 'three';
+import { Box3, Color, type Material, type Mesh } from 'three';
 import type { SpatialNode } from '../model/SpatialNode';
 import { resolveModelUrl } from '../model/resolveModelUrl';
-import { modelFitTransform } from './modelFit';
+import { modelFitTransformFromBounds } from './modelFit';
 
 function ModelBox({ color }: { color: string }) {
   return <mesh><boxGeometry /><meshStandardMaterial color={color} wireframe transparent opacity={0.45} /></mesh>;
@@ -20,7 +20,7 @@ class ModelErrorBoundary extends Component<{ children: ReactNode }, { failed: bo
 
 function LoadedModel({ source, fit, align, node }: { source: string; fit: 'contain' | 'stretch'; align: 'center' | 'floor'; node: SpatialNode }) {
   const gltf = useGLTF(source);
-  const scene = useMemo(() => {
+  const imported = useMemo(() => {
     const clone = SkeletonUtils.clone(gltf.scene);
     clone.traverse((object) => {
       if ('isLight' in object || 'isCamera' in object) object.visible = false;
@@ -38,21 +38,26 @@ function LoadedModel({ source, fit, align, node }: { source: string; fit: 'conta
       });
       mesh.material = Array.isArray(mesh.material) ? materials : materials[0];
     });
-    return clone;
+    clone.updateWorldMatrix(true, true);
+    return { scene: clone, bounds: new Box3().setFromObject(clone) };
   }, [gltf.scene, node.material.color, node.material.metalness, node.material.roughness]);
-  const fitted = useMemo(() => modelFitTransform(scene, fit, align), [scene, fit, align]);
-  return <group scale={fitted.scale}><primitive object={scene} position={fitted.position} /></group>;
+  const fitted = useMemo(() => modelFitTransformFromBounds(imported.bounds, fit, align), [imported.bounds, fit, align]);
+  return <group scale={fitted.scale}><group position={fitted.position}><primitive object={imported.scene} /></group></group>;
+}
+
+function ResolvedModel({ model, node }: { model: NonNullable<SpatialNode['model']>; node: SpatialNode }) {
+  const source = resolveModelUrl(model.source!);
+  return <LoadedModel source={source} fit={model.fit} align={model.align} node={node} />;
 }
 
 export function ModelPrimitive({ node, isSelected = false, onSelect }: { node: SpatialNode; isSelected?: boolean; onSelect?: (id: string) => void }) {
   const model = node.model!;
-  const source = resolveModelUrl(model.source!);
   const { position, rotation, scale } = node.transform;
   function handleClick(event: ThreeEvent<MouseEvent>) { event.stopPropagation(); onSelect?.(node.id); }
 
-  return <group position={position} rotation={rotation} scale={scale} onClick={handleClick} userData={{ spatialNodeId: node.id, model: source }}>
-    <ModelErrorBoundary key={source}>
-      <Suspense fallback={<ModelBox color="#60a5fa" />}><LoadedModel source={source} fit={model.fit} align={model.align} node={node} /></Suspense>
+  return <group position={position} rotation={rotation} scale={scale} onClick={handleClick} userData={{ spatialNodeId: node.id, model: model.source }}>
+    <ModelErrorBoundary key={model.source}>
+      <Suspense fallback={<ModelBox color="#60a5fa" />}><ResolvedModel model={model} node={node} /></Suspense>
     </ModelErrorBoundary>
     {isSelected ? <mesh scale={1.03}><boxGeometry /><meshBasicMaterial transparent opacity={0} /><Edges color="#facc15" /></mesh> : null}
   </group>;

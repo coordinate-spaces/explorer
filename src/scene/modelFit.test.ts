@@ -1,4 +1,4 @@
-import { BoxGeometry, Mesh } from 'three';
+import { BoxGeometry, Mesh, PlaneGeometry } from 'three';
 import { describe, expect, it } from 'vitest';
 import { modelFitTransform } from './modelFit';
 
@@ -22,5 +22,13 @@ describe('modelFitTransform', () => {
   it('stretches each dimension independently', () => {
     const mesh = new Mesh(new BoxGeometry(2, 4, 1));
     expect(modelFitTransform(mesh, 'stretch', 'center').scale).toEqual([0.5, 0.25, 1]);
+  });
+
+  it('allows planar geometry for contain fitting but not stretch fitting', () => {
+    const plane = new Mesh(new PlaneGeometry(2, 4));
+    expect(modelFitTransform(plane, 'contain', 'center').scale).toEqual([0.25, 0.25, 0.25]);
+    expect(() => modelFitTransform(plane, 'stretch', 'center')).toThrow(
+      'Stretch fitting requires nonzero bounds on every axis.',
+    );
   });
 });

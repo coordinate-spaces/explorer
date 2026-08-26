@@ -1,5 +1,6 @@
 import type { XyzDslModelAlign, XyzDslModelFit, XyzDslModelSpec } from './types';
 import type { XyzDslPropertyDeclaration } from './propertyParser';
+import { resolveModelUrl } from '../model/resolveModelUrl';
 
 const FITS = new Set<XyzDslModelFit>(['contain', 'stretch']);
 const ALIGNS = new Set<XyzDslModelAlign>(['center', 'floor']);
@@ -11,21 +12,12 @@ export function parseModelDeclaration(declarations: XyzDslPropertyDeclaration[])
   const align = declarations.find(({ property }) => property === 'model-align');
 
   if (source) {
-    const path = source.value.toLowerCase().split(/[?#]/, 1)[0];
-    let invalidUrl = false;
     try {
-      const absolute = new URL(source.value);
-      invalidUrl = absolute.protocol !== 'http:' && absolute.protocol !== 'https:';
-    } catch {
-      invalidUrl = source.value.startsWith('//') || source.value.split('/').includes('..');
-    }
-    if (invalidUrl) {
-      model.diagnostics.push('model must be an http(s) URL or a safe MODEL_STORE-relative path.');
-    } else if (!path.endsWith('.glb')) {
-      model.diagnostics.push('model must reference a .glb file.');
-    } else {
+      resolveModelUrl(source.value);
       model.source = source.value;
       model.declared = true;
+    } catch (error) {
+      model.diagnostics.push(error instanceof Error ? error.message : 'Model URL is invalid.');
     }
   }
   if (fit) {
