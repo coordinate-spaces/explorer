@@ -1,4 +1,4 @@
-import { Component, Suspense, useMemo, type ErrorInfo, type ReactNode } from 'react';
+import { Component, Suspense, useEffect, useMemo, type ErrorInfo, type ReactNode } from 'react';
 import { Edges, useGLTF } from '@react-three/drei';
 import type { ThreeEvent } from '@react-three/fiber';
 import { SkeletonUtils } from 'three-stdlib';
@@ -18,10 +18,11 @@ class ModelErrorBoundary extends Component<{ children: ReactNode }, { failed: bo
   render() { return this.state.failed ? <ModelBox color="#ef4444" /> : this.props.children; }
 }
 
-function LoadedModel({ source, fit, align, node }: { source: string; fit: 'contain' | 'stretch'; align: 'center' | 'floor'; node: SpatialNode }) {
+function LoadedModel({ source, fit, align, node, targetScale }: { source: string; fit: 'contain' | 'stretch'; align: 'center' | 'floor'; node: SpatialNode; targetScale: [number, number, number] }) {
   const gltf = useGLTF(source);
   const imported = useMemo(() => {
     const clone = SkeletonUtils.clone(gltf.scene);
+    const ownedMaterials = new Set<Material>();
     clone.traverse((object) => {
       if ('isLight' in object || 'isCamera' in object) object.visible = false;
       if (!('isMesh' in object)) return;
@@ -31,6 +32,7 @@ function LoadedModel({ source, fit, align, node }: { source: string; fit: 'conta
       if (node.material.color === undefined && node.material.metalness === undefined && node.material.roughness === undefined) return;
       const materials = (Array.isArray(mesh.material) ? mesh.material : [mesh.material]).map((sourceMaterial) => {
         const material = sourceMaterial.clone() as Material & { color?: Color; metalness?: number; roughness?: number };
+        ownedMaterials.add(material);
         if (node.material.color !== undefined && material.color) material.color = new Color(node.material.color);
         if (node.material.metalness !== undefined && material.metalness !== undefined) material.metalness = node.material.metalness;
         if (node.material.roughness !== undefined && material.roughness !== undefined) material.roughness = node.material.roughness;
@@ -39,15 +41,19 @@ function LoadedModel({ source, fit, align, node }: { source: string; fit: 'conta
       mesh.material = Array.isArray(mesh.material) ? materials : materials[0];
     });
     clone.updateWorldMatrix(true, true);
-    return { scene: clone, bounds: new Box3().setFromObject(clone) };
+    return { scene: clone, bounds: new Box3().setFromObject(clone), ownedMaterials };
   }, [gltf.scene, node.material.color, node.material.metalness, node.material.roughness]);
-  const fitted = useMemo(() => modelFitTransformFromBounds(imported.bounds, fit, align), [imported.bounds, fit, align]);
+  useEffect(() => () => imported.ownedMaterials.forEach((material) => material.dispose()), [imported]);
+  const fitted = useMemo(
+    () => modelFitTransformFromBounds(imported.bounds, fit, align, targetScale),
+    [imported.bounds, fit, align, targetScale],
+  );
   return <group scale={fitted.scale}><group position={fitted.position}><primitive object={imported.scene} /></group></group>;
 }
 
-function ResolvedModel({ model, node }: { model: NonNullable<SpatialNode['model']>; node: SpatialNode }) {
+function ResolvedModel({ model, node, targetScale }: { model: NonNullable<SpatialNode['model']>; node: SpatialNode; targetScale: [number, number, number] }) {
   const source = resolveModelUrl(model.source!);
-  return <LoadedModel source={source} fit={model.fit} align={model.align} node={node} />;
+  return <LoadedModel source={source} fit={model.fit} align={model.align} node={node} targetScale={targetScale} />;
 }
 
 export function ModelPrimitive({ node, isSelected = false, onSelect }: { node: SpatialNode; isSelected?: boolean; onSelect?: (id: string) => void }) {
@@ -56,8 +62,8 @@ export function ModelPrimitive({ node, isSelected = false, onSelect }: { node: S
   function handleClick(event: ThreeEvent<MouseEvent>) { event.stopPropagation(); onSelect?.(node.id); }
 
   return <group position={position} rotation={rotation} scale={scale} onClick={handleClick} userData={{ spatialNodeId: node.id, model: model.source }}>
-    <ModelErrorBoundary key={model.source}>
-      <Suspense fallback={<ModelBox color="#60a5fa" />}><ResolvedModel model={model} node={node} /></Suspense>
+    <ModelErrorBoundary key={`${model.source}:${model.fit}:${model.align}`}>
+      <Suspense fallback={<ModelBox color="#60a5fa" />}><ResolvedModel model={model} node={node} targetScale={scale} /></Suspense>
     </ModelErrorBoundary>
     {isSelected ? <mesh scale={1.03}><boxGeometry /><meshBasicMaterial transparent opacity={0} /><Edges color="#facc15" /></mesh> : null}
   </group>;

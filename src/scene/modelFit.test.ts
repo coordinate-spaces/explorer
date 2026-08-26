@@ -31,4 +31,12 @@ describe('modelFitTransform', () => {
       'Stretch fitting requires nonzero bounds on every axis.',
     );
   });
+
+  it('preserves proportions while containing a model in a nonuniform target box', () => {
+    const mesh = new Mesh(new BoxGeometry(2, 4, 1));
+    const transform = modelFitTransform(mesh, 'contain', 'center', [4, 2, 2]);
+    const worldScale = transform.scale.map((value, index) => value * [4, 2, 2][index]);
+    expect(worldScale).toEqual([0.5, 0.5, 0.5]);
+    expect([2, 4, 1].map((value, index) => value * worldScale[index])).toEqual([1, 2, 0.5]);
+  });
 });
