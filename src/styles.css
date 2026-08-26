@@ -960,6 +960,14 @@ button {
   font-size: 0.76rem;
 }
 
+.inspector-pov-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0.75rem 0;
+  font-size: 0.82rem;
+}
+
 .selected-node-inspector dl div {
   display: grid;
   grid-template-columns: 5rem minmax(0, 1fr);

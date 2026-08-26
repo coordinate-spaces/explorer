@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { AxisName, XyzDslGeometryKind } from '../xyzdsl/types';
 import type { SpatialNode } from '../model/SpatialNode';
 
@@ -13,6 +13,8 @@ interface SelectedNodeInspectorProps {
   onPathNodeSelect: (id: string) => void;
   onPropertyChange: (key: string, value: string) => void;
   onSelectNode: (id: string) => void;
+  isPovCamera: boolean;
+  onPovCameraChange: (enabled: boolean) => void;
 }
 
 function metadataValue<T>(node: SpatialNode, key: string): T | undefined {
@@ -25,6 +27,15 @@ function displayName(node: SpatialNode): string {
 
 const AXES: AxisName[] = ['x', 'y', 'z'];
 const GEOMETRY_OPTIONS: XyzDslGeometryKind[] = ['box', 'cylinder', 'cone', 'sphere'];
+const LINEAR_STEPS = [0.001, 0.01, 0.1, 1];
+
+export function linearStepForNode(node: SpatialNode): number {
+  const smallest = Math.min(node.box.width, node.box.height, node.box.depth);
+  if (smallest <= 0.01) return 0.001;
+  if (smallest <= 0.1) return 0.01;
+  if (smallest <= 1) return 0.1;
+  return 1;
+}
 
 export function rotationDegreesForInspector(rotationRadians: readonly number[]): number[] {
   return rotationRadians.map((value) => Number(((value * 180) / Math.PI).toFixed(3)));
@@ -41,9 +52,15 @@ export function SelectedNodeInspector({
   onPathNodeSelect,
   onPropertyChange,
   onSelectNode,
+  isPovCamera,
+  onPovCameraChange,
 }: SelectedNodeInspectorProps) {
-  const [linearStep, setLinearStep] = useState(0.01);
+  const [linearStep, setLinearStep] = useState(() => node ? linearStepForNode(node) : 0.01);
   const [rotationStep, setRotationStep] = useState(1);
+
+  useEffect(() => {
+    if (node) setLinearStep(linearStepForNode(node));
+  }, [node?.id]);
 
   if (!node) {
     return (
@@ -80,6 +97,11 @@ export function SelectedNodeInspector({
         {!canEdit ? <span>read only</span> : null}
       </div>
 
+      <label className="inspector-pov-toggle">
+        <input type="checkbox" checked={isPovCamera} onChange={(event) => onPovCameraChange(event.target.checked)} />
+        Use object perspective POV
+      </label>
+
       {selectionPath.length > 1 ? (
         <nav className="inspector-selection-path" aria-label="Selection hierarchy">
           <ol>
@@ -106,8 +128,7 @@ export function SelectedNodeInspector({
             value={linearStep}
             onChange={(event) => setLinearStep(Number(event.target.value))}
           >
-            <option value="0.01">0.01</option>
-            <option value="1">1</option>
+            {LINEAR_STEPS.map((step) => <option key={step} value={step}>{step === 1 ? '1 m' : step === 0.1 ? '1 dm' : step === 0.01 ? '1 cm' : '1 mm'}</option>)}
           </select>
         </label>
         <label>
@@ -130,7 +151,7 @@ export function SelectedNodeInspector({
             {AXES.map((axis, index) => (
               <div className="inspector-transform-row" key={axis}>
                 <span className={`axis axis-${axis}`}>{axis.toUpperCase()}</span>
-                <output aria-label={`${transform.label} ${axis.toUpperCase()} value`}>{transform.values[index]}</output>
+                <output aria-label={`${transform.label} ${axis.toUpperCase()} value`}>{transform.label === 'Rotation' ? transform.values[index] : Number(transform.values[index].toFixed(3))}</output>
                 <button type="button" disabled={!canEdit} aria-label={`Decrease ${transform.label.toLowerCase()} ${axis.toUpperCase()} by ${transform.step} ${transform.unit}`} onClick={() => transform.onStep(axis, -transform.step)}>−</button>
                 <button type="button" disabled={!canEdit} aria-label={`Increase ${transform.label.toLowerCase()} ${axis.toUpperCase()} by ${transform.step} ${transform.unit}`} onClick={() => transform.onStep(axis, transform.step)}>+</button>
               </div>

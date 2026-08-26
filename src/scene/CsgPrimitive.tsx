@@ -65,6 +65,7 @@ export function CsgPrimitive({ expression, isSelected = false, onSelect }: CsgPr
       receiveShadow
       geometry={geometry}
       onClick={handleClick}
+      onDoubleClick={(event) => event.stopPropagation()}
       userData={{ spatialNodeId: expression.base.id, csgExpressionId: expression.id }}
     >
       {isSelected ? <Edges color="#facc15" /> : null}

@@ -63,6 +63,7 @@ export function SpatialPrimitive({ node, isSelected = false, onSelect }: Spatial
       rotation={rotation}
       scale={scale}
       onClick={handleClick}
+      onDoubleClick={(event) => event.stopPropagation()}
       userData={{
         spatialNodeId: node.id,
         unionGroupId: node.unionGroupId,

@@ -48,6 +48,7 @@ export function ContentPrimitive({ node, isSelected = false, onSelect }: Content
         contentKind: node.content.kind,
         label,
       }}
+      onDoubleClick={(event) => event.stopPropagation()}
     >
       <mesh castShadow receiveShadow onClick={handleClick}>
         <boxGeometry args={[1, 1, 0.04]} />

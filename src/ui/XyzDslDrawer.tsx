@@ -135,6 +135,8 @@ interface XyzDslDrawerProps {
   onRotateNode: (axis: AxisName, delta: number) => void;
   onPathNodeSelect: (id: string) => void;
   onNodePropertyChange: (key: string, value: string) => void;
+  povCameraNodeId?: string;
+  onPovCameraChange: (enabled: boolean) => void;
 }
 
 export function XyzDslDrawer({
@@ -185,6 +187,8 @@ export function XyzDslDrawer({
   onRotateNode,
   onPathNodeSelect,
   onNodePropertyChange,
+  povCameraNodeId,
+  onPovCameraChange,
 }: XyzDslDrawerProps) {
   const isEditorMode = appMode === 'editor';
   const [activeTab, setActiveTab] = usePersistentState<DrawerTab>('xyzdsl-drawer-active-tab', 'objects');
@@ -240,6 +244,8 @@ export function XyzDslDrawer({
                 onPathNodeSelect={onPathNodeSelect}
                 onPropertyChange={onNodePropertyChange}
                 onSelectNode={(id) => onSelectNode?.(id)}
+                isPovCamera={selectedNode?.id === povCameraNodeId}
+                onPovCameraChange={onPovCameraChange}
               />
             </div>
           ) : null}

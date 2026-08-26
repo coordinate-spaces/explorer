@@ -61,7 +61,7 @@ export function ModelPrimitive({ node, isSelected = false, onSelect }: { node: S
   const { position, rotation, scale } = node.transform;
   function handleClick(event: ThreeEvent<MouseEvent>) { event.stopPropagation(); onSelect?.(node.id); }
 
-  return <group position={position} rotation={rotation} scale={scale} onClick={handleClick} userData={{ spatialNodeId: node.id, model: model.source }}>
+  return <group position={position} rotation={rotation} scale={scale} onClick={handleClick} onDoubleClick={(event) => event.stopPropagation()} userData={{ spatialNodeId: node.id, model: model.source }}>
     <ModelErrorBoundary key={`${model.source}:${model.fit}:${model.align}`}>
       <Suspense fallback={<ModelBox color="#60a5fa" />}><ResolvedModel model={model} node={node} targetScale={scale} /></Suspense>
     </ModelErrorBoundary>

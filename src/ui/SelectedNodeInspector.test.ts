@@ -1,5 +1,24 @@
 import { describe, expect, it } from 'vitest';
-import { rotationDegreesForInspector } from './SelectedNodeInspector';
+import type { SpatialNode } from '../model/SpatialNode';
+import { linearStepForNode, rotationDegreesForInspector } from './SelectedNodeInspector';
+
+function nodeWithSize(size: number): SpatialNode {
+  return {
+    id: 'node', source: '', box: { source: '', x: 0, y: 0, z: 0, width: size, height: size, depth: size },
+    bounds: { minX: 0, maxX: size, minY: 0, maxY: size, minZ: 0, maxZ: size },
+    material: { diagnostics: [] }, geometry: { kind: 'box', dimensions: [size, size, size] }, renderable: true,
+    transform: { position: [0, 0, 0], rotation: [0, 0, 0], scale: [size, size, size], pivot: [0, 0, 0] },
+  };
+}
+
+describe('linearStepForNode', () => {
+  it('chooses millimetre through metre steps from object scale', () => {
+    expect(linearStepForNode(nodeWithSize(0.005))).toBe(0.001);
+    expect(linearStepForNode(nodeWithSize(0.05))).toBe(0.01);
+    expect(linearStepForNode(nodeWithSize(0.5))).toBe(0.1);
+    expect(linearStepForNode(nodeWithSize(2))).toBe(1);
+  });
+});
 
 describe('rotationDegreesForInspector', () => {
   it('preserves fractional degree values in the inspector readout', () => {

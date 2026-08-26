@@ -8,6 +8,11 @@ const MILLIMETRES_PER_UNIT = 1000;
 const MIN_SIZE = 0.001;
 const ROTATION_PRECISION = 1000;
 
+export interface ProspectiveDeclarationResult {
+  source: string;
+  lineNumber: number;
+}
+
 interface DeclarationParts {
   indent: string;
   path: string;
@@ -66,6 +71,34 @@ function formatPathNumber(value: number): string {
   if (millimetres % 100 === 0) return `${millimetres / 100}d`;
   if (millimetres % 10 === 0) return `${millimetres / 10}c`;
   return `${millimetres}m`;
+}
+
+export function appendProspectiveDeclaration(
+  source: string,
+  position: [number, number, number],
+  size = 0.1,
+): ProspectiveDeclarationResult {
+  const existingNames = new Set(
+    splitLines(source)
+      .map((line) => declarationParts(line)?.path.split('/')[0])
+      .filter((name): name is string => Boolean(name)),
+  );
+  let suffix = 1;
+  while (existingNames.has(`ProspectiveObject${suffix}`)) suffix += 1;
+
+  const safeSize = Math.max(MIN_SIZE, size);
+  const [centerX, floorY, centerZ] = position;
+  const path = [
+    `ProspectiveObject${suffix}`,
+    formatAxis({ offset: Math.max(0, centerX - safeSize / 2), size: safeSize }),
+    formatAxis({ offset: Math.max(0, floorY), size: safeSize }),
+    formatAxis({ offset: Math.max(0, centerZ - safeSize / 2), size: safeSize }),
+  ].join('/');
+  const declaration = `"${path}" : "geometry: box; color: 0x64748b; metalness: 0; roughness: 0.7; rotation: 0, 0, 0"`;
+  const separator = source.length > 0 && !source.endsWith('\n') ? '\n' : '';
+  const nextSource = `${source}${separator}${declaration}`;
+
+  return { source: nextSource, lineNumber: splitLines(nextSource).length };
 }
 
 function parseAxis(segment: string): AxisParts | undefined {

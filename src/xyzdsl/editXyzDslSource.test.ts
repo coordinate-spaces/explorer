@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  appendProspectiveDeclaration,
   moveDeclarationPath,
   replaceDeclarationPath,
   replaceDeclarationProperties,
@@ -12,6 +13,16 @@ const SOURCE = `"Table/+18d+8d/+0d+5d/+4d+8d" : "color: white; metalness: 0.8"
 "Table/Top/+0d+8d/+4d+1d/+0d+8d" : ""`;
 
 describe('editXyzDslSource', () => {
+  it('appends uniquely named prospective objects with default properties', () => {
+    const first = appendProspectiveDeclaration(SOURCE, [0.5, 0, 0.25]);
+    expect(first.lineNumber).toBe(3);
+    expect(first.source).toContain('"ProspectiveObject1/+45c+1d/+0+1d/+2d+1d"');
+    expect(first.source).toContain('geometry: box; color: 0x64748b; metalness: 0; roughness: 0.7');
+
+    const second = appendProspectiveDeclaration(first.source, [0.5, 0, 0.25]);
+    expect(second.source).toContain('"ProspectiveObject2/');
+  });
+
   it('replaces declaration paths and properties without changing surrounding lines', () => {
     expect(replaceDeclarationPath(SOURCE, 2, 'Table/Top/+1d+8d/+4d+1d/+0d+8d')).toBe(
       `"Table/+18d+8d/+0d+5d/+4d+8d" : "color: white; metalness: 0.8"

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { canEditDeclarationLine, moveDeclarationPath, resizeDeclarationPath, rotateDeclarationPath, updateDeclarationProperty } from './xyzdsl/editXyzDslSource';
+import { appendProspectiveDeclaration, canEditDeclarationLine, moveDeclarationPath, resizeDeclarationPath, rotateDeclarationPath, updateDeclarationProperty } from './xyzdsl/editXyzDslSource';
 import type { AxisName } from './xyzdsl/types';
 import { createSpatialDocument } from './model/createSpatialDocument';
 import type { SpatialNode } from './model/SpatialNode';
@@ -21,6 +21,7 @@ import type { ActiveSecondaryTenant, XyzDslTransaction, SecondaryKeyReference, S
 import { usePublicKeyTransactions } from './transactions/usePublicKeyTransactions';
 import { XyzDslDrawer } from './ui/XyzDslDrawer';
 import { usePersistentState } from './ui/usePersistentState';
+import { linearStepForNode } from './ui/SelectedNodeInspector';
 
 const INITIAL_XYZDSL = `"+2d+4d/+0d+6d/+1d+3d" : "geometry: cylinder; color: 0x333333; metalness: 0.8; roughness: 0.2"
 "+2d+4d/+7d+6d/+0d+10m" : "geometry: cone; color: yellow; metalness: 0.2; roughness: 0.5"
@@ -162,6 +163,7 @@ export default function App() {
   const [selectedLeafNodeId, setSelectedLeafNodeId] = useState<string | undefined>();
   const [selectedSceneHighlightNodeId, setSelectedSceneHighlightNodeId] = useState<string | undefined>();
   const [selectedLineNumber, setSelectedLineNumber] = useState<number | undefined>();
+  const [povCameraNodeId, setPovCameraNodeId] = useState<string | undefined>();
   const [transactionPublicKey, setTransactionPublicKey] = usePersistentState(
     'xyzdsl-transaction-public-key',
     '',
@@ -468,6 +470,13 @@ export default function App() {
   }, [document.nodes, selectedLeafNodeId, selectedNode]);
   const selectedSceneNodeId = selectedSceneHighlightNodeId ?? sceneHighlightIdForNode(document.nodes, selectedNode) ?? selectedNodeId;
   const selectedNodeCanEdit = selectedNodeLineNumber !== undefined && canEditDeclarationLine(authoringSource, selectedNodeLineNumber);
+  const selectedMovementStep = selectedNode ? linearStepForNode(selectedNode) : 0.01;
+
+  useEffect(() => {
+    if (appMode !== 'editor' || (povCameraNodeId && !findNodeById(document.nodes, povCameraNodeId))) {
+      setPovCameraNodeId(undefined);
+    }
+  }, [appMode, document.nodes, povCameraNodeId]);
 
   const handleSecondaryReplay = useCallback((publicKey: string) => {
     const reference = secondaryKeyReferences.find((candidate) => candidate.publicKey === publicKey);
@@ -764,12 +773,24 @@ export default function App() {
   }, [document.nodes]);
 
   const editSelectedDeclaration = useCallback((edit: (source: string, lineNumber: number) => string) => {
-    if (selectedNodeLineNumber === undefined) {
+    if (appMode !== 'editor' || selectedNodeLineNumber === undefined) {
       return;
     }
 
     setAuthoringSource((source) => edit(source, selectedNodeLineNumber));
-  }, [selectedNodeLineNumber]);
+  }, [appMode, selectedNodeLineNumber]);
+
+  const createProspectiveObject = useCallback((position: [number, number, number]) => {
+    if (appMode !== 'editor') return;
+    setAuthoringSource((source) => {
+      const result = appendProspectiveDeclaration(source, position);
+      setSelectedNodeId(undefined);
+      setSelectedLeafNodeId(undefined);
+      setSelectedSceneHighlightNodeId(undefined);
+      setSelectedLineNumber(result.lineNumber);
+      return result.source;
+    });
+  }, [appMode]);
 
   const moveSelectedDeclaration = useCallback((axis: AxisName, delta: number) => {
     editSelectedDeclaration((source, lineNumber) => moveDeclarationPath(source, lineNumber, axis, delta));
@@ -809,6 +830,13 @@ export default function App() {
         document={document}
         selectedNodeId={selectedSceneNodeId}
         onSelectNode={handleSelectNode}
+        appMode={appMode}
+        canEditSelection={selectedNodeCanEdit}
+        movementStep={selectedMovementStep}
+        onMoveSelected={moveSelectedDeclaration}
+        onRotateSelected={rotateSelectedDeclaration}
+        onCreateProspective={createProspectiveObject}
+        povCameraNodeId={povCameraNodeId}
       />
       <XyzDslDrawer
         appMode={appMode}
@@ -858,6 +886,8 @@ export default function App() {
         onRotateNode={rotateSelectedDeclaration}
         onPathNodeSelect={handleSelectHierarchyNode}
         onNodePropertyChange={updateSelectedDeclarationProperty}
+        povCameraNodeId={povCameraNodeId}
+        onPovCameraChange={(enabled) => setPovCameraNodeId(enabled ? selectedNode?.id : undefined)}
       />
     </main>
   );
