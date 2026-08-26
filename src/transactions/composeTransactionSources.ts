@@ -71,21 +71,16 @@ function secondaryConsumerLine(line: string, primaryNamespaces: ReadonlySet<stri
   return namespaceIsPrimaryConsumer(parsed.value.namespace, primaryNamespaces) ? line : undefined;
 }
 
-function latestTenantDeclarations(lines: readonly string[], primaryNamespaces: ReadonlySet<string>): Array<{
+function tenantDeclarations(lines: readonly string[], primaryNamespaces: ReadonlySet<string>): Array<{
   line: string;
   identity?: string;
 }> {
-  const accepted = lines.flatMap((line) => {
+  return lines.flatMap((line) => {
     const consumer = secondaryConsumerLine(line, primaryNamespaces);
     if (!consumer) return [];
 
     const declaration = parseXyzDslDeclaration(consumer).value;
     return declaration ? [{ line: consumer, identity: namedInstanceIdentity(declaration.namespace) }] : [];
-  });
-  return accepted.filter(({ identity }, index) => {
-    if (!identity) return true;
-    if (accepted.slice(index + 1).some((candidate) => candidate.identity === identity)) return false;
-    return true;
   });
 }
 
@@ -115,11 +110,14 @@ export function composeTransactionSources(
       return visibleLines;
     }
 
-    return latestTenantDeclarations(visibleLines, primaryNamespaces).flatMap(({ line, identity }) => {
-      if (identity && occupiedIdentities.has(identity)) return [];
-      if (identity) occupiedIdentities.add(identity);
-      return [line];
-    });
+    const declarations = tenantDeclarations(visibleLines, primaryNamespaces);
+    const tenantIdentities = new Set(declarations
+      .map(({ identity }) => identity)
+      .filter((identity): identity is string => identity !== undefined));
+    const blockedIdentities = new Set([...tenantIdentities].filter((identity) => occupiedIdentities.has(identity)));
+
+    tenantIdentities.forEach((identity) => occupiedIdentities.add(identity));
+    return declarations.flatMap(({ line, identity }) => identity && blockedIdentities.has(identity) ? [] : [line]);
   });
 
   return [primary, composedSecondarySources.join('\n')]

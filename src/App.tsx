@@ -292,7 +292,9 @@ export default function App() {
       secondaryKeyReferences.forEach((reference) => {
         const key = streamKeyForSecondaryReference(reference);
         const validationError = endpointValidationError(reference.endpoint);
-        const current = normalizeActiveSecondaryStream(tenants[key], reference);
+        const previousTenant = tenants[key]
+          ?? Object.values(tenants).find((tenant) => tenant.reference.publicKey === reference.publicKey);
+        const current = normalizeActiveSecondaryStream(previousTenant, reference);
         nextTenants[key] = validationError ? { ...current, streamError: validationError } : current;
       });
 
@@ -636,7 +638,10 @@ export default function App() {
             [streamKey]: {
               ...stream,
               transactions,
-              playbackIndex: stream.replaying ? stream.playbackIndex : Math.max(0, transactions.length - 1),
+              playbackIndex: Math.max(0, transactions.length - 1),
+              replaying: false,
+              playbackStartedAtMs: undefined,
+              playbackBaseTransactionTime: undefined,
               historyLoading: false,
               streamError: undefined,
             },

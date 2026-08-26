@@ -80,12 +80,22 @@ describe('composeTransactionSources', () => {
     expect(result).toBe(`${primary}\n"Table/Leaf/+1d+1d/+0d+1d/+0d+1d" : "color: red"`);
   });
 
-  it('keeps the latest named declaration within an accumulated tenant', () => {
+  it('preserves named declaration history within an accumulated tenant', () => {
     const result = composeTransactionSources(primary, [{
       declarations: '"Table/Leaf/+1d+1d/+0d+1d/+0d+1d" : "color: red"\n"Table/Leaf/+2d+1d/+0d+1d/+0d+1d" : "color: blue"',
     }]);
 
-    expect(result).toBe(`${primary}\n"Table/Leaf/+2d+1d/+0d+1d/+0d+1d" : "color: blue"`);
+    expect(result).toBe(`${primary}\n"Table/Leaf/+1d+1d/+0d+1d/+0d+1d" : "color: red"\n"Table/Leaf/+2d+1d/+0d+1d/+0d+1d" : "color: blue"`);
+  });
+
+  it('retains earlier named declarations needed by intervening references', () => {
+    const declarations = [
+      '"Table/Leaf/+1d+1d/+0d+1d/+0d+1d" : "color: red"',
+      '"+4d+1d/+0d+1d/+0d+1d" : "ref: Table/Leaf/"',
+      '"Table/Leaf/+2d+1d/+0d+1d/+0d+1d" : "color: blue"',
+    ].join('\n');
+
+    expect(composeTransactionSources(primary, [{ declarations }])).toBe(`${primary}\n${declarations}`);
   });
 
   it('does not treat anonymous instances with matching coordinates as collisions', () => {
