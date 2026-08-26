@@ -51,10 +51,6 @@ export function parseObjectProperties(source: string): XyzDslObjectPropertiesSpe
   const reference = parseReferenceDeclaration(declarations);
   const content = parseContentDeclaration(declarations);
   const model = parseModelDeclaration(declarations);
-  if (model.source && geometry.operation) {
-    model.diagnostics.push('CSG operations are not supported for imported models.');
-    geometry.operation = undefined;
-  }
   const unsupportedDiagnostics = declarations
     .filter(({ property }) => !SUPPORTED_OBJECT_PROPERTIES.has(property))
     .map(

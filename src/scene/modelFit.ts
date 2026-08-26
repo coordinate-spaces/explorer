@@ -17,7 +17,7 @@ export function modelFitTransform(object: Object3D, fit: XyzDslModelFit, align: 
     ? [1 / size.x, 1 / size.y, 1 / size.z] as [number, number, number]
     : Array(3).fill(1 / Math.max(size.x, size.y, size.z)) as [number, number, number];
   const center = bounds.getCenter(new Vector3());
-  const anchorY = align === 'floor' ? bounds.min.y : center.y;
   const negate = (value: number) => value === 0 ? 0 : -value;
-  return { position: [negate(center.x), negate(anchorY), negate(center.z)], scale };
+  const y = align === 'floor' ? -bounds.min.y - 0.5 / scale[1] : negate(center.y);
+  return { position: [negate(center.x), y, negate(center.z)], scale };
 }

@@ -69,8 +69,8 @@ describe('parseXyzDslDocument', () => {
     const operation = parseXyzDslDocument('"+1+1/+2+1/+2+1" : "model: chair.glb; operation: union"');
     expect(unsafe.ok).toBe(false);
     expect(unsafe.diagnostics[0].message).toContain('safe MODEL_STORE-relative path');
-    expect(operation.ok).toBe(false);
-    expect(operation.value?.[0].geometry.operation).toBeUndefined();
+    expect(operation.ok).toBe(true);
+    expect(operation.value?.[0].geometry.operation).toBe('union');
   });
   it('parses composed object declarations with geometry and material properties', () => {
     const result = parseXyzDslDocument(EXAMPLE);

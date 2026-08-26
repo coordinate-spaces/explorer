@@ -10,6 +10,17 @@ describe('createSpatialDocument namespaced spatial declarations', () => {
     expect(document.renderNodes[0].model).toMatchObject({ source: 'modern_chair.glb', fit: 'contain', align: 'floor' });
   });
 
+  it('keeps imported models out of CSG expressions as bases and inherited tools', () => {
+    const document = createSpatialDocument(`"ModelTool/" : "operation: subtraction"
+"Chair/+0+1/+0+1/+0+1" : "model: chair.glb"
+"ModelTool/+0+1/+0+1/+0+1" : "model: cutout.glb"`);
+    expect(document.csgExpressions).toEqual([]);
+    expect(document.renderNodes.filter((node) => node.model)).toHaveLength(2);
+    expect(document.diagnostics.map(({ message }) => message)).toContain(
+      'CSG operations are not supported for imported models.',
+    );
+  });
+
   it('resolves namespace inheritance and renders composed children in parent-local space', () => {
     const document =
       createSpatialDocument(`"Table/+3d+8d/+0d+5d/+0d+8d" : "color: 0x333333; metalness: 0.8; roughness: 0.2"
