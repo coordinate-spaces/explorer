@@ -48,6 +48,7 @@ const SHARED_TRANSACTION_PUBLIC_KEY = readPublicKeyFromUrl();
 interface ActiveSecondaryTransactions {
   reference: SecondaryKeyReference;
   enabled: boolean;
+  transactionRange: TransactionRange;
   transactions: XyzDslTransaction[];
   playbackIndex: number;
   playbackSpeed?: number;
@@ -99,6 +100,7 @@ function referencesBySecondaryTenant(
 function normalizeActiveSecondaryStream(
   stream: ActiveSecondaryTransactions | undefined,
   reference: SecondaryKeyReference,
+  defaultRange: TransactionRange,
 ): ActiveSecondaryTransactions {
   const transactions = outgoingTransactionsForPublicKey(
     normalizeXyzDslTransactions(stream?.transactions ?? []),
@@ -109,6 +111,7 @@ function normalizeActiveSecondaryStream(
 
   return {
     reference,
+    transactionRange: stream?.transactionRange ?? defaultRange,
     transactions,
     playbackIndex,
     playbackSpeed: normalizePlaybackSpeed(stream?.playbackSpeed),
@@ -167,6 +170,9 @@ export default function App() {
   const [tipLoading, setTipLoading] = useState(false);
   const [tipError, setTipError] = useState<string | undefined>();
   const [activeSecondaryTransactions, setActiveSecondaryTransactions] = usePersistentState<Record<string, ActiveSecondaryTransactions>>('xyzdsl-active-secondary-transaction-streams-v2', {});
+  const activeSecondaryTransactionsRef = useRef(activeSecondaryTransactions);
+  activeSecondaryTransactionsRef.current = activeSecondaryTransactions;
+  const secondaryHistoryControllersRef = useRef(new Map<string, AbortController>());
   const [secondaryTransactionError, setSecondaryTransactionError] = useState<string | undefined>();
 
   useEffect(() => {
@@ -284,13 +290,13 @@ export default function App() {
       secondaryKeyReferences.forEach((reference) => {
         const key = streamKeyForSecondaryReference(reference);
         const validationError = endpointValidationError(reference.endpoint);
-        const current = normalizeActiveSecondaryStream(tenants[key], reference);
+        const current = normalizeActiveSecondaryStream(tenants[key], reference, transactionRange);
         nextTenants[key] = validationError ? { ...current, streamError: validationError } : current;
       });
 
       return nextTenants;
     });
-  }, [secondaryKeyReferences, setActiveSecondaryTransactions, transactionPublicKey]);
+  }, [secondaryKeyReferences, setActiveSecondaryTransactions, transactionPublicKey, transactionRange]);
 
   useEffect(() => {
     const replayingStreams = Object.values(activeSecondaryTransactions).filter((stream) => stream.replaying);
@@ -341,10 +347,11 @@ export default function App() {
   }, [activeSecondaryTransactions, setActiveSecondaryTransactions]);
 
   const secondaryTransactionStreams = useMemo<ActiveSecondaryTenant[]>(() => Object.values(activeSecondaryTransactions)
-    .map(({ reference, enabled, transactions: secondaryTransactions, playbackIndex, playbackSpeed, replaying, streamError, historyLoading }) => ({
+    .map(({ reference, enabled, transactionRange: tenantRange, transactions: secondaryTransactions, playbackIndex, playbackSpeed, replaying, streamError, historyLoading }) => ({
       publicKey: reference.publicKey,
       endpoint: reference.endpoint,
       enabled,
+      transactionRange: tenantRange,
       transactions: secondaryTransactions,
       playbackIndex,
       playbackSpeed: normalizePlaybackSpeed(playbackSpeed),
@@ -566,11 +573,14 @@ export default function App() {
     });
   }, [secondaryKeyReferences, setActiveSecondaryTransactions]);
 
-  const handleLoadSecondaryHistory = useCallback((publicKey: string) => {
+  const handleLoadSecondaryHistory = useCallback((publicKey: string, rangeOverride?: TransactionRange) => {
     const reference = secondaryKeyReferences.find((candidate) => candidate.publicKey === publicKey);
     if (!reference) return;
     const streamKey = streamKeyForSecondaryReference(reference);
+    const tenantRange = rangeOverride ?? activeSecondaryTransactionsRef.current[streamKey]?.transactionRange ?? DEFAULT_TRANSACTION_RANGE;
+    secondaryHistoryControllersRef.current.get(streamKey)?.abort();
     const controller = new AbortController();
+    secondaryHistoryControllersRef.current.set(streamKey, controller);
 
     setActiveSecondaryTransactions((streams) => {
       const stream = streams[streamKey];
@@ -585,7 +595,7 @@ export default function App() {
       } : streams;
     });
 
-    fetchPublicKeyTransactions({ endpoint: reference.endpoint, publicKey, range: transactionRange, signal: controller.signal })
+    fetchPublicKeyTransactions({ endpoint: reference.endpoint, publicKey, range: tenantRange, signal: controller.signal })
       .then((historicalTransactions) => {
         setActiveSecondaryTransactions((streams) => {
           const stream = streams[streamKey];
@@ -629,10 +639,20 @@ export default function App() {
             },
           } : streams;
         });
+      })
+      .finally(() => {
+        if (secondaryHistoryControllersRef.current.get(streamKey) === controller) {
+          secondaryHistoryControllersRef.current.delete(streamKey);
+        }
       });
 
-    return () => controller.abort();
-  }, [secondaryKeyReferences, setActiveSecondaryTransactions, transactionRange]);
+    return () => {
+      controller.abort();
+      if (secondaryHistoryControllersRef.current.get(streamKey) === controller) {
+        secondaryHistoryControllersRef.current.delete(streamKey);
+      }
+    };
+  }, [secondaryKeyReferences, setActiveSecondaryTransactions]);
 
   useEffect(() => {
     const abortRequests = secondaryKeyReferences
@@ -648,6 +668,14 @@ export default function App() {
       tenant.reference.publicKey === publicKey ? { ...tenant, enabled } : tenant,
     ])));
   }, [setActiveSecondaryTransactions]);
+
+  const handleSecondaryRangeChange = useCallback((publicKey: string, range: TransactionRange) => {
+    setActiveSecondaryTransactions((tenants) => Object.fromEntries(Object.entries(tenants).map(([key, tenant]) => [
+      key,
+      tenant.reference.publicKey === publicKey ? { ...tenant, transactionRange: range } : tenant,
+    ])));
+    handleLoadSecondaryHistory(publicKey, range);
+  }, [handleLoadSecondaryHistory, setActiveSecondaryTransactions]);
 
   const handleAuthoringSourceChange = useCallback((nextSource: string) => {
     setAuthoringSource(nextSource);
@@ -777,6 +805,7 @@ export default function App() {
         onSecondaryPlaybackSeek={handleSecondaryPlaybackSeek}
         onLoadSecondaryHistory={handleLoadSecondaryHistory}
         onSecondaryEnabledChange={handleSecondaryEnabledChange}
+        onSecondaryRangeChange={handleSecondaryRangeChange}
         selectedNodeId={selectedNode?.id}
         onSelectNode={handleSelectExactNode}
         selectedNode={selectedNode}

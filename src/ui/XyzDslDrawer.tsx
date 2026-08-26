@@ -123,6 +123,7 @@ interface XyzDslDrawerProps {
   onSecondaryPlaybackSeek: (publicKey: string, playbackIndex: number) => void;
   onLoadSecondaryHistory: (publicKey: string) => void;
   onSecondaryEnabledChange: (publicKey: string, enabled: boolean) => void;
+  onSecondaryRangeChange: (publicKey: string, range: TransactionRange) => void;
   selectedNodeId?: string;
   onSelectNode?: (id: string) => void;
   selectedNode?: SpatialNode;
@@ -172,6 +173,7 @@ export function XyzDslDrawer({
   onSecondaryPlaybackSeek,
   onLoadSecondaryHistory,
   onSecondaryEnabledChange,
+  onSecondaryRangeChange,
   selectedNodeId,
   onSelectNode,
   selectedNode,
@@ -268,6 +270,7 @@ export function XyzDslDrawer({
             onPlaybackSeek={onSecondaryPlaybackSeek}
             onLoadHistory={onLoadSecondaryHistory}
             onEnabledChange={onSecondaryEnabledChange}
+            onRangeChange={onSecondaryRangeChange}
           /></div> : null}
 
           {activeTab === 'source' ? <div className="drawer-tool-section"><XyzDslEditor

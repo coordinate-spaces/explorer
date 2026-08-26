@@ -377,6 +377,10 @@ button {
 .secondary-tenant-facts dt { color: #7dd3fc; font-weight: 700; }
 .secondary-tenant-facts dd { margin: 0; overflow-wrap: anywhere; color: #e0f2fe; }
 .secondary-tenant-primary-actions, .secondary-tenant-controls { display: flex; flex-wrap: wrap; gap: 0.45rem; align-items: center; }
+.secondary-tenant-range { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.45rem; margin: 0.75rem 0 0; border: 1px solid rgb(125 211 252 / 28%); border-radius: 0.45rem; }
+.secondary-tenant-range legend { color: #7dd3fc; font-size: 0.75rem; font-weight: 700; }
+.secondary-tenant-range label { display: grid; gap: 0.2rem; color: #e0f2fe; font-size: 0.7rem; }
+.secondary-tenant-range input { min-width: 0; width: 100%; }
 .secondary-tenant-primary-actions button, .secondary-tenant-controls button { border: 1px solid rgb(125 211 252 / 42%); border-radius: 999px; padding: 0.25rem 0.55rem; background: rgb(14 165 233 / 18%); color: #e0f2fe; }
 .secondary-tenant-controls label { display: grid; gap: 0.2rem; color: #e0f2fe; font-size: 0.75rem; }
 .secondary-tenant-details { margin-top: 0.75rem; color: #e0f2fe; font-size: 0.78rem; }

@@ -45,6 +45,7 @@ export interface DiscoveredSecondaryPublicKeyReference extends Pick<TransactionP
 
 export interface ActiveSecondaryTenant extends TransactionPublicKeyEndpoint {
   enabled: boolean;
+  transactionRange: TransactionRange;
   streamError?: string;
   transactions: XyzDslTransaction[];
   playbackIndex: number;

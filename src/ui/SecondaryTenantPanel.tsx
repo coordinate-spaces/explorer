@@ -1,6 +1,7 @@
 import { PLAYBACK_SPEED_OPTIONS } from '../transactions/streamTransactions';
 import { normalizeXyzDslTransaction } from '../transactions/transactionXyzDsl';
 import type { SecondaryTenant, XyzDslTransaction } from '../transactions/types';
+import type { TransactionRange } from '../transactions/types';
 
 interface SecondaryTenantPanelProps {
   tenants: SecondaryTenant[];
@@ -10,6 +11,7 @@ interface SecondaryTenantPanelProps {
   onPlaybackSeek: (publicKey: string, playbackIndex: number) => void;
   onLoadHistory: (publicKey: string) => void;
   onEnabledChange: (publicKey: string, enabled: boolean) => void;
+  onRangeChange: (publicKey: string, range: TransactionRange) => void;
 }
 
 function statusLabel(tenant: SecondaryTenant): string {
@@ -27,6 +29,11 @@ function transactionSummary(transaction: XyzDslTransaction): string {
     .join(' · ');
 }
 
+function nonNegativeInteger(value: string): number {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? Math.max(0, Math.round(parsed)) : 0;
+}
+
 export function SecondaryTenantPanel({
   tenants,
   onReplay,
@@ -35,6 +42,7 @@ export function SecondaryTenantPanel({
   onPlaybackSeek,
   onLoadHistory,
   onEnabledChange,
+  onRangeChange,
 }: SecondaryTenantPanelProps) {
   if (tenants.length === 0) return null;
 
@@ -69,6 +77,12 @@ export function SecondaryTenantPanel({
                 </button>
                 {tenant.transactions.length > 0 ? <button type="button" onClick={() => onReplay(tenant.publicKey)}>Replay from start</button> : null}
               </div>
+              <fieldset className="secondary-tenant-range">
+                <legend>Transaction range</legend>
+                <label>Newest height<input type="number" min={tenant.transactionRange.endHeight} value={tenant.transactionRange.startHeight} onChange={(event) => onRangeChange(tenant.publicKey, { ...tenant.transactionRange, startHeight: Math.max(nonNegativeInteger(event.target.value), tenant.transactionRange.endHeight) })} /></label>
+                <label>Oldest height<input type="number" min={0} max={tenant.transactionRange.startHeight} value={tenant.transactionRange.endHeight} onChange={(event) => onRangeChange(tenant.publicKey, { ...tenant.transactionRange, endHeight: Math.min(nonNegativeInteger(event.target.value), tenant.transactionRange.startHeight) })} /></label>
+                <label>Limit<input type="number" min={1} value={tenant.transactionRange.limit} onChange={(event) => onRangeChange(tenant.publicKey, { ...tenant.transactionRange, limit: Math.max(1, nonNegativeInteger(event.target.value)) })} /></label>
+              </fieldset>
               {tenant.transactions.length > 0 ? (
                 <details className="secondary-tenant-details">
                   <summary>Playback details</summary>
