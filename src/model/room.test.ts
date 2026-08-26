@@ -31,8 +31,8 @@ function nodeWithBounds(bounds: Partial<SpatialNode['bounds']>): SpatialNode {
 }
 
 describe('dimensionsFromNodes', () => {
-  it('uses a realistic default room in project units', () => {
-    expect(DEFAULT_ROOM_DIMENSIONS).toEqual({ width: 4, depth: 4, height: 2.8 });
+  it('uses a four-metre cubic default space in project units', () => {
+    expect(DEFAULT_ROOM_DIMENSIONS).toEqual({ width: 4, depth: 4, height: 4 });
     expect(ROOM_DIMENSION_MARGIN).toBe(0.2);
   });
 
@@ -50,12 +50,12 @@ describe('dimensionsFromNodes', () => {
   });
 
   it('expands dimensions to include nodes beyond the default perimeter with margin', () => {
-    const dimensions = dimensionsFromNodes([nodeWithBounds({ maxX: 4.12, maxY: 3.04, maxZ: 4.21 })]);
+    const dimensions = dimensionsFromNodes([nodeWithBounds({ maxX: 4.12, maxY: 4.04, maxZ: 4.21 })]);
 
     expect(dimensions).toEqual({
       width: Math.ceil((4.12 + ROOM_DIMENSION_MARGIN) * 10) / 10,
       depth: Math.ceil((4.21 + ROOM_DIMENSION_MARGIN) * 10) / 10,
-      height: Math.ceil((3.04 + ROOM_DIMENSION_MARGIN) * 10) / 10,
+      height: Math.ceil((4.04 + ROOM_DIMENSION_MARGIN) * 10) / 10,
     });
   });
 });

@@ -9,7 +9,7 @@ export interface RoomDimensions {
 export const DEFAULT_ROOM_DIMENSIONS: RoomDimensions = {
   width: 4,
   depth: 4,
-  height: 2.8,
+  height: 4,
 };
 
 // Keep 20 cm of clearance around authored geometry.
