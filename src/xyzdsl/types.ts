@@ -59,6 +59,9 @@ export interface XyzDslModelSpec {
   fit: XyzDslModelFit;
   align: XyzDslModelAlign;
   declared?: boolean;
+  sourceDeclared?: boolean;
+  fitDeclared?: boolean;
+  alignDeclared?: boolean;
   diagnostics: string[];
 }
 

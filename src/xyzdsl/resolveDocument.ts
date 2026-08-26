@@ -75,6 +75,21 @@ function mergeContent(base: XyzDslContentSpec, override: XyzDslContentSpec): Xyz
   return { ...override, diagnostics: [] };
 }
 
+function mergeModel(base: XyzDslModelSpec, override: XyzDslModelSpec): XyzDslModelSpec {
+  if (!override.declared) return { ...base, diagnostics: [] };
+
+  return {
+    source: override.sourceDeclared ? override.source : base.source,
+    fit: override.fitDeclared ? override.fit : base.fit,
+    align: override.alignDeclared ? override.align : base.align,
+    declared: true,
+    sourceDeclared: override.sourceDeclared ?? base.sourceDeclared,
+    fitDeclared: override.fitDeclared ?? base.fitDeclared,
+    alignDeclared: override.alignDeclared ?? base.alignDeclared,
+    diagnostics: [],
+  };
+}
+
 function anonymousCompoundRefNamespace(
   objectIndex: number,
   occupiedNamespaces: Set<string>,
@@ -114,7 +129,7 @@ function mergeProperties(
     },
     geometry: mergeGeometry(base.geometry, overrideGeometry),
     content: mergeContent(base.content, override.content),
-    model: override.model.declared ? { ...override.model, diagnostics: [] } : { ...base.model, diagnostics: [] },
+    model: mergeModel(base.model, override.model),
     transform:
       includeTransform && overrideTransform.declared
         ? { ...overrideTransform, diagnostics: [] }
@@ -410,6 +425,13 @@ export function resolveXyzDslDocument(objects: SpatialObject[]): {
     const { properties, diagnostics: propertyDiagnostics } =
       resolvePropertiesFor(object, objects);
     diagnostics.push(...propertyDiagnostics);
+    if (properties.model.declared && !properties.model.source) {
+      diagnostics.push({
+        line: object.lineNumber,
+        source: object.source,
+        message: 'model-fit and model-align require an effective model declaration.',
+      });
+    }
 
     const namespace = options.namespace ?? object.namespace;
     const namespacePath = canonicalNamespacePath(namespace);

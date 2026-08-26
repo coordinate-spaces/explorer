@@ -64,6 +64,17 @@ describe('parseXyzDslDocument', () => {
     expect(result.value?.[0].transform.declared).toBe(true);
   });
 
+  it('parses model layout overrides without requiring a source on the same declaration', () => {
+    const result = parseXyzDslDocument('"Chair/+0+1/+0+1/+0+1" : "model-fit: stretch; model-align: floor"');
+    expect(result.ok).toBe(true);
+    expect(result.value?.[0].model).toMatchObject({
+      fit: 'stretch',
+      align: 'floor',
+      fitDeclared: true,
+      alignDeclared: true,
+    });
+  });
+
   it('reports unsafe and unsupported model declarations', () => {
     const unsafe = parseXyzDslDocument('"+1+1/+2+1/+2+1" : "model: ../chair.glb"');
     const operation = parseXyzDslDocument('"+1+1/+2+1/+2+1" : "model: chair.glb; operation: union"');

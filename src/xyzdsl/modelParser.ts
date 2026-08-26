@@ -16,18 +16,26 @@ export function parseModelDeclaration(declarations: XyzDslPropertyDeclaration[])
       resolveModelUrl(source.value);
       model.source = source.value;
       model.declared = true;
+      model.sourceDeclared = true;
     } catch (error) {
       model.diagnostics.push(error instanceof Error ? error.message : 'Model URL is invalid.');
     }
   }
   if (fit) {
-    if (FITS.has(fit.value as XyzDslModelFit)) model.fit = fit.value as XyzDslModelFit;
+    if (FITS.has(fit.value as XyzDslModelFit)) {
+      model.fit = fit.value as XyzDslModelFit;
+      model.declared = true;
+      model.fitDeclared = true;
+    }
     else model.diagnostics.push(`Unsupported model-fit "${fit.value}". Expected contain or stretch.`);
   }
   if (align) {
-    if (ALIGNS.has(align.value as XyzDslModelAlign)) model.align = align.value as XyzDslModelAlign;
+    if (ALIGNS.has(align.value as XyzDslModelAlign)) {
+      model.align = align.value as XyzDslModelAlign;
+      model.declared = true;
+      model.alignDeclared = true;
+    }
     else model.diagnostics.push(`Unsupported model-align "${align.value}". Expected center or floor.`);
   }
-  if ((fit || align) && !source) model.diagnostics.push('model-fit and model-align require a model declaration.');
   return model;
 }
