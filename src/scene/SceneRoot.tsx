@@ -9,6 +9,7 @@ import { Lighting } from './Lighting';
 import { ContentPrimitive } from './ContentPrimitive';
 import { CsgPrimitive } from './CsgPrimitive';
 import { SpatialPrimitive } from './SpatialPrimitive';
+import { ModelPrimitive } from './ModelPrimitive';
 import { nodesForRoomSizing } from './roomSizing';
 
 interface SceneRootProps {
@@ -60,7 +61,9 @@ export function SceneRoot({ document: spatialDocument, selectedNodeId, onSelectN
         />
       ))}
       {spatialDocument.renderNodes.map((node) => (
-        node.content?.kind ? (
+        node.model?.source ? (
+          <ModelPrimitive key={node.id} isSelected={node.id === selectedNodeId} node={node} onSelect={onSelectNode} />
+        ) : node.content?.kind ? (
           <ContentPrimitive key={node.id} isSelected={node.id === selectedNodeId} node={node} onSelect={onSelectNode} />
         ) : (
           <SpatialPrimitive key={node.id} isSelected={node.id === selectedNodeId} node={node} onSelect={onSelectNode} />

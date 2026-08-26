@@ -18,7 +18,7 @@ function sourceOrder(node: SpatialNode): number {
 }
 
 function isCsgTool(node: SpatialNode): boolean {
-  return node.geometry.operation !== undefined;
+  return !node.model && node.geometry.operation !== undefined;
 }
 
 function scopePath(node: SpatialNode): string {
@@ -47,6 +47,7 @@ export function buildCsgExpressions(nodes: SpatialNode[]): { expressions: CsgExp
 
     const earlierOverlapping = ordered
       .filter((candidate) => sourceOrder(candidate) < sourceOrder(tool))
+      .filter((candidate) => !candidate.model)
       .filter((candidate) => boundsOverlap(candidate.bounds, tool.bounds));
     const scopedCandidate = earlierOverlapping
       .filter((candidate) => scopePath(candidate) === scopePath(tool))

@@ -50,6 +50,7 @@ export function parseXyzDslDeclaration(line: string, lineNumber = 1): ParseResul
         transform: properties.transform,
         reference: properties.reference,
         content: properties.content,
+        model: properties.model,
         declarationOnly: path.isDeclarationOnly,
         lineNumber,
       },

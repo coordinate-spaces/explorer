@@ -55,6 +55,43 @@ describe('parseBoxSpec', () => {
 });
 
 describe('parseXyzDslDocument', () => {
+  it('parses a store-relative GLB model with fitting, alignment, and rotation', () => {
+    const result = parseXyzDslDocument(
+      '"+1+4/+2+4/+2+4" : "model: modern_chair.glb; model-fit: contain; model-align: floor; rotation: 5,10,5"',
+    );
+    expect(result.ok).toBe(true);
+    expect(result.value?.[0].model).toMatchObject({ source: 'modern_chair.glb', fit: 'contain', align: 'floor' });
+    expect(result.value?.[0].transform.declared).toBe(true);
+  });
+
+  it('parses model layout overrides without requiring a source on the same declaration', () => {
+    const result = parseXyzDslDocument('"Chair/+0+1/+0+1/+0+1" : "model-fit: stretch; model-align: floor"');
+    expect(result.ok).toBe(true);
+    expect(result.value?.[0].model).toMatchObject({
+      fit: 'stretch',
+      align: 'floor',
+      fitDeclared: true,
+      alignDeclared: true,
+    });
+  });
+
+  it('reports unsafe and unsupported model declarations', () => {
+    const unsafe = parseXyzDslDocument('"+1+1/+2+1/+2+1" : "model: ../chair.glb"');
+    const operation = parseXyzDslDocument('"+1+1/+2+1/+2+1" : "model: chair.glb; operation: union"');
+    expect(unsafe.ok).toBe(false);
+    expect(unsafe.diagnostics[0].message).toContain('inside MODEL_STORE');
+    expect(operation.ok).toBe(true);
+    expect(operation.value?.[0].geometry.operation).toBe('union');
+  });
+
+  it.each(['https://[invalid]/chair.glb', '..\\chair.glb'])(
+    'rejects malformed or backslash-relative model source %s during parsing',
+    (source) => {
+      const result = parseXyzDslDocument(`"+1+1/+2+1/+2+1" : "model: ${source}"`);
+      expect(result.ok).toBe(false);
+      expect(result.value?.[0].model.source).toBeUndefined();
+    },
+  );
   it('parses composed object declarations with geometry and material properties', () => {
     const result = parseXyzDslDocument(EXAMPLE);
 

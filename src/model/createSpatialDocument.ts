@@ -70,6 +70,16 @@ export function createSpatialDocument(source: string): SpatialDocument {
         a.namespace.length - b.namespace.length || a.lineNumber - b.lineNumber,
     )
     .forEach((object) => {
+      const geometry = object.model.source && object.geometry.operation
+        ? { ...object.geometry, operation: undefined }
+        : object.geometry;
+      if (object.model.source && object.geometry.operation) {
+        diagnostics.push({
+          line: object.lineNumber,
+          source: object.source,
+          message: 'CSG operations are not supported for imported models.',
+        });
+      }
       const parent = nearestConcreteAncestor(
         object.namespace,
         nodesByNamespace,
@@ -97,7 +107,8 @@ export function createSpatialDocument(source: string): SpatialDocument {
         box: object.box,
         material: object.material,
         content: object.content,
-        geometry: geometryFromBox(object.box, object.geometry),
+        model: object.model.source ? object.model : undefined,
+        geometry: geometryFromBox(object.box, geometry),
         localTransform,
         worldTransform,
         transform: worldTransform,

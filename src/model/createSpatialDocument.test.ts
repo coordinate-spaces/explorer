@@ -2,6 +2,43 @@ import { describe, expect, it } from 'vitest';
 import { createSpatialDocument } from './createSpatialDocument';
 
 describe('createSpatialDocument namespaced spatial declarations', () => {
+  it('carries imported model settings into a renderable spatial node', () => {
+    const document = createSpatialDocument(
+      '"Chair/+1+4/+2+4/+2+4" : "model: modern_chair.glb; model-align: floor; rotation: 5,10,5"',
+    );
+    expect(document.diagnostics).toEqual([]);
+    expect(document.renderNodes[0].model).toMatchObject({ source: 'modern_chair.glb', fit: 'contain', align: 'floor' });
+  });
+
+  it('allows instances to override fit and alignment inherited with a model source', () => {
+    const document = createSpatialDocument(`"Chair/" : "model: chair.glb; model-fit: stretch"
+"Chair/+0+1/+0+1/+0+1" : "model-fit: contain; model-align: floor"`);
+    expect(document.diagnostics).toEqual([]);
+    expect(document.renderNodes[0].model).toMatchObject({
+      source: 'chair.glb',
+      fit: 'contain',
+      align: 'floor',
+    });
+  });
+
+  it('reports model layout properties on an instance without an effective model', () => {
+    const document = createSpatialDocument('"+0+1/+0+1/+0+1" : "model-align: floor"');
+    expect(document.diagnostics.map(({ message }) => message)).toContain(
+      'model-fit and model-align require an effective model declaration.',
+    );
+  });
+
+  it('keeps imported models out of CSG expressions as bases and inherited tools', () => {
+    const document = createSpatialDocument(`"ModelTool/" : "operation: subtraction"
+"Chair/+0+1/+0+1/+0+1" : "model: chair.glb"
+"ModelTool/+0+1/+0+1/+0+1" : "model: cutout.glb"`);
+    expect(document.csgExpressions).toEqual([]);
+    expect(document.renderNodes.filter((node) => node.model)).toHaveLength(2);
+    expect(document.diagnostics.map(({ message }) => message)).toContain(
+      'CSG operations are not supported for imported models.',
+    );
+  });
+
   it('resolves namespace inheritance and renders composed children in parent-local space', () => {
     const document =
       createSpatialDocument(`"Table/+3d+8d/+0d+5d/+0d+8d" : "color: 0x333333; metalness: 0.8; roughness: 0.2"

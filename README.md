@@ -81,6 +81,8 @@ Manual spatial declarations can use `content-text`/`content-url` for simple valu
 
 Primitive dimensions are derived from the bounding box and use the same project-unit scale as paths (`1` = `1 m`, `1d` = `1 dm`, `1c` = `1 cm`, `1m` = `1 mm`). For example, a cone or cylinder uses X/Z as its footprint and Y as its height. Non-square footprints are rendered as scaled elliptical primitives so every primitive fills the declared bounding box. `box-radius` applies only to box geometry and is measured in project units; omitted or zero radius renders a sharp box, and the renderer clamps positive radii to half of the smallest box dimension. `puff` is intentionally a geometry modifier, not a material setting, because it changes the rendered cushion shape.
 
+GLB models can be imported with `model: modern_chair.glb` or an absolute HTTP(S) URL. Relative names resolve against the configured `MODEL_STORE`. Models default to `model-fit: contain` and `model-align: center`; `stretch` and `floor` are also supported. The declared box remains authoritative for layout, selection, collision, and room sizing. For example: `"+1+4/+2+4/+2+4" : "model: modern_chair.glb; model-fit: contain; model-align: floor; rotation: 5,10,5"`. Imported cameras, lights, animations, and model CSG operations are not currently enabled. The model host must allow browser CORS requests.
+
 ## Material declaration reference
 
 Spatial primitives intentionally expose only the basic scalar properties needed by the standard metallic/roughness shading model. Material presets, semantic material families, textures, transparency, and extended physical-material properties are not supported.
