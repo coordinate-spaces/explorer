@@ -64,4 +64,16 @@ describe('dimensionsFromNodes', () => {
 
     expect(dimensions).toEqual({ width: 5, depth: 4, height: 4 });
   });
+
+  it('does not add a metre for floating-point noise at a whole-metre boundary', () => {
+    const dimensions = dimensionsFromNodes([nodeWithBounds({ maxX: 4.800000000000001 })]);
+
+    expect(dimensions).toEqual({ width: 5, depth: 4, height: 4 });
+  });
+
+  it('still grows for an extent meaningfully beyond a whole-metre boundary', () => {
+    const dimensions = dimensionsFromNodes([nodeWithBounds({ maxX: 4.800001 })]);
+
+    expect(dimensions).toEqual({ width: 6, depth: 4, height: 4 });
+  });
 });
