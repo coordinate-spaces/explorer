@@ -16,7 +16,7 @@ import { fetchPublicKeyTransactions, fetchTipHeight, normalizeEndpoint } from '.
 import { createPublicKeyShareUrl, readPublicKeyFromUrl } from './transactions/publicKeyShareUrl';
 import { composeTransactionSources } from './transactions/composeTransactionSources';
 import { normalizeXyzDslTransactions, transactionsToXyzDslSource } from './transactions/transactionXyzDsl';
-import { clampPlaybackIndex, hasPlaybackReachedEnd, mergeHistoricalStreamTransactions, normalizePlaybackSpeed, outgoingTransactionsForPublicKey, playbackIndexForElapsedTime, playbackTickIntervalMilliseconds, playbackTimeForElapsedTime, scaledPlaybackElapsedSeconds, sortTransactionsByTimeStable } from './transactions/streamTransactions';
+import { clampPlaybackIndex, hasPlaybackReachedEnd, normalizePlaybackSpeed, outgoingTransactionsForPublicKey, playbackIndexForElapsedTime, playbackTickIntervalMilliseconds, playbackTimeForElapsedTime, scaledPlaybackElapsedSeconds, sortTransactionsByTimeStable } from './transactions/streamTransactions';
 import type { ActiveSecondaryTenant, XyzDslTransaction, SecondaryKeyReference, SecondaryTenant, TransactionRange } from './transactions/types';
 import { usePublicKeyTransactions } from './transactions/usePublicKeyTransactions';
 import { XyzDslDrawer } from './ui/XyzDslDrawer';
@@ -279,13 +279,12 @@ export default function App() {
     }
 
     setActiveSecondaryTransactions((tenants) => {
-      const activeKeys = new Set(secondaryKeyReferences.map(streamKeyForSecondaryReference));
-      const nextTenants = Object.fromEntries(Object.entries(tenants).filter(([key]) => activeKeys.has(key)));
+      const nextTenants: Record<string, ActiveSecondaryTransactions> = {};
 
       secondaryKeyReferences.forEach((reference) => {
         const key = streamKeyForSecondaryReference(reference);
         const validationError = endpointValidationError(reference.endpoint);
-        const current = normalizeActiveSecondaryStream(nextTenants[key], reference);
+        const current = normalizeActiveSecondaryStream(tenants[key], reference);
         nextTenants[key] = validationError ? { ...current, streamError: validationError } : current;
       });
 
@@ -599,7 +598,7 @@ export default function App() {
             normalizeXyzDslTransactions(historicalTransactions),
             publicKey,
           );
-          const transactions = sortTransactionsByTimeStable(mergeHistoricalStreamTransactions(stream.transactions, outgoingHistoricalTransactions));
+          const transactions = sortTransactionsByTimeStable(outgoingHistoricalTransactions);
           return {
             ...streams,
             [streamKey]: {
@@ -636,7 +635,11 @@ export default function App() {
   }, [secondaryKeyReferences, setActiveSecondaryTransactions, transactionRange]);
 
   useEffect(() => {
-    secondaryKeyReferences.forEach((reference) => handleLoadSecondaryHistory(reference.publicKey));
+    const abortRequests = secondaryKeyReferences
+      .map((reference) => handleLoadSecondaryHistory(reference.publicKey))
+      .filter((cleanup): cleanup is () => void => cleanup !== undefined);
+
+    return () => abortRequests.forEach((abort) => abort());
   }, [handleLoadSecondaryHistory, secondaryKeyReferences]);
 
   const handleSecondaryEnabledChange = useCallback((publicKey: string, enabled: boolean) => {

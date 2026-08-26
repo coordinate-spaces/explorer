@@ -68,16 +68,30 @@ describe('composeTransactionSources', () => {
       { declarations: '"Table/+0d+1d/+0d+1d/+0d+1d" : "color: red"\n"Table/+2d+1d/+0d+1d/+0d+1d" : "color: blue"' },
     ]);
 
-    expect(result).toBe(`${primary}\n"Table/+2d+1d/+0d+1d/+0d+1d" : "color: blue"`);
+    expect(result).toBe(primary);
   });
 
   it('uses deterministic first-tenant precedence for tenant collisions', () => {
-    const path = '"Table/+2d+1d/+0d+1d/+0d+1d"';
     const result = composeTransactionSources(primary, [
-      { declarations: `${path} : "color: red"` },
-      { declarations: `${path} : "color: blue"` },
+      { declarations: '"Table/Leaf/+1d+1d/+0d+1d/+0d+1d" : "color: red"' },
+      { declarations: '"Table/Leaf/+2d+1d/+0d+1d/+0d+1d" : "color: blue"' },
     ]);
 
-    expect(result).toBe(`${primary}\n${path} : "color: red"`);
+    expect(result).toBe(`${primary}\n"Table/Leaf/+1d+1d/+0d+1d/+0d+1d" : "color: red"`);
+  });
+
+  it('keeps the latest named declaration within an accumulated tenant', () => {
+    const result = composeTransactionSources(primary, [{
+      declarations: '"Table/Leaf/+1d+1d/+0d+1d/+0d+1d" : "color: red"\n"Table/Leaf/+2d+1d/+0d+1d/+0d+1d" : "color: blue"',
+    }]);
+
+    expect(result).toBe(`${primary}\n"Table/Leaf/+2d+1d/+0d+1d/+0d+1d" : "color: blue"`);
+  });
+
+  it('does not treat anonymous instances with matching coordinates as collisions', () => {
+    const anonymous = '"+2d+1d/+0d+1d/+0d+1d" : "color: purple"';
+    const result = composeTransactionSources(anonymous, [{ declarations: anonymous }]);
+
+    expect(result).toBe(`${anonymous}\n${anonymous}`);
   });
 });

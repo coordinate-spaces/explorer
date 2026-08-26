@@ -41,9 +41,16 @@ function primaryDeclarationNamespaces(primaryXyzDslSource: string): Set<string> 
   return namespaces;
 }
 
-function primaryDeclarationPaths(primaryXyzDslSource: string): Set<string> {
+function namedInstanceIdentity(namespace: readonly string[]): string | undefined {
+  return namespace.length > 0 ? `instance:${canonicalNamespacePath([...namespace])}` : undefined;
+}
+
+function primaryNamedInstanceIdentities(primaryXyzDslSource: string): Set<string> {
   const parsed = parseXyzDslDocument(primaryXyzDslSource);
-  return new Set((parsed.value ?? []).map((object) => object.path.canonicalPath));
+  return new Set((parsed.value ?? [])
+    .filter((object) => !object.declarationOnly)
+    .map((object) => namedInstanceIdentity(object.namespace))
+    .filter((identity): identity is string => identity !== undefined));
 }
 
 function namespaceIsPrimaryConsumer(namespace: readonly string[], primaryNamespaces: ReadonlySet<string>): boolean {
@@ -64,6 +71,24 @@ function secondaryConsumerLine(line: string, primaryNamespaces: ReadonlySet<stri
   return namespaceIsPrimaryConsumer(parsed.value.namespace, primaryNamespaces) ? line : undefined;
 }
 
+function latestTenantDeclarations(lines: readonly string[], primaryNamespaces: ReadonlySet<string>): Array<{
+  line: string;
+  identity?: string;
+}> {
+  const accepted = lines.flatMap((line) => {
+    const consumer = secondaryConsumerLine(line, primaryNamespaces);
+    if (!consumer) return [];
+
+    const declaration = parseXyzDslDeclaration(consumer).value;
+    return declaration ? [{ line: consumer, identity: namedInstanceIdentity(declaration.namespace) }] : [];
+  });
+  return accepted.filter(({ identity }, index) => {
+    if (!identity) return true;
+    if (accepted.slice(index + 1).some((candidate) => candidate.identity === identity)) return false;
+    return true;
+  });
+}
+
 function clampCursor(cursor: number | undefined, lineCount: number): number {
   if (cursor === undefined) {
     return lineCount;
@@ -79,7 +104,7 @@ export function composeTransactionSources(
 ): string {
   const primary = primaryXyzDslSource;
   const primaryNamespaces = primaryDeclarationNamespaces(primaryXyzDslSource);
-  const occupiedPaths = primaryDeclarationPaths(primaryXyzDslSource);
+  const occupiedIdentities = primaryNamedInstanceIdentities(primaryXyzDslSource);
   const policy = options.namespacePolicy ?? 'consume-primary-namespaces';
   const composedSecondarySources = secondaryStreams.flatMap((stream) => {
     const lines = declarationSources(stream.declarations);
@@ -90,14 +115,10 @@ export function composeTransactionSources(
       return visibleLines;
     }
 
-    return visibleLines.flatMap((line) => {
-      const accepted = secondaryConsumerLine(line, primaryNamespaces);
-      if (!accepted) return [];
-
-      const declaration = parseXyzDslDeclaration(accepted).value;
-      if (!declaration || occupiedPaths.has(declaration.path.canonicalPath)) return [];
-      occupiedPaths.add(declaration.path.canonicalPath);
-      return [accepted];
+    return latestTenantDeclarations(visibleLines, primaryNamespaces).flatMap(({ line, identity }) => {
+      if (identity && occupiedIdentities.has(identity)) return [];
+      if (identity) occupiedIdentities.add(identity);
+      return [line];
     });
   });
 
