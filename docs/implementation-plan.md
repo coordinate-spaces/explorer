@@ -149,7 +149,7 @@ src/
     collision.ts
     createSpatialDocument.ts
   scene/
-    XyzCornerSpace.tsx
+    XyzCornerGrid.tsx
     Lighting.tsx
     SceneRoot.tsx
     SpatialPrimitive.tsx
@@ -202,7 +202,7 @@ Full boolean geometry merging is implemented through a ThreeJS-compatible CSG li
 
 ## Rendering architecture
 
-The renderer uses React Three Fiber and Drei. `SceneRoot` owns the canvas, camera, controls, lighting, XYZ corner space, and spatial primitives. `XyzCornerSpace` draws the floor and two wall planes exclusively as transparent lines. `SpatialPrimitive` maps each spatial node into a ThreeJS mesh by dispatching on the derived geometry kind while sharing the same transform and union-highlight behavior for all primitives. All spatial primitives render with `meshStandardMaterial` using only color, metalness, and roughness. `puff` affects the actual box geometry by increasing rounded cushion curvature; collision bounds remain based on the declared transformed box, so the layout contract stays stable even as the silhouette softens.
+The renderer uses React Three Fiber and Drei. `SceneRoot` owns the canvas, camera, controls, lighting, XYZ corner grid, and spatial primitives. `XyzCornerGrid` draws the floor and two wall planes as transparent lines spaced one decimetre apart. `SpatialPrimitive` maps each spatial node into a ThreeJS mesh by dispatching on the derived geometry kind while sharing the same transform and union-highlight behavior for all primitives. All spatial primitives render with `meshStandardMaterial` using only color, metalness, and roughness. `puff` affects the actual box geometry by increasing rounded cushion curvature; collision bounds remain based on the declared transformed box, so the layout contract stays stable even as the silhouette softens.
 
 ## UI drawer workflow
 
