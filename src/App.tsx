@@ -175,7 +175,6 @@ export default function App() {
   const activeSecondaryTransactionsRef = useRef(activeSecondaryTransactions);
   activeSecondaryTransactionsRef.current = activeSecondaryTransactions;
   const secondaryHistoryControllersRef = useRef(new Map<string, AbortController>());
-  const [secondaryTransactionError, setSecondaryTransactionError] = useState<string | undefined>();
 
   useEffect(() => {
     setActiveSecondaryTransactions((streams) => {
@@ -279,9 +278,8 @@ export default function App() {
   );
 
   useEffect(() => {
-    setSecondaryTransactionError(undefined);
-
     if (secondaryKeyReferences.length === 0) {
+      if (transactionsLoading || transactionError) return;
       setActiveSecondaryTransactions({});
       return;
     }
@@ -294,13 +292,23 @@ export default function App() {
         const validationError = endpointValidationError(reference.endpoint);
         const previousTenant = tenants[key]
           ?? Object.values(tenants).find((tenant) => tenant.reference.publicKey === reference.publicKey);
-        const current = normalizeActiveSecondaryStream(previousTenant, reference);
+        const endpointChanged = previousTenant && previousTenant.reference.endpoint !== reference.endpoint;
+        const current = normalizeActiveSecondaryStream(endpointChanged ? {
+          ...previousTenant,
+          transactions: [],
+          playbackIndex: 0,
+          replaying: false,
+          historyLoading: false,
+          streamError: undefined,
+          playbackStartedAtMs: undefined,
+          playbackBaseTransactionTime: undefined,
+        } : previousTenant, reference);
         nextTenants[key] = validationError ? { ...current, streamError: validationError } : current;
       });
 
       return nextTenants;
     });
-  }, [secondaryKeyReferences, setActiveSecondaryTransactions, transactionPublicKey]);
+  }, [secondaryKeyReferences, setActiveSecondaryTransactions, transactionError, transactionPublicKey, transactionsLoading]);
 
   useEffect(() => {
     const replayingStreams = Object.values(activeSecondaryTransactions).filter((stream) => stream.replaying);
@@ -350,8 +358,12 @@ export default function App() {
     return () => window.clearInterval(interval);
   }, [activeSecondaryTransactions, setActiveSecondaryTransactions]);
 
-  const secondaryTransactionStreams = useMemo<ActiveSecondaryTenant[]>(() => Object.values(activeSecondaryTransactions)
-    .map(({ reference, enabled, transactionRange: tenantRange, transactions: secondaryTransactions, playbackIndex, playbackSpeed, replaying, streamError, historyLoading }) => ({
+  const secondaryTransactionStreams = useMemo<ActiveSecondaryTenant[]>(() => {
+    const discoveredKeys = new Set(secondaryKeyReferences.map(streamKeyForSecondaryReference));
+
+    return Object.entries(activeSecondaryTransactions)
+    .filter(([key]) => discoveredKeys.has(key))
+    .map(([, { reference, enabled, transactionRange: tenantRange, transactions: secondaryTransactions, playbackIndex, playbackSpeed, replaying, streamError, historyLoading }]) => ({
       publicKey: reference.publicKey,
       endpoint: reference.endpoint,
       enabled,
@@ -363,7 +375,8 @@ export default function App() {
       streamError,
       historyLoading,
       rejectedDiagnostics: [],
-    })), [activeSecondaryTransactions]);
+    }));
+  }, [activeSecondaryTransactions, secondaryKeyReferences]);
 
   const secondaryTransactionOverlayStreams = useMemo(() => secondaryTransactionStreams
     .map(({ publicKey, endpoint, enabled, transactions: secondaryTransactions, playbackIndex }) => {
@@ -581,7 +594,9 @@ export default function App() {
     const reference = secondaryKeyReferences.find((candidate) => candidate.publicKey === publicKey);
     if (!reference) return;
     const streamKey = streamKeyForSecondaryReference(reference);
-    const tenant = activeSecondaryTransactionsRef.current[streamKey];
+    const tenant = activeSecondaryTransactionsRef.current[streamKey]
+      ?? Object.values(activeSecondaryTransactionsRef.current)
+        .find((candidate) => candidate.reference.publicKey === publicKey);
     const tenantRange = rangeOverride ?? tenant?.transactionRange ?? DEFAULT_TRANSACTION_RANGE;
     const rangeNeedsTip = tenant?.rangeNeedsTip ?? (tenant?.transactionRange === undefined);
     secondaryHistoryControllersRef.current.get(streamKey)?.abort();
@@ -653,7 +668,6 @@ export default function App() {
           return;
         }
 
-        setSecondaryTransactionError(caught instanceof Error ? caught.message : 'Unable to load secondary transaction history.');
         setActiveSecondaryTransactions((streams) => {
           const stream = streams[streamKey];
 
@@ -806,7 +820,7 @@ export default function App() {
         transactionPublicKeyShareUrl={transactionPublicKeyShareUrl}
         transactionRange={transactionRange}
         transactionsLoading={transactionsLoading}
-        transactionError={transactionError ?? secondaryTransactionError}
+        transactionError={transactionError}
         tipHeight={tipHeight}
         tipLoading={tipLoading}
         tipError={tipError}
