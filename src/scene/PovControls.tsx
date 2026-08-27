@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import { Euler, MathUtils, Raycaster, Vector2 } from 'three';
-import { spatialNodeIdFromObject } from './povPicking';
+import { spatialNodeIdForPovRaycast } from './povPicking';
 import { worldAlignedPovMovement } from './povNavigation';
 
 interface PovControlsProps {
@@ -39,10 +39,12 @@ export function PovControls({ active, collision, speed, onLockChange, onSelectNo
     const lockChange = () => {
       const locked = document.pointerLockElement === gl.domElement;
       if (locked) syncAnglesFromCamera();
+      else keys.current.clear();
       onLockChange(locked);
     };
     const keyDown = (event: KeyboardEvent) => { if (!editableTarget(event.target)) keys.current.add(event.code); };
     const keyUp = (event: KeyboardEvent) => keys.current.delete(event.code);
+    const keyUpAll = () => keys.current.clear();
     const mouseMove = (event: MouseEvent) => {
       if (document.pointerLockElement !== gl.domElement) return;
       yaw.current -= event.movementX * 0.002;
@@ -56,20 +58,24 @@ export function PovControls({ active, collision, speed, onLockChange, onSelectNo
       }
       if (event.button === 0) {
         selectionRaycaster.current.setFromCamera(new Vector2(0, 0), camera);
-        const hit = selectionRaycaster.current.intersectObjects(scene.children, true).find(({ object }) => spatialNodeIdFromObject(object));
-        onSelectNode?.(hit ? spatialNodeIdFromObject(hit.object) : undefined);
+        const hit = selectionRaycaster.current.intersectObjects(scene.children, true)
+          .map(({ object }) => spatialNodeIdForPovRaycast(object))
+          .find((id) => id !== undefined);
+        onSelectNode?.(hit);
       }
     };
     document.addEventListener('pointerlockchange', lockChange);
     document.addEventListener('keydown', keyDown);
     document.addEventListener('keyup', keyUp);
     document.addEventListener('mousemove', mouseMove);
+    window.addEventListener('blur', keyUpAll);
     gl.domElement.addEventListener('pointerdown', pointerDown);
     return () => {
       document.removeEventListener('pointerlockchange', lockChange);
       document.removeEventListener('keydown', keyDown);
       document.removeEventListener('keyup', keyUp);
       document.removeEventListener('mousemove', mouseMove);
+      window.removeEventListener('blur', keyUpAll);
       gl.domElement.removeEventListener('pointerdown', pointerDown);
       keys.current.clear();
     };
@@ -90,7 +96,8 @@ export function PovControls({ active, collision, speed, onLockChange, onSelectNo
     if (collision) {
       collisionRaycaster.current.set(camera.position, movement.clone().normalize());
       collisionRaycaster.current.far = Math.max(movement.length() + speed * 0.08, speed * 0.12);
-      const blocked = collisionRaycaster.current.intersectObjects(scene.children, true).some(({ object }) => spatialNodeIdFromObject(object));
+      const blocked = collisionRaycaster.current.intersectObjects(scene.children, true)
+        .some(({ object }) => spatialNodeIdForPovRaycast(object) !== undefined);
       if (blocked) return;
     }
     camera.position.add(movement);

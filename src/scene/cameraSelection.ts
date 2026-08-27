@@ -1,5 +1,6 @@
 import type { SpatialDocument } from '../model/SpatialDocument';
 import type { SpatialBounds, SpatialNode } from '../model/SpatialNode';
+import { nodePrecisionScale } from './cameraScale';
 
 function unionBounds(bounds: SpatialBounds, addition: SpatialBounds): SpatialBounds {
   return {
@@ -27,6 +28,10 @@ export function cameraNodeForSelection(
   const bounds = expression.operations
     .filter(({ op }) => op === 'union')
     .reduce((combined, { tool }) => unionBounds(combined, tool.bounds), expression.base.bounds);
+  const precisionScales = [
+    nodePrecisionScale(expression.base),
+    ...expression.operations.filter(({ op }) => op === 'union').map(({ tool }) => nodePrecisionScale(tool)),
+  ].filter((scale): scale is number => scale !== undefined);
   const position: [number, number, number] = [
     (bounds.minX + bounds.maxX) / 2,
     (bounds.minY + bounds.maxY) / 2,
@@ -36,6 +41,10 @@ export function cameraNodeForSelection(
   return {
     ...expression.base,
     bounds,
+    metadata: {
+      ...expression.base.metadata,
+      ...(precisionScales.length > 0 ? { cameraPrecisionScale: Math.min(...precisionScales) } : {}),
+    },
     transform: { ...expression.base.transform, position },
   };
 }

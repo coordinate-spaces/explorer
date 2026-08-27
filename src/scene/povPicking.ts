@@ -8,3 +8,8 @@ export function spatialNodeIdFromObject(object: Object3D | null): string | undef
   }
   return undefined;
 }
+
+export function spatialNodeIdForPovRaycast(object: Object3D): string | undefined {
+  if ('isLine' in object && object.isLine) return undefined;
+  return spatialNodeIdFromObject(object);
+}

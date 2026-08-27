@@ -4,12 +4,15 @@ import type { SpatialNode } from '../model/SpatialNode';
 const MIN_SCENE_SCALE = 0.001;
 const MAX_SCENE_SCALE = 10;
 
-function smallestPositiveDimension(node: SpatialNode): number | undefined {
-  const dimensions = [
-    node.bounds.maxX - node.bounds.minX,
-    node.bounds.maxY - node.bounds.minY,
-    node.bounds.maxZ - node.bounds.minZ,
-  ].filter((value) => Number.isFinite(value) && value > 0);
+export function nodePrecisionScale(node: SpatialNode): number | undefined {
+  const compositeScale = node.metadata?.cameraPrecisionScale;
+  if (typeof compositeScale === 'number' && Number.isFinite(compositeScale) && compositeScale > 0) {
+    return compositeScale;
+  }
+
+  const dimensions = node.transform.scale
+    .map(Math.abs)
+    .filter((value) => Number.isFinite(value) && value > 0);
 
   return dimensions.length > 0 ? Math.min(...dimensions) : undefined;
 }
@@ -28,7 +31,7 @@ function overallSceneExtent(nodes: readonly SpatialNode[]): number | undefined {
 }
 
 export function cameraSceneScale(nodes: readonly SpatialNode[], selectedNode?: SpatialNode): number {
-  const selectedScale = selectedNode && smallestPositiveDimension(selectedNode);
+  const selectedScale = selectedNode && nodePrecisionScale(selectedNode);
   const scale = selectedScale ?? overallSceneExtent(nodes) ?? 1;
   return Math.min(MAX_SCENE_SCALE, Math.max(MIN_SCENE_SCALE, scale));
 }

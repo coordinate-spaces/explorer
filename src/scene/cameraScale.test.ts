@@ -18,6 +18,13 @@ describe('camera scene scale', () => {
     expect(cameraSceneScale([node([2, 2, 2])], node([0.01, 0.02, 0.03]))).toBe(0.01);
   });
 
+  it('uses oriented transform dimensions for a rotated selected object', () => {
+    const selected = node([10, 10, 0.01]);
+    selected.bounds = { minX: -7, maxX: 7, minY: -7, maxY: 7, minZ: -7, maxZ: 7 };
+    selected.transform.rotation = [0.8, 0.6, 0.4];
+    expect(cameraSceneScale([node([100, 100, 100])], selected)).toBe(0.01);
+  });
+
   it('uses overall scene extent when no object is selected', () => {
     expect(cameraSceneScale([node([100, 0.01, 100])])).toBe(10);
     expect(cameraSceneScale([

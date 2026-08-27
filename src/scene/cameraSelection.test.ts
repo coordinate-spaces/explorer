@@ -34,6 +34,7 @@ describe('cameraNodeForSelection', () => {
 
     expect(selected?.bounds).toEqual({ minX: 0, maxX: 5, minY: 0, maxY: 1, minZ: 0, maxZ: 1 });
     expect(selected?.transform.position).toEqual([2.5, 0.5, 0.5]);
+    expect(selected?.metadata?.cameraPrecisionScale).toBe(1);
   });
 
   it('returns ordinary render nodes unchanged', () => {

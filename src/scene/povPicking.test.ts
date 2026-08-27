@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { Object3D } from 'three';
-import { spatialNodeIdFromObject } from './povPicking';
+import { BufferGeometry, LineBasicMaterial, LineSegments, Object3D } from 'three';
+import { spatialNodeIdForPovRaycast, spatialNodeIdFromObject } from './povPicking';
 
 describe('spatialNodeIdFromObject', () => {
   it('finds selection metadata on an ancestor', () => {
@@ -13,5 +13,13 @@ describe('spatialNodeIdFromObject', () => {
 
   it('returns undefined outside spatial geometry', () => {
     expect(spatialNodeIdFromObject(new Object3D())).toBeUndefined();
+  });
+
+  it('excludes selection outlines from POV raycasts', () => {
+    const parent = new Object3D();
+    const outline = new LineSegments(new BufferGeometry(), new LineBasicMaterial());
+    parent.userData.spatialNodeId = 'selected-node';
+    parent.add(outline);
+    expect(spatialNodeIdForPovRaycast(outline)).toBeUndefined();
   });
 });
