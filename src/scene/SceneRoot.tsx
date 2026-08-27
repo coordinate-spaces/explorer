@@ -27,15 +27,17 @@ interface SceneRootProps {
 }
 
 const DEFAULT_ORBIT_TARGET: [number, number, number] = [0.6, 0.5, 0.4];
+const DEFAULT_CAMERA_POSITION: [number, number, number] = [1.4, 1.1, 1.8];
 
 export function SceneRoot({ document: spatialDocument, selectedNodeId, onSelectNode, cameraMode, onCameraModeChange }: SceneRootProps) {
-  const roomDimensions = dimensionsFromNodes(nodesForRoomSizing(spatialDocument));
+  const cameraSizingNodes = nodesForRoomSizing(spatialDocument);
+  const roomDimensions = dimensionsFromNodes(cameraSizingNodes);
   const selectedNode = useMemo(
     () => cameraNodeForSelection(spatialDocument, selectedNodeId),
     [selectedNodeId, spatialDocument],
   );
-  const sceneScale = cameraSceneScale(nodesForRoomSizing(spatialDocument), selectedNode);
-  const clips = cameraClipPlanes(sceneScale, Math.max(roomDimensions.width, roomDimensions.height, roomDimensions.depth));
+  const sceneScale = cameraSceneScale(cameraSizingNodes, selectedNode);
+  const clips = cameraClipPlanes(sceneScale, cameraSizingNodes, DEFAULT_CAMERA_POSITION);
   const [speedMultiplier, setSpeedMultiplier] = useState(1);
   const [collision, setCollision] = useState(false);
   const [pointerLocked, setPointerLocked] = useState(false);
@@ -57,7 +59,7 @@ export function SceneRoot({ document: spatialDocument, selectedNodeId, onSelectN
   }, [focusRequest, selectedNode]);
   useEffect(() => {
     if (!cameraRef.current || resetRequest === 0) return;
-    cameraRef.current.position.set(1.4, 1.1, 1.8);
+    cameraRef.current.position.set(...DEFAULT_CAMERA_POSITION);
     cameraRef.current.lookAt(...DEFAULT_ORBIT_TARGET);
   }, [resetRequest]);
 
@@ -72,7 +74,7 @@ export function SceneRoot({ document: spatialDocument, selectedNodeId, onSelectN
       }}
     >
       <color attach="background" args={['#151820']} />
-      <PerspectiveCamera ref={cameraRef} makeDefault position={[1.4, 1.1, 1.8]} fov={45} near={clips.near} far={clips.far} />
+      <PerspectiveCamera ref={cameraRef} makeDefault position={DEFAULT_CAMERA_POSITION} fov={45} near={clips.near} far={clips.far} />
       <Lighting />
       <XyzCornerGrid {...roomDimensions} />
       {spatialDocument.csgExpressions.map((expression) => (
@@ -81,15 +83,16 @@ export function SceneRoot({ document: spatialDocument, selectedNodeId, onSelectN
           expression={expression}
           isSelected={expression.base.id === selectedNodeId}
           onSelect={onSelectNode}
+          selectionEnabled={cameraMode === 'orbit'}
         />
       ))}
       {spatialDocument.renderNodes.map((node) => (
         node.model?.source ? (
-          <ModelPrimitive key={node.id} isSelected={node.id === selectedNodeId} node={node} onSelect={onSelectNode} />
+          <ModelPrimitive key={node.id} isSelected={node.id === selectedNodeId} node={node} onSelect={onSelectNode} selectionEnabled={cameraMode === 'orbit'} />
         ) : node.content?.kind ? (
-          <ContentPrimitive key={node.id} isSelected={node.id === selectedNodeId} node={node} onSelect={onSelectNode} />
+          <ContentPrimitive key={node.id} isSelected={node.id === selectedNodeId} node={node} onSelect={onSelectNode} selectionEnabled={cameraMode === 'orbit'} />
         ) : (
-          <SpatialPrimitive key={node.id} isSelected={node.id === selectedNodeId} node={node} onSelect={onSelectNode} />
+          <SpatialPrimitive key={node.id} isSelected={node.id === selectedNodeId} node={node} onSelect={onSelectNode} selectionEnabled={cameraMode === 'orbit'} />
         )
       ))}
       {cameraMode === 'orbit' ? <OrbitControls target={orbitTarget} maxPolarAngle={Math.PI} /> : null}

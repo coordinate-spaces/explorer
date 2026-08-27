@@ -10,6 +10,7 @@ interface SpatialPrimitiveProps {
   node: SpatialNode;
   isSelected?: boolean;
   onSelect?: (id: string) => void;
+  selectionEnabled?: boolean;
 }
 
 function PrimitiveGeometry({ geometry }: { geometry: SpatialGeometry }) {
@@ -46,13 +47,13 @@ export function materialParameters(node: SpatialNode): MeshStandardMaterialParam
   };
 }
 
-export function SpatialPrimitive({ node, isSelected = false, onSelect }: SpatialPrimitiveProps) {
+export function SpatialPrimitive({ node, isSelected = false, onSelect, selectionEnabled = true }: SpatialPrimitiveProps) {
   const { position, rotation, scale } = node.transform;
   const material = materialParameters(node);
 
   function handleClick(event: ThreeEvent<MouseEvent>) {
     event.stopPropagation();
-    onSelect?.(node.id);
+    if (selectionEnabled) onSelect?.(node.id);
   }
 
   return (

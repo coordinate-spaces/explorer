@@ -11,6 +11,7 @@ interface CsgPrimitiveProps {
   expression: CsgExpression;
   isSelected?: boolean;
   onSelect?: (id: string) => void;
+  selectionEnabled?: boolean;
 }
 
 function brushFor(node: SpatialNode): Brush {
@@ -40,7 +41,7 @@ function csgOperation({ op }: CsgOperationNode) {
   }
 }
 
-export function CsgPrimitive({ expression, isSelected = false, onSelect }: CsgPrimitiveProps) {
+export function CsgPrimitive({ expression, isSelected = false, onSelect, selectionEnabled = true }: CsgPrimitiveProps) {
   const geometry = useMemo(() => {
     const evaluator = new Evaluator();
     evaluator.attributes = ['position', 'normal', 'uv'];
@@ -56,7 +57,7 @@ export function CsgPrimitive({ expression, isSelected = false, onSelect }: CsgPr
 
   function handleClick(event: ThreeEvent<MouseEvent>) {
     event.stopPropagation();
-    onSelect?.(expression.base.id);
+    if (selectionEnabled) onSelect?.(expression.base.id);
   }
 
   return (

@@ -56,10 +56,10 @@ function ResolvedModel({ model, node, targetScale }: { model: NonNullable<Spatia
   return <LoadedModel source={source} fit={model.fit} align={model.align} node={node} targetScale={targetScale} />;
 }
 
-export function ModelPrimitive({ node, isSelected = false, onSelect }: { node: SpatialNode; isSelected?: boolean; onSelect?: (id: string) => void }) {
+export function ModelPrimitive({ node, isSelected = false, onSelect, selectionEnabled = true }: { node: SpatialNode; isSelected?: boolean; onSelect?: (id: string) => void; selectionEnabled?: boolean }) {
   const model = node.model!;
   const { position, rotation, scale } = node.transform;
-  function handleClick(event: ThreeEvent<MouseEvent>) { event.stopPropagation(); onSelect?.(node.id); }
+  function handleClick(event: ThreeEvent<MouseEvent>) { event.stopPropagation(); if (selectionEnabled) onSelect?.(node.id); }
 
   return <group position={position} rotation={rotation} scale={scale} onClick={handleClick} userData={{ spatialNodeId: node.id, model: model.source }}>
     <ModelErrorBoundary key={`${model.source}:${model.fit}:${model.align}`}>
