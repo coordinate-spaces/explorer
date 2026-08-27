@@ -27,6 +27,7 @@ export function PovControls({ active, collision, speed, onLockChange, onSelectNo
   useEffect(() => {
     if (!active) {
       if (document.pointerLockElement === gl.domElement) document.exitPointerLock();
+      onLockChange(false);
       return;
     }
     const syncAnglesFromCamera = () => {

@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { OrbitControls, PerspectiveCamera } from '@react-three/drei';
 import { Canvas } from '@react-three/fiber';
 import type { SpatialDocument } from '../model/SpatialDocument';
-import type { SpatialNode } from '../model/SpatialNode';
 import { dimensionsFromNodes } from '../model/room';
 import { XyzCornerGrid } from './XyzCornerGrid';
 import { Lighting } from './Lighting';
@@ -15,6 +14,7 @@ import { cameraClipPlanes, cameraSceneScale } from './cameraScale';
 import { inspectionPose } from './cameraPlacement';
 import { PovControls } from './PovControls';
 import { Vector3, type PerspectiveCamera as ThreePerspectiveCamera } from 'three';
+import { cameraNodeForSelection } from './cameraSelection';
 
 export type CameraMode = 'orbit' | 'pov';
 
@@ -28,20 +28,12 @@ interface SceneRootProps {
 
 const DEFAULT_ORBIT_TARGET: [number, number, number] = [0.6, 0.5, 0.4];
 
-function selectedOrbitNode(spatialDocument: SpatialDocument, selectedNodeId?: string): SpatialNode | undefined {
-  if (!selectedNodeId) {
-    return undefined;
-  }
-
-  return (
-    spatialDocument.renderNodes.find((node) => node.id === selectedNodeId) ??
-    spatialDocument.csgExpressions.find((expression) => expression.base.id === selectedNodeId)?.base
-  );
-}
-
 export function SceneRoot({ document: spatialDocument, selectedNodeId, onSelectNode, cameraMode, onCameraModeChange }: SceneRootProps) {
   const roomDimensions = dimensionsFromNodes(nodesForRoomSizing(spatialDocument));
-  const selectedNode = selectedOrbitNode(spatialDocument, selectedNodeId);
+  const selectedNode = useMemo(
+    () => cameraNodeForSelection(spatialDocument, selectedNodeId),
+    [selectedNodeId, spatialDocument],
+  );
   const sceneScale = cameraSceneScale(nodesForRoomSizing(spatialDocument), selectedNode);
   const clips = cameraClipPlanes(sceneScale, Math.max(roomDimensions.width, roomDimensions.height, roomDimensions.depth));
   const [speedMultiplier, setSpeedMultiplier] = useState(1);
