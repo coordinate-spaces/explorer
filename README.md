@@ -9,6 +9,12 @@ npm install
 npm run dev
 ```
 
+## Camera navigation
+
+The viewer supports both orbit and first-person **POV** cameras. Choose **POV** in the lower-right camera controls, then click the viewport to capture the pointer. Use WASD or the arrow keys to move, E/Space and Q to move vertically, Alt or Control for precision movement, Shift for a speed boost, and Escape to release the pointer. The movement and near-clipping scales adapt to the smallest selected geometry so centimetre- and millimetre-scale interiors remain navigable.
+
+POV navigation defaults to **No clip**, which is useful for entering enclosed or subtracted composite geometry. Enable **Collision** when surface blocking is preferred. The speed control changes the scale-aware movement rate, **Focus selection** moves to a safe inspection pose outside the selected object, and the center crosshair selects geometry while the pointer is captured.
+
 
 ## Deploy to GitHub Pages
 

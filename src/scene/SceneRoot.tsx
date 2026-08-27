@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { OrbitControls, PerspectiveCamera } from '@react-three/drei';
 import { Canvas } from '@react-three/fiber';
 import type { SpatialDocument } from '../model/SpatialDocument';
@@ -11,11 +11,19 @@ import { CsgPrimitive } from './CsgPrimitive';
 import { SpatialPrimitive } from './SpatialPrimitive';
 import { ModelPrimitive } from './ModelPrimitive';
 import { nodesForRoomSizing } from './roomSizing';
+import { cameraClipPlanes, cameraSceneScale } from './cameraScale';
+import { inspectionPose } from './cameraPlacement';
+import { PovControls } from './PovControls';
+import { Vector3, type PerspectiveCamera as ThreePerspectiveCamera } from 'three';
+
+export type CameraMode = 'orbit' | 'pov';
 
 interface SceneRootProps {
   document: SpatialDocument;
   selectedNodeId?: string;
   onSelectNode?: (id: string | undefined) => void;
+  cameraMode: CameraMode;
+  onCameraModeChange: (mode: CameraMode) => void;
 }
 
 const DEFAULT_ORBIT_TARGET: [number, number, number] = [0.6, 0.5, 0.4];
@@ -31,25 +39,48 @@ function selectedOrbitNode(spatialDocument: SpatialDocument, selectedNodeId?: st
   );
 }
 
-export function SceneRoot({ document: spatialDocument, selectedNodeId, onSelectNode }: SceneRootProps) {
+export function SceneRoot({ document: spatialDocument, selectedNodeId, onSelectNode, cameraMode, onCameraModeChange }: SceneRootProps) {
   const roomDimensions = dimensionsFromNodes(nodesForRoomSizing(spatialDocument));
+  const selectedNode = selectedOrbitNode(spatialDocument, selectedNodeId);
+  const sceneScale = cameraSceneScale(nodesForRoomSizing(spatialDocument), selectedNode);
+  const clips = cameraClipPlanes(sceneScale, Math.max(roomDimensions.width, roomDimensions.height, roomDimensions.depth));
+  const [speedMultiplier, setSpeedMultiplier] = useState(1);
+  const [collision, setCollision] = useState(false);
+  const [pointerLocked, setPointerLocked] = useState(false);
+  const [focusRequest, setFocusRequest] = useState(0);
+  const [resetRequest, setResetRequest] = useState(0);
   const orbitTarget = useMemo(() => {
-    const selectedNode = selectedOrbitNode(spatialDocument, selectedNodeId);
-
     return selectedNode?.transform.position ?? DEFAULT_ORBIT_TARGET;
-  }, [selectedNodeId, spatialDocument]);
+  }, [selectedNode]);
+
+  const cameraRef = useRef<ThreePerspectiveCamera>(null);
+  const handledFocusRequest = useRef(0);
+  useEffect(() => {
+    if (!selectedNode || !cameraRef.current || focusRequest === handledFocusRequest.current) return;
+    handledFocusRequest.current = focusRequest;
+    const forward = cameraRef.current.getWorldDirection(new Vector3()).toArray() as [number, number, number];
+    const pose = inspectionPose(selectedNode, forward);
+    cameraRef.current.position.set(...pose.position);
+    cameraRef.current.lookAt(...pose.target);
+  }, [focusRequest, selectedNode]);
+  useEffect(() => {
+    if (!cameraRef.current || resetRequest === 0) return;
+    cameraRef.current.position.set(1.4, 1.1, 1.8);
+    cameraRef.current.lookAt(...DEFAULT_ORBIT_TARGET);
+  }, [resetRequest]);
 
   return (
+    <div className="scene-viewport">
     <Canvas
       className="scene-canvas"
       shadows
       gl={{ antialias: true }}
       onPointerMissed={() => {
-        onSelectNode?.(undefined);
+        if (cameraMode === 'orbit') onSelectNode?.(undefined);
       }}
     >
       <color attach="background" args={['#151820']} />
-      <PerspectiveCamera makeDefault position={[1.4, 1.1, 1.8]} fov={45} />
+      <PerspectiveCamera ref={cameraRef} makeDefault position={[1.4, 1.1, 1.8]} fov={45} near={clips.near} far={clips.far} />
       <Lighting />
       <XyzCornerGrid {...roomDimensions} />
       {spatialDocument.csgExpressions.map((expression) => (
@@ -69,7 +100,29 @@ export function SceneRoot({ document: spatialDocument, selectedNodeId, onSelectN
           <SpatialPrimitive key={node.id} isSelected={node.id === selectedNodeId} node={node} onSelect={onSelectNode} />
         )
       ))}
-      <OrbitControls target={orbitTarget} maxPolarAngle={Math.PI} />
+      {cameraMode === 'orbit' ? <OrbitControls target={orbitTarget} maxPolarAngle={Math.PI} /> : null}
+      <PovControls
+        active={cameraMode === 'pov'}
+        collision={collision}
+        speed={sceneScale * 1.5 * speedMultiplier}
+        onLockChange={setPointerLocked}
+        onSelectNode={onSelectNode}
+      />
     </Canvas>
+    <section className={`camera-controls camera-controls--${cameraMode}`} aria-label="Camera navigation">
+      <div className="camera-mode-switch" role="group" aria-label="Camera mode">
+        <button type="button" aria-pressed={cameraMode === 'orbit'} onClick={() => onCameraModeChange('orbit')}>Orbit</button>
+        <button type="button" aria-pressed={cameraMode === 'pov'} onClick={() => onCameraModeChange('pov')}>POV</button>
+      </div>
+      {cameraMode === 'pov' ? <>
+        <p>{pointerLocked ? 'WASD move · E/Q up/down · Alt precision · Shift boost · Esc release' : 'Click the viewport to look around'}</p>
+        <label>Speed <input aria-label="POV movement speed" type="range" min="0.1" max="4" step="0.1" value={speedMultiplier} onChange={(event) => setSpeedMultiplier(Number(event.target.value))} /> <span>{(sceneScale * 1.5 * speedMultiplier).toPrecision(2)} u/s</span></label>
+        <button className="camera-option" type="button" aria-pressed={collision} onClick={() => setCollision((value) => !value)}>{collision ? 'Collision on' : 'No clip'}</button>
+        <button className="camera-option" type="button" disabled={!selectedNode} onClick={() => setFocusRequest((value) => value + 1)}>Focus selection</button>
+        <button className="camera-option" type="button" onClick={() => setResetRequest((value) => value + 1)}>Reset camera</button>
+      </> : null}
+    </section>
+    {cameraMode === 'pov' && pointerLocked ? <div className="pov-crosshair" aria-hidden="true">+</div> : null}
+    </div>
   );
 }
