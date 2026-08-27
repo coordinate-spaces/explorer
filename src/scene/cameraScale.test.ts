@@ -18,6 +18,14 @@ describe('camera scene scale', () => {
     expect(cameraSceneScale([node([2, 2, 2])], node([0.01, 0.02, 0.03]))).toBe(0.01);
   });
 
+  it('uses overall scene extent when no object is selected', () => {
+    expect(cameraSceneScale([node([100, 0.01, 100])])).toBe(10);
+    expect(cameraSceneScale([
+      node([1, 1, 1], [-20, 0, 0]),
+      node([1, 1, 1], [20, 0, 0]),
+    ])).toBe(10);
+  });
+
   it('has safe empty-scene and degenerate fallbacks', () => {
     expect(cameraSceneScale([])).toBe(1);
     expect(cameraSceneScale([node([0, 0, 0])])).toBe(1);

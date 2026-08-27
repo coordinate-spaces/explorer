@@ -14,10 +14,22 @@ function smallestPositiveDimension(node: SpatialNode): number | undefined {
   return dimensions.length > 0 ? Math.min(...dimensions) : undefined;
 }
 
+function overallSceneExtent(nodes: readonly SpatialNode[]): number | undefined {
+  const axisExtents = [
+    nodes.flatMap(({ bounds }) => [bounds.minX, bounds.maxX]),
+    nodes.flatMap(({ bounds }) => [bounds.minY, bounds.maxY]),
+    nodes.flatMap(({ bounds }) => [bounds.minZ, bounds.maxZ]),
+  ].map((axisValues) => {
+    const values = axisValues.filter(Number.isFinite);
+    return values.length > 0 ? Math.max(...values) - Math.min(...values) : 0;
+  });
+  const extent = Math.max(...axisExtents);
+  return extent > 0 ? extent : undefined;
+}
+
 export function cameraSceneScale(nodes: readonly SpatialNode[], selectedNode?: SpatialNode): number {
   const selectedScale = selectedNode && smallestPositiveDimension(selectedNode);
-  const dimensions = selectedScale ? [selectedScale] : nodes.flatMap((node) => smallestPositiveDimension(node) ?? []);
-  const scale = dimensions.length > 0 ? Math.min(...dimensions) : 1;
+  const scale = selectedScale ?? overallSceneExtent(nodes) ?? 1;
   return Math.min(MAX_SCENE_SCALE, Math.max(MIN_SCENE_SCALE, scale));
 }
 
