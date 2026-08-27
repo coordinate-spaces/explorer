@@ -1,7 +1,8 @@
 import { useEffect, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
-import { Euler, MathUtils, Raycaster, Vector2, Vector3 } from 'three';
+import { Euler, MathUtils, Raycaster, Vector2 } from 'three';
 import { spatialNodeIdFromObject } from './povPicking';
+import { worldAlignedPovMovement } from './povNavigation';
 
 interface PovControlsProps {
   active: boolean;
@@ -20,17 +21,25 @@ export function PovControls({ active, collision, speed, onLockChange, onSelectNo
   const keys = useRef(new Set<string>());
   const yaw = useRef(0);
   const pitch = useRef(0);
-  const raycaster = useRef(new Raycaster());
+  const selectionRaycaster = useRef(new Raycaster());
+  const collisionRaycaster = useRef(new Raycaster());
 
   useEffect(() => {
     if (!active) {
       if (document.pointerLockElement === gl.domElement) document.exitPointerLock();
       return;
     }
-    const euler = new Euler().setFromQuaternion(camera.quaternion, 'YXZ');
-    yaw.current = euler.y;
-    pitch.current = euler.x;
-    const lockChange = () => onLockChange(document.pointerLockElement === gl.domElement);
+    const syncAnglesFromCamera = () => {
+      const euler = new Euler().setFromQuaternion(camera.quaternion, 'YXZ');
+      yaw.current = euler.y;
+      pitch.current = euler.x;
+    };
+    syncAnglesFromCamera();
+    const lockChange = () => {
+      const locked = document.pointerLockElement === gl.domElement;
+      if (locked) syncAnglesFromCamera();
+      onLockChange(locked);
+    };
     const keyDown = (event: KeyboardEvent) => { if (!editableTarget(event.target)) keys.current.add(event.code); };
     const keyUp = (event: KeyboardEvent) => keys.current.delete(event.code);
     const mouseMove = (event: MouseEvent) => {
@@ -45,8 +54,8 @@ export function PovControls({ active, collision, speed, onLockChange, onSelectNo
         return;
       }
       if (event.button === 0) {
-        raycaster.current.setFromCamera(new Vector2(0, 0), camera);
-        const hit = raycaster.current.intersectObjects(scene.children, true).find(({ object }) => spatialNodeIdFromObject(object));
+        selectionRaycaster.current.setFromCamera(new Vector2(0, 0), camera);
+        const hit = selectionRaycaster.current.intersectObjects(scene.children, true).find(({ object }) => spatialNodeIdFromObject(object));
         onSelectNode?.(hit ? spatialNodeIdFromObject(hit.object) : undefined);
       }
     };
@@ -71,20 +80,19 @@ export function PovControls({ active, collision, speed, onLockChange, onSelectNo
     const precision = keys.current.has('AltLeft') || keys.current.has('AltRight') || keys.current.has('ControlLeft');
     const boost = keys.current.has('ShiftLeft') || keys.current.has('ShiftRight');
     const distance = speed * delta * (precision ? 0.1 : boost ? 4 : 1);
-    const local = new Vector3(
-      Number(keys.current.has('KeyD') || keys.current.has('ArrowRight')) - Number(keys.current.has('KeyA') || keys.current.has('ArrowLeft')),
-      Number(keys.current.has('KeyE') || keys.current.has('Space')) - Number(keys.current.has('KeyQ')),
-      Number(keys.current.has('KeyS') || keys.current.has('ArrowDown')) - Number(keys.current.has('KeyW') || keys.current.has('ArrowUp')),
-    );
-    if (!local.lengthSq()) return;
-    local.normalize().applyQuaternion(camera.quaternion).multiplyScalar(distance);
+    const movement = worldAlignedPovMovement({
+      right: Number(keys.current.has('KeyD') || keys.current.has('ArrowRight')) - Number(keys.current.has('KeyA') || keys.current.has('ArrowLeft')),
+      up: Number(keys.current.has('KeyE') || keys.current.has('Space')) - Number(keys.current.has('KeyQ')),
+      backward: Number(keys.current.has('KeyS') || keys.current.has('ArrowDown')) - Number(keys.current.has('KeyW') || keys.current.has('ArrowUp')),
+    }, yaw.current, distance);
+    if (!movement.lengthSq()) return;
     if (collision) {
-      raycaster.current.set(camera.position, local.clone().normalize());
-      raycaster.current.far = Math.max(local.length() + speed * 0.08, speed * 0.12);
-      const blocked = raycaster.current.intersectObjects(scene.children, true).some(({ object }) => spatialNodeIdFromObject(object));
+      collisionRaycaster.current.set(camera.position, movement.clone().normalize());
+      collisionRaycaster.current.far = Math.max(movement.length() + speed * 0.08, speed * 0.12);
+      const blocked = collisionRaycaster.current.intersectObjects(scene.children, true).some(({ object }) => spatialNodeIdFromObject(object));
       if (blocked) return;
     }
-    camera.position.add(local);
+    camera.position.add(movement);
   });
 
   return null;
