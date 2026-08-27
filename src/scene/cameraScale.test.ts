@@ -1,6 +1,7 @@
-import { describe, expect, it } from 'vitest';
+import { PerspectiveCamera } from 'three';
+import { describe, expect, it, vi } from 'vitest';
 import type { SpatialNode } from '../model/SpatialNode';
-import { cameraClipPlanes, cameraSceneScale } from './cameraScale';
+import { cameraClipPlanes, cameraSceneScale, updateCameraClipPlanes } from './cameraScale';
 
 function node(dimensions: [number, number, number], position: [number, number, number] = [0, 0, 0]): SpatialNode {
   return {
@@ -25,5 +26,15 @@ describe('camera scene scale', () => {
   it('uses close clipping without sacrificing a useful far plane', () => {
     expect(cameraClipPlanes(0.001, [], [1.4, 1.1, 1.8])).toEqual({ near: 0.0001, far: 100 });
     expect(cameraClipPlanes(1, [node([1, 1, 1], [-300, 0, 0])], [1.4, 1.1, 1.8]).far).toBeGreaterThan(600);
+  });
+
+  it('grows the far plane from the live camera position as POV navigation moves away', () => {
+    const camera = new PerspectiveCamera(45, 1, 0.1, 100);
+    const updateProjectionMatrix = vi.spyOn(camera, 'updateProjectionMatrix');
+    camera.position.set(250, 0, 0);
+
+    expect(updateCameraClipPlanes(camera, 1, [node([1, 1, 1])])).toBe(true);
+    expect(camera.far).toBeGreaterThan(500);
+    expect(updateProjectionMatrix).toHaveBeenCalledOnce();
   });
 });

@@ -15,6 +15,7 @@ import { inspectionPose } from './cameraPlacement';
 import { PovControls } from './PovControls';
 import { Vector3, type PerspectiveCamera as ThreePerspectiveCamera } from 'three';
 import { cameraNodeForSelection } from './cameraSelection';
+import { CameraClipController } from './CameraClipController';
 
 export type CameraMode = 'orbit' | 'pov';
 
@@ -103,6 +104,7 @@ export function SceneRoot({ document: spatialDocument, selectedNodeId, onSelectN
         onLockChange={setPointerLocked}
         onSelectNode={onSelectNode}
       />
+      <CameraClipController nodes={cameraSizingNodes} scale={sceneScale} />
     </Canvas>
     <section className={`camera-controls camera-controls--${cameraMode}`} aria-label="Camera navigation">
       <div className="camera-mode-switch" role="group" aria-label="Camera mode">

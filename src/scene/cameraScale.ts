@@ -1,3 +1,4 @@
+import type { PerspectiveCamera } from 'three';
 import type { SpatialNode } from '../model/SpatialNode';
 
 const MIN_SCENE_SCALE = 0.001;
@@ -36,4 +37,29 @@ export function cameraClipPlanes(
     near: Math.max(0.0001, Math.min(0.05, scale * 0.02)),
     far: Math.max(100, farthestDistance * 2),
   };
+}
+
+export function updateCameraClipPlanes(
+  camera: PerspectiveCamera,
+  scale: number,
+  nodes: readonly SpatialNode[],
+): boolean {
+  const position = camera.position.toArray() as [number, number, number];
+  const clips = cameraClipPlanes(scale, nodes, position);
+  let changed = false;
+
+  if (camera.near !== clips.near) {
+    camera.near = clips.near;
+    changed = true;
+  }
+
+  // Grow with headroom as the POV camera travels, avoiding a projection-matrix
+  // update on every movement frame while ensuring the scene remains in range.
+  if (clips.far > camera.far * 1.25) {
+    camera.far = clips.far * 1.5;
+    changed = true;
+  }
+
+  if (changed) camera.updateProjectionMatrix();
+  return changed;
 }
