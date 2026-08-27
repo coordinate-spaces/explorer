@@ -30,7 +30,7 @@ export function cameraNodeForSelection(
     .reduce((combined, { tool }) => unionBounds(combined, tool.bounds), expression.base.bounds);
   const precisionScales = [
     nodePrecisionScale(expression.base),
-    ...expression.operations.filter(({ op }) => op === 'union').map(({ tool }) => nodePrecisionScale(tool)),
+    ...expression.operations.filter(({ op }) => op !== 'subtraction').map(({ tool }) => nodePrecisionScale(tool)),
   ].filter((scale): scale is number => scale !== undefined);
   const position: [number, number, number] = [
     (bounds.minX + bounds.maxX) / 2,

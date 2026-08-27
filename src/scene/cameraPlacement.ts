@@ -14,7 +14,7 @@ export function inspectionPose(node: SpatialNode, forward: [number, number, numb
   );
   const dimensions = [node.bounds.maxX - node.bounds.minX, node.bounds.maxY - node.bounds.minY, node.bounds.maxZ - node.bounds.minZ]
     .filter((value) => Number.isFinite(value) && value > 0);
-  const distance = Math.max(0.05, (dimensions.length ? Math.max(...dimensions) : 1) * 1.5);
+  const distance = Math.max(0.0005, (dimensions.length ? Math.max(...dimensions) : 1) * 1.5);
   const direction = new Vector3(...forward);
   if (direction.lengthSq() === 0) direction.set(0, 0, -1);
   direction.normalize();

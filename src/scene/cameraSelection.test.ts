@@ -42,4 +42,17 @@ describe('cameraNodeForSelection', () => {
     const document: SpatialDocument = { id: 'document', nodes: [], renderNodes: [rendered], csgExpressions: [], diagnostics: [] };
     expect(cameraNodeForSelection(document, rendered.id)).toBe(rendered);
   });
+
+  it('includes intersection tools in CSG precision scale', () => {
+    const base = node('base', 0, 10);
+    const intersection = node('intersection', 0, 0.01);
+    intersection.transform.scale = [0.01, 0.01, 0.01];
+    const selected = cameraNodeForSelection(documentWith({
+      id: 'csg',
+      base,
+      operations: [{ op: 'intersection', tool: intersection }],
+    }), base.id);
+
+    expect(selected?.metadata?.cameraPrecisionScale).toBe(0.01);
+  });
 });
