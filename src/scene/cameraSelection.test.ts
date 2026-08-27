@@ -43,9 +43,9 @@ describe('cameraNodeForSelection', () => {
     expect(cameraNodeForSelection(document, rendered.id)).toBe(rendered);
   });
 
-  it('includes intersection tools in CSG precision scale', () => {
+  it('uses an intersection tool for CSG focus bounds, center, and precision scale', () => {
     const base = node('base', 0, 10);
-    const intersection = node('intersection', 0, 0.01);
+    const intersection = node('intersection', 8, 9);
     intersection.transform.scale = [0.01, 0.01, 0.01];
     const selected = cameraNodeForSelection(documentWith({
       id: 'csg',
@@ -53,6 +53,8 @@ describe('cameraNodeForSelection', () => {
       operations: [{ op: 'intersection', tool: intersection }],
     }), base.id);
 
+    expect(selected?.bounds).toEqual({ minX: 8, maxX: 9, minY: 0, maxY: 1, minZ: 0, maxZ: 1 });
+    expect(selected?.transform.position).toEqual([8.5, 0.5, 0.5]);
     expect(selected?.metadata?.cameraPrecisionScale).toBe(0.01);
   });
 });

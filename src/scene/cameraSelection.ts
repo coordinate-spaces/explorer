@@ -13,6 +13,23 @@ function unionBounds(bounds: SpatialBounds, addition: SpatialBounds): SpatialBou
   };
 }
 
+function intersectionBounds(bounds: SpatialBounds, constraint: SpatialBounds): SpatialBounds | undefined {
+  const intersection = {
+    minX: Math.max(bounds.minX, constraint.minX),
+    maxX: Math.min(bounds.maxX, constraint.maxX),
+    minY: Math.max(bounds.minY, constraint.minY),
+    maxY: Math.min(bounds.maxY, constraint.maxY),
+    minZ: Math.max(bounds.minZ, constraint.minZ),
+    maxZ: Math.min(bounds.maxZ, constraint.maxZ),
+  };
+
+  return intersection.minX <= intersection.maxX
+    && intersection.minY <= intersection.maxY
+    && intersection.minZ <= intersection.maxZ
+    ? intersection
+    : undefined;
+}
+
 export function cameraNodeForSelection(
   spatialDocument: SpatialDocument,
   selectedNodeId?: string,
@@ -25,9 +42,11 @@ export function cameraNodeForSelection(
   const expression = spatialDocument.csgExpressions.find(({ base }) => base.id === selectedNodeId);
   if (!expression) return undefined;
 
-  const bounds = expression.operations
-    .filter(({ op }) => op === 'union')
-    .reduce((combined, { tool }) => unionBounds(combined, tool.bounds), expression.base.bounds);
+  const bounds = expression.operations.reduce((combined, { op, tool }) => {
+    if (op === 'union') return unionBounds(combined, tool.bounds);
+    if (op === 'intersection') return intersectionBounds(combined, tool.bounds) ?? combined;
+    return combined;
+  }, expression.base.bounds);
   const precisionScales = [
     nodePrecisionScale(expression.base),
     ...expression.operations.filter(({ op }) => op !== 'subtraction').map(({ tool }) => nodePrecisionScale(tool)),
