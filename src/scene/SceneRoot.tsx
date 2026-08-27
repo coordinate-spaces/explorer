@@ -112,7 +112,7 @@ export function SceneRoot({ document: spatialDocument, selectedNodeId, onSelectN
         <button type="button" aria-pressed={cameraMode === 'pov'} onClick={() => onCameraModeChange('pov')}>POV</button>
       </div>
       {cameraMode === 'pov' ? <>
-        <p>{pointerLocked ? 'WASD move · E/Q up/down · Alt precision · Shift boost · Esc release' : 'Click the viewport to look around'}</p>
+        <p>{pointerLocked ? 'WASD move · E/Q up/down · Z precision · Shift boost · Esc release' : 'Click the viewport to look around'}</p>
         <label>Speed <input aria-label="POV movement speed" type="range" min="0.1" max="4" step="0.1" value={speedMultiplier} onChange={(event) => setSpeedMultiplier(Number(event.target.value))} /> <span>{(sceneScale * 1.5 * speedMultiplier).toPrecision(2)} u/s</span></label>
         <button className="camera-option" type="button" aria-pressed={collision} onClick={() => setCollision((value) => !value)}>{collision ? 'Collision on' : 'No clip'}</button>
         <button className="camera-option" type="button" disabled={!selectedNode} onClick={() => setFocusRequest((value) => value + 1)}>Focus selection</button>

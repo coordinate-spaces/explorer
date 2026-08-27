@@ -84,7 +84,7 @@ export function PovControls({ active, collision, speed, onLockChange, onSelectNo
   useFrame((_, frameDelta) => {
     if (!active || document.pointerLockElement !== gl.domElement) return;
     const delta = Math.min(frameDelta, 0.05);
-    const precision = keys.current.has('AltLeft') || keys.current.has('AltRight') || keys.current.has('ControlLeft');
+    const precision = keys.current.has('KeyZ');
     const boost = keys.current.has('ShiftLeft') || keys.current.has('ShiftRight');
     const distance = speed * delta * (precision ? 0.1 : boost ? 4 : 1);
     const movement = worldAlignedPovMovement({
