@@ -1,6 +1,7 @@
 import type { SpatialDocument } from '../model/SpatialDocument';
 import type { SpatialBounds, SpatialNode } from '../model/SpatialNode';
 import { nodePrecisionScale } from './cameraScale';
+import { evaluateCsgExpressionGeometry } from './csgGeometry';
 
 function unionBounds(bounds: SpatialBounds, addition: SpatialBounds): SpatialBounds {
   return {
@@ -42,12 +43,30 @@ export function cameraNodeForSelection(
   const expression = spatialDocument.csgExpressions.find(({ base }) => base.id === selectedNodeId);
   if (!expression) return undefined;
 
-  const bounds = expression.operations.reduce((combined, { op, tool }) => {
+  const fallbackBounds = expression.operations.reduce((combined, { op, tool }) => {
     if (op === 'union') return unionBounds(combined, tool.bounds);
     if (op === 'intersection') return intersectionBounds(combined, tool.bounds) ?? combined;
     return combined;
   }, expression.base.bounds);
+  const geometry = evaluateCsgExpressionGeometry(expression);
+  geometry.computeBoundingBox();
+  const evaluatedBounds = geometry.boundingBox && !geometry.boundingBox.isEmpty() ? geometry.boundingBox : undefined;
+  const bounds = evaluatedBounds ? {
+    minX: evaluatedBounds.min.x,
+    maxX: evaluatedBounds.max.x,
+    minY: evaluatedBounds.min.y,
+    maxY: evaluatedBounds.max.y,
+    minZ: evaluatedBounds.min.z,
+    maxZ: evaluatedBounds.max.z,
+  } : fallbackBounds;
+  geometry.dispose();
+  const evaluatedDimensions = evaluatedBounds ? [
+    evaluatedBounds.max.x - evaluatedBounds.min.x,
+    evaluatedBounds.max.y - evaluatedBounds.min.y,
+    evaluatedBounds.max.z - evaluatedBounds.min.z,
+  ].filter((dimension) => Number.isFinite(dimension) && dimension > 0) : [];
   const precisionScales = [
+    ...(evaluatedDimensions.length > 0 ? [Math.min(...evaluatedDimensions)] : []),
     nodePrecisionScale(expression.base),
     ...expression.operations.filter(({ op }) => op !== 'subtraction').map(({ tool }) => nodePrecisionScale(tool)),
   ].filter((scale): scale is number => scale !== undefined);

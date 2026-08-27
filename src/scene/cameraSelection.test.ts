@@ -28,7 +28,6 @@ describe('cameraNodeForSelection', () => {
       base,
       operations: [
         { op: 'union', tool: node('extension', 1, 5) },
-        { op: 'subtraction', tool: node('cutout', -4, 6) },
       ],
     }), base.id);
 
@@ -45,16 +44,30 @@ describe('cameraNodeForSelection', () => {
 
   it('uses an intersection tool for CSG focus bounds, center, and precision scale', () => {
     const base = node('base', 0, 10);
-    const intersection = node('intersection', 8, 9);
-    intersection.transform.scale = [0.01, 0.01, 0.01];
+    const intersection = node('intersection', 8, 8.01);
     const selected = cameraNodeForSelection(documentWith({
       id: 'csg',
       base,
       operations: [{ op: 'intersection', tool: intersection }],
     }), base.id);
 
-    expect(selected?.bounds).toEqual({ minX: 8, maxX: 9, minY: 0, maxY: 1, minZ: 0, maxZ: 1 });
-    expect(selected?.transform.position).toEqual([8.5, 0.5, 0.5]);
-    expect(selected?.metadata?.cameraPrecisionScale).toBe(0.01);
+    expect(selected?.bounds.minX).toBeCloseTo(8);
+    expect(selected?.bounds.maxX).toBeCloseTo(8.01);
+    expect(selected?.transform.position[0]).toBeCloseTo(8.005);
+    expect(selected?.metadata?.cameraPrecisionScale).toBeCloseTo(0.01);
+  });
+
+  it('uses the surviving CSG geometry after an asymmetric subtraction', () => {
+    const base = node('base', 0, 10);
+    const selected = cameraNodeForSelection(documentWith({
+      id: 'csg',
+      base,
+      operations: [{ op: 'subtraction', tool: node('cutout', 0.001, 11) }],
+    }), base.id);
+
+    expect(selected?.bounds.minX).toBeCloseTo(0);
+    expect(selected?.bounds.maxX).toBeCloseTo(0.001);
+    expect(selected?.transform.position[0]).toBeCloseTo(0.0005);
+    expect(selected?.metadata?.cameraPrecisionScale).toBeCloseTo(0.001);
   });
 });
