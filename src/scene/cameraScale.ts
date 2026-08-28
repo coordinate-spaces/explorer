@@ -17,11 +17,14 @@ export function nodePrecisionScale(node: SpatialNode): number | undefined {
   return dimensions.length > 0 ? Math.min(...dimensions) : undefined;
 }
 
-function overallSceneExtent(nodes: readonly SpatialNode[]): number | undefined {
+function overallSceneExtent(
+  nodes: readonly SpatialNode[],
+  referencePosition: readonly [number, number, number],
+): number | undefined {
   const axisExtents = [
-    nodes.flatMap(({ bounds }) => [bounds.minX, bounds.maxX]),
-    nodes.flatMap(({ bounds }) => [bounds.minY, bounds.maxY]),
-    nodes.flatMap(({ bounds }) => [bounds.minZ, bounds.maxZ]),
+    [referencePosition[0], ...nodes.flatMap(({ bounds }) => [bounds.minX, bounds.maxX])],
+    [referencePosition[1], ...nodes.flatMap(({ bounds }) => [bounds.minY, bounds.maxY])],
+    [referencePosition[2], ...nodes.flatMap(({ bounds }) => [bounds.minZ, bounds.maxZ])],
   ].map((axisValues) => {
     const values = axisValues.filter(Number.isFinite);
     return values.length > 0 ? Math.max(...values) - Math.min(...values) : 0;
@@ -30,9 +33,13 @@ function overallSceneExtent(nodes: readonly SpatialNode[]): number | undefined {
   return extent > 0 ? extent : undefined;
 }
 
-export function cameraSceneScale(nodes: readonly SpatialNode[], selectedNode?: SpatialNode): number {
+export function cameraSceneScale(
+  nodes: readonly SpatialNode[],
+  selectedNode?: SpatialNode,
+  referencePosition: readonly [number, number, number] = [0, 0, 0],
+): number {
   const selectedScale = selectedNode && nodePrecisionScale(selectedNode);
-  const scale = selectedScale ?? overallSceneExtent(nodes) ?? 1;
+  const scale = selectedScale ?? overallSceneExtent(nodes, referencePosition) ?? 1;
   return Math.min(MAX_SCENE_SCALE, Math.max(MIN_SCENE_SCALE, scale));
 }
 

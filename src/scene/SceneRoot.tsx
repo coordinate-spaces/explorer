@@ -16,6 +16,7 @@ import { PovControls } from './PovControls';
 import { Vector3, type PerspectiveCamera as ThreePerspectiveCamera } from 'three';
 import { cameraNodeForSelection } from './cameraSelection';
 import { CameraClipController } from './CameraClipController';
+import { povCollisionRadius } from './povNavigation';
 
 export type CameraMode = 'orbit' | 'pov';
 
@@ -37,7 +38,7 @@ export function SceneRoot({ document: spatialDocument, selectedNodeId, onSelectN
     () => cameraNodeForSelection(spatialDocument, selectedNodeId),
     [selectedNodeId, spatialDocument],
   );
-  const sceneScale = cameraSceneScale(cameraSizingNodes, selectedNode);
+  const sceneScale = cameraSceneScale(cameraSizingNodes, selectedNode, DEFAULT_CAMERA_POSITION);
   const clips = cameraClipPlanes(sceneScale, cameraSizingNodes, DEFAULT_CAMERA_POSITION);
   const [speedMultiplier, setSpeedMultiplier] = useState(1);
   const [collision, setCollision] = useState(false);
@@ -100,6 +101,7 @@ export function SceneRoot({ document: spatialDocument, selectedNodeId, onSelectN
       <PovControls
         active={cameraMode === 'pov'}
         collision={collision}
+        collisionRadius={povCollisionRadius(sceneScale)}
         speed={sceneScale * 1.5 * speedMultiplier}
         onLockChange={setPointerLocked}
         onSelectNode={onSelectNode}

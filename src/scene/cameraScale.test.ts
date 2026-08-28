@@ -33,6 +33,10 @@ describe('camera scene scale', () => {
     ])).toBe(10);
   });
 
+  it('includes distance from the initial camera in the unselected scene scale', () => {
+    expect(cameraSceneScale([node([1, 1, 1], [1000, 0, 0])], undefined, [1.4, 1.1, 1.8])).toBe(10);
+  });
+
   it('has safe empty-scene and degenerate fallbacks', () => {
     expect(cameraSceneScale([])).toBe(1);
     expect(cameraSceneScale([node([0, 0, 0])])).toBe(1);

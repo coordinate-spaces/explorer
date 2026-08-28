@@ -1,6 +1,8 @@
 import { Vector3 } from 'three';
 
 const WORLD_UP = new Vector3(0, 1, 0);
+const MIN_COLLISION_RADIUS = 0.0001;
+const MAX_COLLISION_RADIUS = 0.25;
 
 export interface PovMovementInput {
   right: number;
@@ -17,4 +19,13 @@ export function worldAlignedPovMovement(
   if (movement.lengthSq() === 0) return movement;
 
   return movement.normalize().applyAxisAngle(WORLD_UP, yaw).multiplyScalar(distance);
+}
+
+export function povCollisionRadius(sceneScale: number): number {
+  const scaledRadius = Number.isFinite(sceneScale) ? sceneScale * 0.05 : MIN_COLLISION_RADIUS;
+  return Math.min(MAX_COLLISION_RADIUS, Math.max(MIN_COLLISION_RADIUS, scaledRadius));
+}
+
+export function collisionProbeDistance(stepDistance: number, cameraRadius: number): number {
+  return Math.max(0, stepDistance) + Math.max(0, cameraRadius);
 }

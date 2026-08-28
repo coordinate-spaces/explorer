@@ -2,12 +2,13 @@ import { useEffect, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import { Euler, MathUtils, Raycaster, Vector2 } from 'three';
 import { spatialNodeIdForPovRaycast } from './povPicking';
-import { worldAlignedPovMovement } from './povNavigation';
+import { collisionProbeDistance, worldAlignedPovMovement } from './povNavigation';
 
 interface PovControlsProps {
   active: boolean;
   collision: boolean;
   speed: number;
+  collisionRadius: number;
   onLockChange: (locked: boolean) => void;
   onSelectNode?: (id: string | undefined) => void;
 }
@@ -16,7 +17,7 @@ function editableTarget(target: EventTarget | null): boolean {
   return target instanceof HTMLElement && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON'].includes(target.tagName));
 }
 
-export function PovControls({ active, collision, speed, onLockChange, onSelectNode }: PovControlsProps) {
+export function PovControls({ active, collision, collisionRadius, speed, onLockChange, onSelectNode }: PovControlsProps) {
   const { camera, gl, scene } = useThree();
   const keys = useRef(new Set<string>());
   const yaw = useRef(0);
@@ -95,7 +96,7 @@ export function PovControls({ active, collision, speed, onLockChange, onSelectNo
     if (!movement.lengthSq()) return;
     if (collision) {
       collisionRaycaster.current.set(camera.position, movement.clone().normalize());
-      collisionRaycaster.current.far = Math.max(movement.length() + speed * 0.08, speed * 0.12);
+      collisionRaycaster.current.far = collisionProbeDistance(movement.length(), collisionRadius);
       const blocked = collisionRaycaster.current.intersectObjects(scene.children, true)
         .some(({ object }) => spatialNodeIdForPovRaycast(object) !== undefined);
       if (blocked) return;
