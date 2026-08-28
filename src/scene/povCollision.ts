@@ -1,5 +1,16 @@
-import { Box3, BufferGeometry, Line3, Mesh, Ray, Triangle, Vector3, type Object3D } from 'three';
+import { Box3, BufferGeometry, DoubleSide, InstancedMesh, Line3, Matrix4, Mesh, Ray, Triangle, Vector3, type Object3D } from 'three';
+import { MeshBVH } from 'three-mesh-bvh';
 import { spatialNodeIdForPovCollision } from './povPicking';
+
+const geometryBoundsTrees = new WeakMap<BufferGeometry, MeshBVH>();
+
+function boundsTreeFor(geometry: BufferGeometry): MeshBVH {
+  const cached = geometryBoundsTrees.get(geometry);
+  if (cached) return cached;
+  const tree = new MeshBVH(geometry);
+  geometryBoundsTrees.set(geometry, tree);
+  return tree;
+}
 
 function segmentSegmentDistanceSquared(first: Line3, second: Line3): number {
   const u = first.delta(new Vector3());
@@ -42,25 +53,67 @@ function segmentTriangleDistanceSquared(segment: Line3, triangle: Triangle): num
   return distance;
 }
 
-function geometryIntersectsSweep(mesh: Mesh, sweep: Line3, radius: number): boolean {
-  const geometry = mesh.geometry as BufferGeometry;
-  const position = geometry.getAttribute('position');
-  if (!position) return false;
-  const index = geometry.getIndex();
-  const count = index?.count ?? position.count;
-  const a = new Vector3();
-  const b = new Vector3();
-  const c = new Vector3();
-  const triangle = new Triangle(a, b, c);
-  const radiusSquared = radius * radius;
+interface SweepMetrics {
+  hit: boolean;
+  startInside: boolean;
+  endInside: boolean;
+  startDistanceSquared: number;
+  endDistanceSquared: number;
+}
 
-  for (let offset = 0; offset + 2 < count; offset += 3) {
-    a.fromBufferAttribute(position, index?.getX(offset) ?? offset).applyMatrix4(mesh.matrixWorld);
-    b.fromBufferAttribute(position, index?.getX(offset + 1) ?? offset + 1).applyMatrix4(mesh.matrixWorld);
-    c.fromBufferAttribute(position, index?.getX(offset + 2) ?? offset + 2).applyMatrix4(mesh.matrixWorld);
-    if (segmentTriangleDistanceSquared(sweep, triangle) <= radiusSquared) return true;
-  }
-  return false;
+function pointInsideGeometry(tree: MeshBVH, point: Vector3): boolean {
+  const direction = new Vector3(0.8123, 0.3371, 0.4759).normalize();
+  const hits = tree.raycast(new Ray(point, direction), DoubleSide)
+    .map(({ distance }) => distance)
+    .sort((left, right) => left - right)
+    .filter((distance, index, values) => index === 0 || Math.abs(distance - values[index - 1]) > 1e-7);
+  return hits.length % 2 === 1;
+}
+
+function geometrySweepMetrics(
+  geometry: BufferGeometry,
+  matrixWorld: Matrix4,
+  sweep: Line3,
+  radius: number,
+): SweepMetrics {
+  const inverse = matrixWorld.clone().invert();
+  const localStart = sweep.start.clone().applyMatrix4(inverse);
+  const localEnd = sweep.end.clone().applyMatrix4(inverse);
+  const localRadius = radius * inverse.getMaxScaleOnAxis();
+  const localSweepBounds = new Box3().setFromPoints([localStart, localEnd]).expandByScalar(localRadius);
+  const radiusSquared = radius * radius;
+  const worldTriangle = new Triangle();
+  const closest = new Vector3();
+  const metrics: SweepMetrics = {
+    hit: false,
+    startInside: false,
+    endInside: false,
+    startDistanceSquared: Infinity,
+    endDistanceSquared: Infinity,
+  };
+  const tree = boundsTreeFor(geometry);
+  metrics.startInside = pointInsideGeometry(tree, localStart);
+  metrics.endInside = pointInsideGeometry(tree, localEnd);
+
+  tree.shapecast({
+    intersectsBounds: (bounds) => bounds.intersectsBox(localSweepBounds),
+    intersectsTriangle: (triangle) => {
+      worldTriangle.a.copy(triangle.a).applyMatrix4(matrixWorld);
+      worldTriangle.b.copy(triangle.b).applyMatrix4(matrixWorld);
+      worldTriangle.c.copy(triangle.c).applyMatrix4(matrixWorld);
+      metrics.startDistanceSquared = Math.min(
+        metrics.startDistanceSquared,
+        worldTriangle.closestPointToPoint(sweep.start, closest).distanceToSquared(sweep.start),
+      );
+      metrics.endDistanceSquared = Math.min(
+        metrics.endDistanceSquared,
+        worldTriangle.closestPointToPoint(sweep.end, closest).distanceToSquared(sweep.end),
+      );
+      if (segmentTriangleDistanceSquared(sweep, worldTriangle) <= radiusSquared) metrics.hit = true;
+      return false;
+    },
+  });
+  return metrics;
 }
 
 export function sweptSphereIntersectsScene(
@@ -70,15 +123,39 @@ export function sweptSphereIntersectsScene(
   radius: number,
 ): boolean {
   const sweep = new Line3(start, end);
-  const sweepBounds = new Box3().setFromPoints([start, end]).expandByScalar(radius);
-  let blocked = false;
+  let hit = false;
+  let startInside = false;
+  let endInside = false;
+  let startDistanceSquared = Infinity;
+  let endDistanceSquared = Infinity;
   scene.updateWorldMatrix(true, true);
   scene.traverse((object) => {
-    if (blocked || !(object instanceof Mesh) || !object.visible) return;
+    if (!(object instanceof Mesh) || !object.visible) return;
     if (spatialNodeIdForPovCollision(object) === undefined) return;
-    const objectBounds = new Box3().setFromObject(object);
-    if (!sweepBounds.intersectsBox(objectBounds.expandByScalar(radius))) return;
-    blocked = geometryIntersectsSweep(object, sweep, radius);
+    const transforms: Matrix4[] = [];
+    if (object instanceof InstancedMesh) {
+      const instanceMatrix = new Matrix4();
+      for (let index = 0; index < object.count; index += 1) {
+        object.getMatrixAt(index, instanceMatrix);
+        transforms.push(object.matrixWorld.clone().multiply(instanceMatrix));
+      }
+    } else {
+      transforms.push(object.matrixWorld);
+    }
+    transforms.forEach((matrixWorld) => {
+      const metrics = geometrySweepMetrics(object.geometry, matrixWorld, sweep, radius);
+      hit ||= metrics.hit;
+      startInside ||= metrics.startInside;
+      endInside ||= metrics.endInside;
+      startDistanceSquared = Math.min(startDistanceSquared, metrics.startDistanceSquared);
+      endDistanceSquared = Math.min(endDistanceSquared, metrics.endDistanceSquared);
+    });
   });
-  return blocked;
+  if (!hit) return false;
+  const radiusSquared = radius * radius;
+  const tolerance = Math.max(1e-12, radiusSquared * 1e-6);
+  const escapingInterior = startInside && (!endInside || endDistanceSquared < startDistanceSquared - tolerance);
+  const escapingOverlap = !startInside && startDistanceSquared <= radiusSquared
+    && endDistanceSquared > startDistanceSquared + tolerance;
+  return !(escapingInterior || escapingOverlap);
 }
