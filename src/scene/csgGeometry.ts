@@ -43,6 +43,26 @@ export function evaluateCsgExpressionGeometry(expression: CsgExpression): Buffer
   return result.geometry;
 }
 
+export interface EvaluatedCsgExpression {
+  geometry: BufferGeometry;
+  operationContributions: boolean[];
+}
+
+export function evaluateCsgExpressionWithContributions(expression: CsgExpression): EvaluatedCsgExpression {
+  const evaluator = new Evaluator();
+  evaluator.attributes = ['position', 'normal', 'uv'];
+  let result = brushFor(expression.base);
+  const operationContributions: boolean[] = [];
+
+  expression.operations.forEach((operation) => {
+    const before = csgGeometrySignature(result.geometry);
+    result = evaluator.evaluate(result, brushFor(operation.tool), csgOperation(operation));
+    operationContributions.push(!csgGeometrySignaturesEqual(before, csgGeometrySignature(result.geometry)));
+  });
+
+  return { geometry: result.geometry, operationContributions };
+}
+
 export interface CsgGeometrySignature {
   triangleCount: number;
   surfaceArea: number;

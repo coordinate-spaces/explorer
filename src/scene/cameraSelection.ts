@@ -1,7 +1,7 @@
 import type { SpatialDocument } from '../model/SpatialDocument';
 import type { SpatialBounds, SpatialNode } from '../model/SpatialNode';
 import { nodePrecisionScale } from './cameraScale';
-import { csgGeometrySignature, csgGeometrySignaturesEqual, evaluateCsgExpressionGeometry } from './csgGeometry';
+import { evaluateCsgExpressionWithContributions } from './csgGeometry';
 
 function unionBounds(bounds: SpatialBounds, addition: SpatialBounds): SpatialBounds {
   return {
@@ -48,8 +48,7 @@ export function cameraNodeForSelection(
     if (op === 'intersection') return intersectionBounds(combined, tool.bounds) ?? combined;
     return combined;
   }, expression.base.bounds);
-  const geometry = evaluateCsgExpressionGeometry(expression);
-  const evaluatedSignature = csgGeometrySignature(geometry);
+  const { geometry, operationContributions } = evaluateCsgExpressionWithContributions(expression);
   geometry.computeBoundingBox();
   const evaluatedBounds = geometry.boundingBox && !geometry.boundingBox.isEmpty() ? geometry.boundingBox : undefined;
   const bounds = evaluatedBounds ? {
@@ -69,15 +68,9 @@ export function cameraNodeForSelection(
   const precisionScales = [
     ...(evaluatedDimensions.length > 0 ? [Math.min(...evaluatedDimensions)] : []),
     nodePrecisionScale(expression.base),
-    ...expression.operations.map(({ tool }, operationIndex) => {
-      const withoutOperation = evaluateCsgExpressionGeometry({
-        ...expression,
-        operations: expression.operations.filter((_, index) => index !== operationIndex),
-      });
-      const contributes = !csgGeometrySignaturesEqual(evaluatedSignature, csgGeometrySignature(withoutOperation));
-      withoutOperation.dispose();
-      return contributes ? nodePrecisionScale(tool) : undefined;
-    }),
+    ...expression.operations.map(({ tool }, operationIndex) => (
+      operationContributions[operationIndex] ? nodePrecisionScale(tool) : undefined
+    )),
   ].filter((scale): scale is number => scale !== undefined);
   const position: [number, number, number] = [
     (bounds.minX + bounds.maxX) / 2,

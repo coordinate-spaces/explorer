@@ -1,8 +1,9 @@
 import { useEffect, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import { Euler, MathUtils, Raycaster, Vector2 } from 'three';
-import { spatialNodeIdForPovCollision, spatialNodeIdForPovRaycast } from './povPicking';
-import { collisionProbeDistance, collisionProbeOrigins, worldAlignedPovMovement } from './povNavigation';
+import { spatialNodeIdForPovRaycast } from './povPicking';
+import { worldAlignedPovMovement } from './povNavigation';
+import { sweptSphereIntersectsScene } from './povCollision';
 
 interface PovControlsProps {
   active: boolean;
@@ -23,7 +24,6 @@ export function PovControls({ active, collision, collisionRadius, speed, onLockC
   const yaw = useRef(0);
   const pitch = useRef(0);
   const selectionRaycaster = useRef(new Raycaster());
-  const collisionRaycaster = useRef(new Raycaster());
 
   useEffect(() => {
     if (!active) {
@@ -94,19 +94,12 @@ export function PovControls({ active, collision, collisionRadius, speed, onLockC
       backward: Number(keys.current.has('KeyS') || keys.current.has('ArrowDown')) - Number(keys.current.has('KeyW') || keys.current.has('ArrowUp')),
     }, yaw.current, distance);
     if (!movement.lengthSq()) return;
-    if (collision) {
-      const direction = movement.clone().normalize();
-      const probeOrigins = collisionProbeOrigins(camera.position, direction, collisionRadius);
-      const blocked = probeOrigins.some((origin, index) => {
-        collisionRaycaster.current.set(origin, direction);
-        collisionRaycaster.current.far = index === 0
-          ? collisionProbeDistance(movement.length(), collisionRadius)
-          : movement.length();
-        return collisionRaycaster.current.intersectObjects(scene.children, true)
-          .some(({ object }) => spatialNodeIdForPovCollision(object) !== undefined);
-      });
-      if (blocked) return;
-    }
+    if (collision && sweptSphereIntersectsScene(
+      scene,
+      camera.position,
+      camera.position.clone().add(movement),
+      collisionRadius,
+    )) return;
     camera.position.add(movement);
   });
 
