@@ -93,7 +93,7 @@ export function cameraNodeForSelection(
       .filter((node): node is SpatialNode => node !== undefined);
     const descendants = [...renderedDescendants, ...csgDescendants];
 
-    return descendants.length > 0 ? nodeWithAggregateBounds(hierarchyNode, descendants) : hierarchyNode;
+    return descendants.length > 0 ? nodeWithAggregateBounds(hierarchyNode, descendants) : undefined;
   }
 
   const fallbackBounds = expression.operations.reduce((combined, { op, tool }) => {

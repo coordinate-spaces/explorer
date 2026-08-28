@@ -81,6 +81,19 @@ describe('cameraNodeForSelection', () => {
     });
   });
 
+  it('does not create selection bounds for an unrendered hierarchy declaration', () => {
+    const declaration = { ...node('unrendered', 20, 21), renderable: false };
+    const document: SpatialDocument = {
+      id: 'document',
+      nodes: [declaration],
+      renderNodes: [],
+      csgExpressions: [],
+      diagnostics: [],
+    };
+
+    expect(cameraNodeForSelection(document, declaration.id)).toBeUndefined();
+  });
+
   it('uses an intersection tool for CSG focus bounds, center, and precision scale', () => {
     const base = node('base', 0, 10);
     const intersection = node('intersection', 8, 8.01);
