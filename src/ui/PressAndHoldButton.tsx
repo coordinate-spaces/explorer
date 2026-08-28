@@ -31,7 +31,13 @@ export function PressAndHoldButton({ onActivate, onPointerDown, onPointerUp, onP
   return <button
     {...props}
     type={props.type ?? 'button'}
-    onPointerDown={(event) => { event.currentTarget.setPointerCapture(event.pointerId); start(); onPointerDown?.(event); }}
+    onPointerDown={(event) => {
+      if (event.button === 0) {
+        event.currentTarget.setPointerCapture(event.pointerId);
+        start();
+      }
+      onPointerDown?.(event);
+    }}
     onPointerUp={(event) => { stop(); onPointerUp?.(event); }}
     onPointerCancel={(event) => { stop(); onPointerCancel?.(event); }}
     onPointerLeave={(event) => { if (!event.currentTarget.hasPointerCapture(event.pointerId)) stop(); onPointerLeave?.(event); }}

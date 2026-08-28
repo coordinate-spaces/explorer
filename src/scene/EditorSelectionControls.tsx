@@ -43,7 +43,7 @@ export function EditorSelectionControls({ active, canEditSelection, linearStep, 
         w: ['z', -linearStep], s: ['z', linearStep],
       };
       const move = movement[key];
-      if (move) {
+      if (move && !event.metaKey && !event.ctrlKey) {
         event.preventDefault();
         onMove(...move);
         return;
