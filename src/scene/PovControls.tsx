@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import { Euler, MathUtils, Raycaster, Vector2 } from 'three';
 import { spatialNodeIdForPovCollision, spatialNodeIdForPovRaycast } from './povPicking';
-import { collisionProbeDistance, worldAlignedPovMovement } from './povNavigation';
+import { collisionProbeDistance, collisionProbeOrigins, worldAlignedPovMovement } from './povNavigation';
 
 interface PovControlsProps {
   active: boolean;
@@ -95,10 +95,16 @@ export function PovControls({ active, collision, collisionRadius, speed, onLockC
     }, yaw.current, distance);
     if (!movement.lengthSq()) return;
     if (collision) {
-      collisionRaycaster.current.set(camera.position, movement.clone().normalize());
-      collisionRaycaster.current.far = collisionProbeDistance(movement.length(), collisionRadius);
-      const blocked = collisionRaycaster.current.intersectObjects(scene.children, true)
-        .some(({ object }) => spatialNodeIdForPovCollision(object) !== undefined);
+      const direction = movement.clone().normalize();
+      const probeOrigins = collisionProbeOrigins(camera.position, direction, collisionRadius);
+      const blocked = probeOrigins.some((origin, index) => {
+        collisionRaycaster.current.set(origin, direction);
+        collisionRaycaster.current.far = index === 0
+          ? collisionProbeDistance(movement.length(), collisionRadius)
+          : movement.length();
+        return collisionRaycaster.current.intersectObjects(scene.children, true)
+          .some(({ object }) => spatialNodeIdForPovCollision(object) !== undefined);
+      });
       if (blocked) return;
     }
     camera.position.add(movement);

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { collisionProbeDistance, povCollisionRadius, worldAlignedPovMovement } from './povNavigation';
+import { Vector3 } from 'three';
+import { collisionProbeDistance, collisionProbeOrigins, povCollisionRadius, worldAlignedPovMovement } from './povNavigation';
 
 describe('worldAlignedPovMovement', () => {
   it('keeps vertical movement on the world Y axis', () => {
@@ -23,5 +24,19 @@ describe('worldAlignedPovMovement', () => {
     expect(povCollisionRadius(4)).toBeCloseTo(0.2);
     expect(povCollisionRadius(100)).toBe(0.25);
     expect(collisionProbeDistance(0.1, 0.2)).toBeCloseTo(0.3);
+  });
+
+  it('places swept-radius probes around the movement axis', () => {
+    const position = new Vector3(1, 2, 3);
+    const direction = new Vector3(1, 0, 0);
+    const origins = collisionProbeOrigins(position, direction, 0.2);
+
+    expect(origins).toHaveLength(9);
+    expect(origins[0].toArray()).toEqual(position.toArray());
+    origins.slice(1).forEach((origin) => {
+      const offset = origin.clone().sub(position);
+      expect(offset.length()).toBeCloseTo(0.2);
+      expect(offset.dot(direction)).toBeCloseTo(0);
+    });
   });
 });
