@@ -11,7 +11,7 @@ import {
   sceneHighlightIdForNode,
   selectionTargetForNodeId,
 } from './selection';
-import { SceneRoot } from './scene/SceneRoot';
+import { SceneRoot, type CameraMode } from './scene/SceneRoot';
 import { fetchPublicKeyTransactions, fetchTipHeight, normalizeEndpoint } from './transactions/publicKeyTransactions';
 import { createPublicKeyShareUrl, readPublicKeyFromUrl } from './transactions/publicKeyShareUrl';
 import { composeTransactionSources } from './transactions/composeTransactionSources';
@@ -157,6 +157,7 @@ export default function App() {
   const [remoteBaselineAppliedToEditor, setRemoteBaselineAppliedToEditor] = useState('');
   const latestRemoteBaselineRef = useRef('');
   const [appMode, setAppMode] = useState<'viewer' | 'editor'>('viewer');
+  const [cameraMode, setCameraMode] = useState<CameraMode>('orbit');
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [selectedNodeId, setSelectedNodeId] = useState<string | undefined>();
   const [selectedLeafNodeId, setSelectedLeafNodeId] = useState<string | undefined>();
@@ -809,6 +810,8 @@ export default function App() {
         document={document}
         selectedNodeId={selectedSceneNodeId}
         onSelectNode={handleSelectNode}
+        cameraMode={cameraMode}
+        onCameraModeChange={setCameraMode}
       />
       <XyzDslDrawer
         appMode={appMode}

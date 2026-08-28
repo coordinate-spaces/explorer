@@ -1,11 +1,11 @@
-import { Component, Suspense, useEffect, useMemo, type ErrorInfo, type ReactNode } from 'react';
+import { Component, Suspense, useCallback, useEffect, useMemo, type ErrorInfo, type ReactNode } from 'react';
 import { Edges, useGLTF } from '@react-three/drei';
 import type { ThreeEvent } from '@react-three/fiber';
 import { SkeletonUtils } from 'three-stdlib';
 import { Box3, Color, type Material, type Mesh } from 'three';
 import type { SpatialNode } from '../model/SpatialNode';
 import { resolveModelUrl } from '../model/resolveModelUrl';
-import { modelFitTransformFromBounds } from './modelFit';
+import { modelFitTransformFromBounds, renderedModelPrecisionScale } from './modelFit';
 
 function ModelBox({ color }: { color: string }) {
   return <mesh><boxGeometry /><meshStandardMaterial color={color} wireframe transparent opacity={0.45} /></mesh>;
@@ -18,7 +18,7 @@ class ModelErrorBoundary extends Component<{ children: ReactNode }, { failed: bo
   render() { return this.state.failed ? <ModelBox color="#ef4444" /> : this.props.children; }
 }
 
-function LoadedModel({ source, fit, align, node, targetScale }: { source: string; fit: 'contain' | 'stretch'; align: 'center' | 'floor'; node: SpatialNode; targetScale: [number, number, number] }) {
+function LoadedModel({ source, fit, align, node, targetScale, onPrecisionScaleChange }: { source: string; fit: 'contain' | 'stretch'; align: 'center' | 'floor'; node: SpatialNode; targetScale: [number, number, number]; onPrecisionScaleChange?: (scale: number | undefined) => void }) {
   const gltf = useGLTF(source);
   const imported = useMemo(() => {
     const clone = SkeletonUtils.clone(gltf.scene);
@@ -48,24 +48,32 @@ function LoadedModel({ source, fit, align, node, targetScale }: { source: string
     () => modelFitTransformFromBounds(imported.bounds, fit, align, targetScale),
     [imported.bounds, fit, align, targetScale],
   );
+  useEffect(() => {
+    onPrecisionScaleChange?.(renderedModelPrecisionScale(imported.bounds, fitted.scale, targetScale));
+    return () => onPrecisionScaleChange?.(undefined);
+  }, [fitted.scale, imported.bounds, onPrecisionScaleChange, targetScale]);
   return <group scale={fitted.scale}><group position={fitted.position}><primitive object={imported.scene} /></group></group>;
 }
 
-function ResolvedModel({ model, node, targetScale }: { model: NonNullable<SpatialNode['model']>; node: SpatialNode; targetScale: [number, number, number] }) {
+function ResolvedModel({ model, node, targetScale, onPrecisionScaleChange }: { model: NonNullable<SpatialNode['model']>; node: SpatialNode; targetScale: [number, number, number]; onPrecisionScaleChange?: (scale: number | undefined) => void }) {
   const source = resolveModelUrl(model.source!);
-  return <LoadedModel source={source} fit={model.fit} align={model.align} node={node} targetScale={targetScale} />;
+  return <LoadedModel source={source} fit={model.fit} align={model.align} node={node} targetScale={targetScale} onPrecisionScaleChange={onPrecisionScaleChange} />;
 }
 
-export function ModelPrimitive({ node, isSelected = false, onSelect }: { node: SpatialNode; isSelected?: boolean; onSelect?: (id: string) => void }) {
+export function ModelPrimitive({ node, isSelected = false, onSelect, selectionEnabled = true, onPrecisionScaleChange }: { node: SpatialNode; isSelected?: boolean; onSelect?: (id: string) => void; selectionEnabled?: boolean; onPrecisionScaleChange?: (id: string, scale: number | undefined) => void }) {
   const model = node.model!;
   const { position, rotation, scale } = node.transform;
-  function handleClick(event: ThreeEvent<MouseEvent>) { event.stopPropagation(); onSelect?.(node.id); }
+  const handlePrecisionScaleChange = useCallback(
+    (precisionScale: number | undefined) => onPrecisionScaleChange?.(node.id, precisionScale),
+    [node.id, onPrecisionScaleChange],
+  );
+  function handleClick(event: ThreeEvent<MouseEvent>) { event.stopPropagation(); if (selectionEnabled) onSelect?.(node.id); }
 
   return <group position={position} rotation={rotation} scale={scale} onClick={handleClick} userData={{ spatialNodeId: node.id, model: model.source }}>
     <ModelErrorBoundary key={`${model.source}:${model.fit}:${model.align}`}>
-      <Suspense fallback={<ModelBox color="#60a5fa" />}><ResolvedModel model={model} node={node} targetScale={scale} /></Suspense>
+      <Suspense fallback={<ModelBox color="#60a5fa" />}><ResolvedModel model={model} node={node} targetScale={scale} onPrecisionScaleChange={handlePrecisionScaleChange} /></Suspense>
     </ModelErrorBoundary>
-    <mesh scale={isSelected ? 1.03 : 1}>
+    <mesh scale={isSelected ? 1.03 : 1} userData={{ povCollisionIgnored: true }}>
       <boxGeometry />
       <meshBasicMaterial transparent opacity={0} depthWrite={false} />
       {isSelected ? <Edges color="#facc15" /> : null}

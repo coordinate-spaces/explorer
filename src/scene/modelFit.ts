@@ -6,6 +6,18 @@ export interface ModelFitTransform {
   scale: [number, number, number];
 }
 
+export function renderedModelPrecisionScale(
+  bounds: Box3,
+  fittedScale: readonly [number, number, number],
+  targetScale: readonly [number, number, number],
+): number | undefined {
+  const size = bounds.getSize(new Vector3());
+  const dimensions = size.toArray()
+    .map((dimension, index) => Math.abs(dimension * fittedScale[index] * targetScale[index]))
+    .filter((dimension) => Number.isFinite(dimension) && dimension > 0);
+  return dimensions.length > 0 ? Math.min(...dimensions) : undefined;
+}
+
 export function modelFitTransformFromBounds(
   bounds: Box3,
   fit: XyzDslModelFit,

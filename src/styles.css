@@ -32,9 +32,64 @@ button {
 }
 
 .app-shell,
-.scene-canvas {
+.scene-canvas,
+.scene-viewport {
   width: 100vw;
   height: 100vh;
+}
+
+.scene-viewport {
+  position: relative;
+}
+
+.camera-controls {
+  position: fixed;
+  right: 1rem;
+  bottom: 1rem;
+  z-index: 9;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  max-width: min(42rem, calc(100vw - 2rem));
+  border: 1px solid rgb(255 255 255 / 16%);
+  border-radius: 1rem;
+  padding: 0.55rem;
+  background: rgb(13 17 23 / 82%);
+  box-shadow: 0 14px 45px rgb(0 0 0 / 28%);
+  backdrop-filter: blur(14px);
+}
+
+.camera-controls button {
+  border: 1px solid rgb(147 197 253 / 28%);
+  border-radius: 999px;
+  padding: 0.42rem 0.7rem;
+  background: rgb(30 41 59 / 88%);
+  color: #dbeafe;
+}
+
+.camera-controls button[aria-pressed='true'] {
+  border-color: #60a5fa;
+  background: #2563eb;
+  color: white;
+}
+
+.camera-controls button:disabled { cursor: not-allowed; opacity: 0.45; }
+.camera-mode-switch { display: flex; gap: 0.3rem; }
+.camera-controls p { margin: 0; color: #bfdbfe; font-size: 0.74rem; }
+.camera-controls label { display: flex; gap: 0.35rem; align-items: center; color: #dbeafe; font-size: 0.74rem; }
+.camera-controls input { width: 7rem; }
+
+.pov-crosshair {
+  pointer-events: none;
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  z-index: 8;
+  translate: -50% -50%;
+  color: white;
+  font: 700 1.3rem/1 monospace;
+  text-shadow: 0 1px 4px black;
 }
 
 .xyzdsl-drawer {
@@ -1091,6 +1146,7 @@ button {
 }
 
 @media (max-width: 640px) {
+  .camera-controls { right: 0.65rem; bottom: 0.65rem; max-width: calc(100vw - 1.3rem); }
   .xyzdsl-drawer {
     padding: 0.65rem;
   }
