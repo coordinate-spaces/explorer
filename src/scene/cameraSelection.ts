@@ -86,7 +86,9 @@ export function cameraNodeForSelection(
     const ids = descendantIds(hierarchyNode);
     const renderedDescendants = spatialDocument.renderNodes.filter((node) => ids.has(node.id));
     const csgDescendants = spatialDocument.csgExpressions
-      .filter(({ base }) => ids.has(base.id))
+      .filter(({ base, operations }) => (
+        ids.has(base.id) || operations.some(({ tool }) => ids.has(tool.id))
+      ))
       .map(({ base }) => cameraNodeForSelection(spatialDocument, base.id))
       .filter((node): node is SpatialNode => node !== undefined);
     const descendants = [...renderedDescendants, ...csgDescendants];

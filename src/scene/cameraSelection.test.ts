@@ -59,6 +59,28 @@ describe('cameraNodeForSelection', () => {
     expect(selected?.transform.position).toEqual([0.5, 0.5, 0.5]);
   });
 
+  it('includes a CSG result when only its operation tool belongs to the container', () => {
+    const base = node('external-base', 0, 1);
+    const tool = node('nested-tool', 1, 5);
+    const container = { ...node('container', 20, 21), renderable: false, children: [tool] };
+    const document: SpatialDocument = {
+      id: 'document',
+      nodes: [base, container],
+      renderNodes: [],
+      csgExpressions: [{ id: 'csg', base, operations: [{ op: 'union', tool }] }],
+      diagnostics: [],
+    };
+
+    expect(cameraNodeForSelection(document, container.id)?.bounds).toEqual({
+      minX: 0,
+      maxX: 5,
+      minY: 0,
+      maxY: 1,
+      minZ: 0,
+      maxZ: 1,
+    });
+  });
+
   it('uses an intersection tool for CSG focus bounds, center, and precision scale', () => {
     const base = node('base', 0, 10);
     const intersection = node('intersection', 8, 8.01);
