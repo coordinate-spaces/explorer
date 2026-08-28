@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { rotationDegreesForInspector } from './SelectedNodeInspector';
+import { rotationDegreesForInspector, transformDeltaForDirectValue } from './SelectedNodeInspector';
 import type { SpatialNode } from '../model/SpatialNode';
 import { linearTransformStepForNode } from '../model/transformStep';
 
@@ -20,5 +20,17 @@ describe('linearTransformStepForNode', () => {
     expect(linearTransformStepForNode(node(0.001))).toBe(0.001);
     expect(linearTransformStepForNode(node(1))).toBe(0.1);
     expect(linearTransformStepForNode(node(100))).toBe(10);
+  });
+});
+
+describe('transformDeltaForDirectValue', () => {
+  it('converts an absolute inspector entry into a transform delta', () => {
+    expect(transformDeltaForDirectValue(1.25, '2.5')).toBe(1.25);
+    expect(transformDeltaForDirectValue(90, '-45')).toBe(-135);
+  });
+
+  it('ignores empty and invalid entries', () => {
+    expect(transformDeltaForDirectValue(1, '')).toBeUndefined();
+    expect(transformDeltaForDirectValue(1, 'not-a-number')).toBeUndefined();
   });
 });

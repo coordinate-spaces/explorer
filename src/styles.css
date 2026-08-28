@@ -1521,7 +1521,10 @@ button {
 .axis-y { color: #4ade80; }
 .axis-z { color: #60a5fa; }
 
-.inspector-transform-row output {
+.inspector-transform-row input {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
   overflow: hidden;
   border: 1px solid rgb(148 163 184 / 18%);
   border-radius: 0.18rem;
@@ -1531,6 +1534,11 @@ button {
   font-family: ui-monospace, monospace;
   font-size: 0.65rem;
   text-overflow: ellipsis;
+}
+
+.inspector-transform-row input:focus {
+  border-color: rgb(125 211 252 / 70%);
+  outline: 1px solid rgb(125 211 252 / 35%);
 }
 
 .selected-node-inspector .inspector-transform-row button {

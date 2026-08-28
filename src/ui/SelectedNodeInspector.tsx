@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { AxisName, XyzDslGeometryKind } from '../xyzdsl/types';
 import type { SpatialNode } from '../model/SpatialNode';
 import { PressAndHoldButton } from './PressAndHoldButton';
@@ -30,6 +30,61 @@ const GEOMETRY_OPTIONS: XyzDslGeometryKind[] = ['box', 'cylinder', 'cone', 'sphe
 
 export function rotationDegreesForInspector(rotationRadians: readonly number[]): number[] {
   return rotationRadians.map((value) => Number(((value * 180) / Math.PI).toFixed(3)));
+}
+
+export function transformDeltaForDirectValue(currentValue: number, nextValue: string): number | undefined {
+  if (nextValue.trim() === '') return undefined;
+  const parsed = Number(nextValue);
+  return Number.isFinite(parsed) ? parsed - currentValue : undefined;
+}
+
+function TransformValueInput({ label, value, step, disabled, onCommit }: {
+  label: string;
+  value: number;
+  step: number;
+  disabled: boolean;
+  onCommit: (delta: number) => void;
+}) {
+  const [draft, setDraft] = useState(String(value));
+  const [editing, setEditing] = useState(false);
+  const cancelNextBlur = useRef(false);
+
+  useEffect(() => {
+    if (!editing) setDraft(String(value));
+  }, [editing, value]);
+
+  const commit = () => {
+    if (cancelNextBlur.current) {
+      cancelNextBlur.current = false;
+      setEditing(false);
+      setDraft(String(value));
+      return;
+    }
+    const delta = transformDeltaForDirectValue(value, draft);
+    setEditing(false);
+    if (delta !== undefined && delta !== 0) onCommit(delta);
+    else setDraft(String(value));
+  };
+
+  return <input
+    aria-label={label}
+    disabled={disabled}
+    inputMode="decimal"
+    step={step}
+    type="number"
+    value={draft}
+    onBlur={commit}
+    onChange={(event) => setDraft(event.target.value)}
+    onFocus={() => setEditing(true)}
+    onKeyDown={(event) => {
+      if (event.key === 'Enter') event.currentTarget.blur();
+      if (event.key === 'Escape') {
+        cancelNextBlur.current = true;
+        setDraft(String(value));
+        event.currentTarget.blur();
+      }
+    }}
+  />;
 }
 
 export function SelectedNodeInspector({
@@ -137,7 +192,13 @@ export function SelectedNodeInspector({
             {AXES.map((axis, index) => (
               <div className="inspector-transform-row" key={axis}>
                 <span className={`axis axis-${axis}`}>{axis.toUpperCase()}</span>
-                <output aria-label={`${transform.label} ${axis.toUpperCase()} value`}>{transform.values[index]}</output>
+                <TransformValueInput
+                  label={`${transform.label} ${axis.toUpperCase()} value`}
+                  value={transform.values[index]}
+                  step={transform.step}
+                  disabled={!canEdit}
+                  onCommit={(delta) => transform.onStep(axis, delta)}
+                />
                 <PressAndHoldButton disabled={!canEdit} aria-label={`Decrease ${transform.label.toLowerCase()} ${axis.toUpperCase()} by ${transform.step} ${transform.unit}`} onActivate={() => transform.onStep(axis, -transform.step)}>−</PressAndHoldButton>
                 <PressAndHoldButton disabled={!canEdit} aria-label={`Increase ${transform.label.toLowerCase()} ${axis.toUpperCase()} by ${transform.step} ${transform.unit}`} onActivate={() => transform.onStep(axis, transform.step)}>+</PressAndHoldButton>
               </div>
