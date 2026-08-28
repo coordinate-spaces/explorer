@@ -30,6 +30,7 @@ interface SceneRootProps {
   onCameraModeChange: (mode: CameraMode) => void;
   editorMode: boolean;
   selectedNodeCanEdit: boolean;
+  editorLinearStep: number;
   onMoveNode: (axis: AxisName, delta: number) => void;
   onResizeNode: (axis: AxisName, delta: number) => void;
   onRotateNode: (axis: AxisName, delta: number) => void;
@@ -39,7 +40,7 @@ interface SceneRootProps {
 const DEFAULT_ORBIT_TARGET: [number, number, number] = [0.6, 0.5, 0.4];
 const DEFAULT_CAMERA_POSITION: [number, number, number] = [1.4, 1.1, 1.8];
 
-export function SceneRoot({ document: spatialDocument, selectedNodeId, onSelectNode, cameraMode, onCameraModeChange, editorMode, selectedNodeCanEdit, onMoveNode, onResizeNode, onRotateNode, onCreateNode }: SceneRootProps) {
+export function SceneRoot({ document: spatialDocument, selectedNodeId, onSelectNode, cameraMode, onCameraModeChange, editorMode, selectedNodeCanEdit, editorLinearStep, onMoveNode, onResizeNode, onRotateNode, onCreateNode }: SceneRootProps) {
   const cameraSizingNodes = useMemo(() => nodesForRoomSizing(spatialDocument), [spatialDocument]);
   const roomDimensions = dimensionsFromNodes(cameraSizingNodes);
   const [modelPrecisionScales, setModelPrecisionScales] = useState<Record<string, number>>({});
@@ -138,7 +139,7 @@ export function SceneRoot({ document: spatialDocument, selectedNodeId, onSelectN
       <EditorSelectionControls
         active={editorMode && cameraMode === 'orbit'}
         canEditSelection={Boolean(selectedNodeId && selectedNodeCanEdit)}
-        linearStep={selectedNode ? Math.max(0.001, 10 ** Math.floor(Math.log10(Math.min(...selectedNode.transform.scale.filter((value) => value > 0))) - 1)) : 0.01}
+        linearStep={editorLinearStep}
         rotationStep={1}
         onMove={onMoveNode}
         onResize={onResizeNode}

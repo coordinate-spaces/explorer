@@ -21,6 +21,7 @@ import type { ActiveSecondaryTenant, XyzDslTransaction, SecondaryKeyReference, S
 import { usePublicKeyTransactions } from './transactions/usePublicKeyTransactions';
 import { XyzDslDrawer } from './ui/XyzDslDrawer';
 import { usePersistentState } from './ui/usePersistentState';
+import { linearTransformStepForNode } from './model/transformStep';
 
 const INITIAL_XYZDSL = `"+2d+4d/+0d+6d/+1d+3d" : "geometry: cylinder; color: 0x333333; metalness: 0.8; roughness: 0.2"
 "+2d+4d/+7d+6d/+0d+10m" : "geometry: cone; color: yellow; metalness: 0.2; roughness: 0.5"
@@ -825,6 +826,7 @@ export default function App() {
         onCameraModeChange={setCameraMode}
         editorMode={appMode === 'editor'}
         selectedNodeCanEdit={selectedNodeCanEdit}
+        editorLinearStep={selectedNode ? linearTransformStepForNode(selectedNode) : 0.01}
         onMoveNode={moveSelectedDeclaration}
         onResizeNode={resizeSelectedDeclaration}
         onRotateNode={rotateSelectedDeclaration}

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { linearTransformStepForNode, rotationDegreesForInspector } from './SelectedNodeInspector';
+import { rotationDegreesForInspector } from './SelectedNodeInspector';
 import type { SpatialNode } from '../model/SpatialNode';
+import { linearTransformStepForNode } from '../model/transformStep';
 
 describe('rotationDegreesForInspector', () => {
   it('preserves fractional degree values in the inspector readout', () => {

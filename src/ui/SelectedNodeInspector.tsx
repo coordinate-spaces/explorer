@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { AxisName, XyzDslGeometryKind } from '../xyzdsl/types';
 import type { SpatialNode } from '../model/SpatialNode';
 import { PressAndHoldButton } from './PressAndHoldButton';
+import { linearTransformStepForNode } from '../model/transformStep';
 
 interface SelectedNodeInspectorProps {
   node?: SpatialNode;
@@ -29,13 +30,6 @@ const GEOMETRY_OPTIONS: XyzDslGeometryKind[] = ['box', 'cylinder', 'cone', 'sphe
 
 export function rotationDegreesForInspector(rotationRadians: readonly number[]): number[] {
   return rotationRadians.map((value) => Number(((value * 180) / Math.PI).toFixed(3)));
-}
-
-export function linearTransformStepForNode(node: SpatialNode): number {
-  const dimensions = [node.box.width, node.box.height, node.box.depth].filter((value) => value > 0);
-  const smallest = Math.min(...dimensions);
-  if (!Number.isFinite(smallest)) return 0.01;
-  return Math.max(0.001, Math.min(10, 10 ** Math.floor(Math.log10(smallest) - 1)));
 }
 
 export function SelectedNodeInspector({
