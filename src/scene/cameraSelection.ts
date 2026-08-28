@@ -2,6 +2,7 @@ import type { SpatialDocument } from '../model/SpatialDocument';
 import type { SpatialBounds, SpatialNode } from '../model/SpatialNode';
 import { nodePrecisionScale } from './cameraScale';
 import { evaluateCsgExpressionWithContributions } from './csgGeometry';
+import { findNodeById } from '../selection';
 
 function unionBounds(bounds: SpatialBounds, addition: SpatialBounds): SpatialBounds {
   return {
@@ -41,7 +42,7 @@ export function cameraNodeForSelection(
   if (renderedNode) return renderedNode;
 
   const expression = spatialDocument.csgExpressions.find(({ base }) => base.id === selectedNodeId);
-  if (!expression) return undefined;
+  if (!expression) return findNodeById(spatialDocument.nodes, selectedNodeId);
 
   const fallbackBounds = expression.operations.reduce((combined, { op, tool }) => {
     if (op === 'union') return unionBounds(combined, tool.bounds);

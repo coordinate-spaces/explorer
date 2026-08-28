@@ -42,6 +42,13 @@ describe('cameraNodeForSelection', () => {
     expect(cameraNodeForSelection(document, rendered.id)).toBe(rendered);
   });
 
+  it('returns a nested composite container so its complete bounds can be highlighted', () => {
+    const container = { ...node('container', -2, 6), renderable: false, children: [node('child', 0, 1)] };
+    const document: SpatialDocument = { id: 'document', nodes: [container], renderNodes: container.children, csgExpressions: [], diagnostics: [] };
+
+    expect(cameraNodeForSelection(document, container.id)).toBe(container);
+  });
+
   it('uses an intersection tool for CSG focus bounds, center, and precision scale', () => {
     const base = node('base', 0, 10);
     const intersection = node('intersection', 8, 8.01);

@@ -117,6 +117,10 @@ export function sceneHighlightIdForNode(nodes: SpatialNode[], node: SpatialNode 
     return node.id;
   }
 
+  if (isEditableContainerAnchor(node)) {
+    return node.id;
+  }
+
   return csgBaseForTool(nodes, node)?.id ?? firstRenderableDescendant(node)?.id;
 }
 
