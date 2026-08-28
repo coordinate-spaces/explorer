@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { BufferGeometry, LineBasicMaterial, LineSegments, Object3D } from 'three';
-import { spatialNodeIdForPovRaycast, spatialNodeIdFromObject } from './povPicking';
+import { spatialNodeIdForPovCollision, spatialNodeIdForPovRaycast, spatialNodeIdFromObject } from './povPicking';
 
 describe('spatialNodeIdFromObject', () => {
   it('finds selection metadata on an ancestor', () => {
@@ -21,5 +21,15 @@ describe('spatialNodeIdFromObject', () => {
     parent.userData.spatialNodeId = 'selected-node';
     parent.add(outline);
     expect(spatialNodeIdForPovRaycast(outline)).toBeUndefined();
+  });
+
+  it('excludes model selection proxies from POV collision only', () => {
+    const parent = new Object3D();
+    const proxy = new Object3D();
+    parent.userData.spatialNodeId = 'model-node';
+    proxy.userData.povCollisionIgnored = true;
+    parent.add(proxy);
+    expect(spatialNodeIdForPovRaycast(proxy)).toBe('model-node');
+    expect(spatialNodeIdForPovCollision(proxy)).toBeUndefined();
   });
 });

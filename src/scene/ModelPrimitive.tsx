@@ -65,7 +65,7 @@ export function ModelPrimitive({ node, isSelected = false, onSelect, selectionEn
     <ModelErrorBoundary key={`${model.source}:${model.fit}:${model.align}`}>
       <Suspense fallback={<ModelBox color="#60a5fa" />}><ResolvedModel model={model} node={node} targetScale={scale} /></Suspense>
     </ModelErrorBoundary>
-    <mesh scale={isSelected ? 1.03 : 1}>
+    <mesh scale={isSelected ? 1.03 : 1} userData={{ povCollisionIgnored: true }}>
       <boxGeometry />
       <meshBasicMaterial transparent opacity={0} depthWrite={false} />
       {isSelected ? <Edges color="#facc15" /> : null}

@@ -25,6 +25,12 @@ describe('camera scene scale', () => {
     expect(cameraSceneScale([node([100, 100, 100])], selected)).toBe(0.01);
   });
 
+  it('uses rendered panel thickness for selected content', () => {
+    const selected = node([1, 1, 1]);
+    selected.content = { kind: 'text', text: 'Inspect me', diagnostics: [] };
+    expect(cameraSceneScale([selected], selected)).toBe(0.04);
+  });
+
   it('uses overall scene extent when no object is selected', () => {
     expect(cameraSceneScale([node([100, 0.01, 100])])).toBe(10);
     expect(cameraSceneScale([

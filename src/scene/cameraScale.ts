@@ -1,5 +1,6 @@
 import type { PerspectiveCamera } from 'three';
 import type { SpatialBounds, SpatialNode } from '../model/SpatialNode';
+import { CONTENT_CARD_DEPTH } from './contentGeometry';
 
 const MIN_SCENE_SCALE = 0.001;
 const MAX_SCENE_SCALE = 10;
@@ -11,7 +12,7 @@ export function nodePrecisionScale(node: SpatialNode): number | undefined {
   }
 
   const dimensions = node.transform.scale
-    .map(Math.abs)
+    .map((value, index) => Math.abs(value) * (node.content?.kind && index === 2 ? CONTENT_CARD_DEPTH : 1))
     .filter((value) => Number.isFinite(value) && value > 0);
 
   return dimensions.length > 0 ? Math.min(...dimensions) : undefined;

@@ -13,3 +13,12 @@ export function spatialNodeIdForPovRaycast(object: Object3D): string | undefined
   if ('isLine' in object && object.isLine) return undefined;
   return spatialNodeIdFromObject(object);
 }
+
+export function spatialNodeIdForPovCollision(object: Object3D): string | undefined {
+  let current: Object3D | null = object;
+  while (current) {
+    if (current.userData.povCollisionIgnored === true) return undefined;
+    current = current.parent;
+  }
+  return spatialNodeIdForPovRaycast(object);
+}
