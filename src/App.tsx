@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { canEditDeclarationLine, moveDeclarationPath, resizeDeclarationPath, rotateDeclarationPath, updateDeclarationProperty } from './xyzdsl/editXyzDslSource';
+import { appendProspectiveObjectDeclaration, canEditDeclarationLine, moveDeclarationPath, resizeDeclarationPath, rotateDeclarationPath, updateDeclarationProperty } from './xyzdsl/editXyzDslSource';
 import type { AxisName } from './xyzdsl/types';
 import { createSpatialDocument } from './model/createSpatialDocument';
 import type { SpatialNode } from './model/SpatialNode';
@@ -791,6 +791,17 @@ export default function App() {
     editSelectedDeclaration((source, lineNumber) => updateDeclarationProperty(source, lineNumber, key, value));
   }, [editSelectedDeclaration]);
 
+  const createProspectiveObject = useCallback((position: [number, number, number]) => {
+    setAuthoringSource((source) => {
+      const appended = appendProspectiveObjectDeclaration(source, position);
+      setSelectedNodeId(undefined);
+      setSelectedLeafNodeId(undefined);
+      setSelectedSceneHighlightNodeId(undefined);
+      setSelectedLineNumber(appended.lineNumber);
+      return appended.source;
+    });
+  }, []);
+
   const resetAuthoringToRemote = useCallback(() => {
     if (!hasRemoteBaseline) {
       return;
@@ -812,6 +823,12 @@ export default function App() {
         onSelectNode={handleSelectNode}
         cameraMode={cameraMode}
         onCameraModeChange={setCameraMode}
+        editorMode={appMode === 'editor'}
+        selectedNodeCanEdit={selectedNodeCanEdit}
+        onMoveNode={moveSelectedDeclaration}
+        onResizeNode={resizeSelectedDeclaration}
+        onRotateNode={rotateSelectedDeclaration}
+        onCreateNode={createProspectiveObject}
       />
       <XyzDslDrawer
         appMode={appMode}

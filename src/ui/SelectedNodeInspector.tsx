@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { AxisName, XyzDslGeometryKind } from '../xyzdsl/types';
 import type { SpatialNode } from '../model/SpatialNode';
+import { PressAndHoldButton } from './PressAndHoldButton';
 
 interface SelectedNodeInspectorProps {
   node?: SpatialNode;
@@ -30,6 +31,13 @@ export function rotationDegreesForInspector(rotationRadians: readonly number[]):
   return rotationRadians.map((value) => Number(((value * 180) / Math.PI).toFixed(3)));
 }
 
+export function linearTransformStepForNode(node: SpatialNode): number {
+  const dimensions = [node.box.width, node.box.height, node.box.depth].filter((value) => value > 0);
+  const smallest = Math.min(...dimensions);
+  if (!Number.isFinite(smallest)) return 0.01;
+  return Math.max(0.001, Math.min(10, 10 ** Math.floor(Math.log10(smallest) - 1)));
+}
+
 export function SelectedNodeInspector({
   node,
   canEdit,
@@ -42,7 +50,7 @@ export function SelectedNodeInspector({
   onPropertyChange,
   onSelectNode,
 }: SelectedNodeInspectorProps) {
-  const [linearStep, setLinearStep] = useState(0.01);
+  const [linearStepChoice, setLinearStepChoice] = useState<'auto' | number>('auto');
   const [rotationStep, setRotationStep] = useState(1);
 
   if (!node) {
@@ -58,6 +66,7 @@ export function SelectedNodeInspector({
   const lineNumber = metadataValue<number>(node, 'lineNumber');
   const childNodes = node.children ?? [];
   const rotation = rotationDegreesForInspector(node.localTransform?.rotation ?? node.transform.rotation);
+  const linearStep = linearStepChoice === 'auto' ? linearTransformStepForNode(node) : linearStepChoice;
   const transforms = [
     { label: 'Position', values: [node.box.x, node.box.y, node.box.z], step: linearStep, onStep: onMove, unit: 'units' },
     { label: 'Size', values: [node.box.width, node.box.height, node.box.depth], step: linearStep, onStep: onResize, unit: 'units' },
@@ -103,11 +112,15 @@ export function SelectedNodeInspector({
           Step
           <select
             aria-label="Linear transform step"
-            value={linearStep}
-            onChange={(event) => setLinearStep(Number(event.target.value))}
+            value={linearStepChoice}
+            onChange={(event) => setLinearStepChoice(event.target.value === 'auto' ? 'auto' : Number(event.target.value))}
           >
-            <option value="0.01">0.01</option>
-            <option value="1">1</option>
+            <option value="auto">Auto ({linearStep} m)</option>
+            <option value="0.001">1 mm</option>
+            <option value="0.01">1 cm</option>
+            <option value="0.1">1 dm</option>
+            <option value="1">1 m</option>
+            <option value="10">10 m</option>
           </select>
         </label>
         <label>
@@ -131,8 +144,8 @@ export function SelectedNodeInspector({
               <div className="inspector-transform-row" key={axis}>
                 <span className={`axis axis-${axis}`}>{axis.toUpperCase()}</span>
                 <output aria-label={`${transform.label} ${axis.toUpperCase()} value`}>{transform.values[index]}</output>
-                <button type="button" disabled={!canEdit} aria-label={`Decrease ${transform.label.toLowerCase()} ${axis.toUpperCase()} by ${transform.step} ${transform.unit}`} onClick={() => transform.onStep(axis, -transform.step)}>−</button>
-                <button type="button" disabled={!canEdit} aria-label={`Increase ${transform.label.toLowerCase()} ${axis.toUpperCase()} by ${transform.step} ${transform.unit}`} onClick={() => transform.onStep(axis, transform.step)}>+</button>
+                <PressAndHoldButton disabled={!canEdit} aria-label={`Decrease ${transform.label.toLowerCase()} ${axis.toUpperCase()} by ${transform.step} ${transform.unit}`} onActivate={() => transform.onStep(axis, -transform.step)}>−</PressAndHoldButton>
+                <PressAndHoldButton disabled={!canEdit} aria-label={`Increase ${transform.label.toLowerCase()} ${axis.toUpperCase()} by ${transform.step} ${transform.unit}`} onActivate={() => transform.onStep(axis, transform.step)}>+</PressAndHoldButton>
               </div>
             ))}
           </div>

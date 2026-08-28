@@ -6,6 +6,7 @@ import {
   resizeDeclarationPath,
   rotateDeclarationPath,
   updateDeclarationProperty,
+  appendProspectiveObjectDeclaration,
 } from './editXyzDslSource';
 
 const SOURCE = `"Table/+18d+8d/+0d+5d/+4d+8d" : "color: white; metalness: 0.8"
@@ -47,5 +48,11 @@ describe('editXyzDslSource', () => {
     expect(rotateDeclarationPath(SOURCE, 2, 'y', 15, [0, 90, 0])).toContain('"rotation: 0, 105, 0"');
     const rotatedSource = `"Table/+18d+8d/+0d+5d/+4d+8d" : "color: white; rotation: 0, 90, 0"`;
     expect(rotateDeclarationPath(rotatedSource, 1, 'z', -15, [0, 180, 0])).toContain('rotation: 0, 90, -15');
+  });
+
+  it('appends a prospective default object at a canonical floor position', () => {
+    const result = appendProspectiveObjectDeclaration(SOURCE, [1.05, 0.05, 2.05]);
+    expect(result.lineNumber).toBe(3);
+    expect(result.source).toContain('"+1+1d/+0+1d/+2+1d" : ""');
   });
 });

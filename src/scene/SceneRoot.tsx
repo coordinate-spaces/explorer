@@ -17,6 +17,8 @@ import { Vector3, type PerspectiveCamera as ThreePerspectiveCamera } from 'three
 import { cameraNodeForSelection } from './cameraSelection';
 import { CameraClipController } from './CameraClipController';
 import { povCollisionRadius } from './povNavigation';
+import { EditorSelectionControls } from './EditorSelectionControls';
+import type { AxisName } from '../xyzdsl/types';
 
 export type CameraMode = 'orbit' | 'pov';
 
@@ -26,12 +28,18 @@ interface SceneRootProps {
   onSelectNode?: (id: string | undefined) => void;
   cameraMode: CameraMode;
   onCameraModeChange: (mode: CameraMode) => void;
+  editorMode: boolean;
+  selectedNodeCanEdit: boolean;
+  onMoveNode: (axis: AxisName, delta: number) => void;
+  onResizeNode: (axis: AxisName, delta: number) => void;
+  onRotateNode: (axis: AxisName, delta: number) => void;
+  onCreateNode: (position: [number, number, number]) => void;
 }
 
 const DEFAULT_ORBIT_TARGET: [number, number, number] = [0.6, 0.5, 0.4];
 const DEFAULT_CAMERA_POSITION: [number, number, number] = [1.4, 1.1, 1.8];
 
-export function SceneRoot({ document: spatialDocument, selectedNodeId, onSelectNode, cameraMode, onCameraModeChange }: SceneRootProps) {
+export function SceneRoot({ document: spatialDocument, selectedNodeId, onSelectNode, cameraMode, onCameraModeChange, editorMode, selectedNodeCanEdit, onMoveNode, onResizeNode, onRotateNode, onCreateNode }: SceneRootProps) {
   const cameraSizingNodes = useMemo(() => nodesForRoomSizing(spatialDocument), [spatialDocument]);
   const roomDimensions = dimensionsFromNodes(cameraSizingNodes);
   const [modelPrecisionScales, setModelPrecisionScales] = useState<Record<string, number>>({});
@@ -127,6 +135,16 @@ export function SceneRoot({ document: spatialDocument, selectedNodeId, onSelectN
         onSelectNode={onSelectNode}
       />
       <CameraClipController nodes={cameraSizingNodes} scale={sceneScale} />
+      <EditorSelectionControls
+        active={editorMode && cameraMode === 'orbit'}
+        canEditSelection={Boolean(selectedNodeId && selectedNodeCanEdit)}
+        linearStep={selectedNode ? Math.max(0.001, 10 ** Math.floor(Math.log10(Math.min(...selectedNode.transform.scale.filter((value) => value > 0))) - 1)) : 0.01}
+        rotationStep={1}
+        onMove={onMoveNode}
+        onResize={onResizeNode}
+        onRotate={onRotateNode}
+        onCreate={onCreateNode}
+      />
     </Canvas>
     <section className={`camera-controls camera-controls--${cameraMode}`} aria-label="Camera navigation">
       <div className="camera-mode-switch" role="group" aria-label="Camera mode">
