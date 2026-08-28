@@ -936,8 +936,7 @@ button {
   margin-top: 0.75rem;
 }
 
-.xyzdsl-editor-status,
-.xyzdsl-editor-selected-line {
+.xyzdsl-editor-status {
   display: flex;
   flex-wrap: wrap;
   gap: 0.4rem;
@@ -945,16 +944,6 @@ button {
   color: #bfdbfe;
   font-size: 0.72rem;
   font-weight: 600;
-}
-
-.xyzdsl-editor-selected-line {
-  width: max-content;
-  max-width: 100%;
-  border: 1px solid rgb(250 204 21 / 35%);
-  border-radius: 999px;
-  padding: 0.15rem 0.5rem;
-  background: rgb(113 63 18 / 42%);
-  color: #fde68a;
 }
 
 .selected-node-inspector {
