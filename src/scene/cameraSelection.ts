@@ -2,6 +2,8 @@ import type { SpatialDocument } from '../model/SpatialDocument';
 import type { SpatialBounds, SpatialNode } from '../model/SpatialNode';
 import { nodePrecisionScale } from './cameraScale';
 import { evaluateCsgExpressionWithContributions } from './csgGeometry';
+import { findNodeById } from '../selection';
+import { selectionBoundsForNode } from './SelectionBounds';
 
 function unionBounds(bounds: SpatialBounds, addition: SpatialBounds): SpatialBounds {
   return {
@@ -31,6 +33,42 @@ function intersectionBounds(bounds: SpatialBounds, constraint: SpatialBounds): S
     : undefined;
 }
 
+function descendantIds(node: SpatialNode): Set<string> {
+  const ids = new Set<string>();
+  const visit = (current: SpatialNode) => {
+    ids.add(current.id);
+    current.children?.forEach(visit);
+  };
+  visit(node);
+  return ids;
+}
+
+function nodeWithAggregateBounds(container: SpatialNode, descendants: SpatialNode[]): SpatialNode {
+  const bounds = descendants
+    .map(selectionBoundsForNode)
+    .reduce(unionBounds);
+  const precisionScales = descendants
+    .map(nodePrecisionScale)
+    .filter((scale): scale is number => scale !== undefined);
+
+  return {
+    ...container,
+    bounds,
+    transform: {
+      ...container.transform,
+      position: [
+        (bounds.minX + bounds.maxX) / 2,
+        (bounds.minY + bounds.maxY) / 2,
+        (bounds.minZ + bounds.maxZ) / 2,
+      ],
+    },
+    metadata: {
+      ...container.metadata,
+      ...(precisionScales.length > 0 ? { cameraPrecisionScale: Math.min(...precisionScales) } : {}),
+    },
+  };
+}
+
 export function cameraNodeForSelection(
   spatialDocument: SpatialDocument,
   selectedNodeId?: string,
@@ -41,7 +79,22 @@ export function cameraNodeForSelection(
   if (renderedNode) return renderedNode;
 
   const expression = spatialDocument.csgExpressions.find(({ base }) => base.id === selectedNodeId);
-  if (!expression) return undefined;
+  if (!expression) {
+    const hierarchyNode = findNodeById(spatialDocument.nodes, selectedNodeId);
+    if (!hierarchyNode) return undefined;
+
+    const ids = descendantIds(hierarchyNode);
+    const renderedDescendants = spatialDocument.renderNodes.filter((node) => ids.has(node.id));
+    const csgDescendants = spatialDocument.csgExpressions
+      .filter(({ base, operations }) => (
+        ids.has(base.id) || operations.some(({ tool }) => ids.has(tool.id))
+      ))
+      .map(({ base }) => cameraNodeForSelection(spatialDocument, base.id))
+      .filter((node): node is SpatialNode => node !== undefined);
+    const descendants = [...renderedDescendants, ...csgDescendants];
+
+    return descendants.length > 0 ? nodeWithAggregateBounds(hierarchyNode, descendants) : undefined;
+  }
 
   const fallbackBounds = expression.operations.reduce((combined, { op, tool }) => {
     if (op === 'union') return unionBounds(combined, tool.bounds);

@@ -468,7 +468,7 @@ export default function App() {
 
     return selectedNode ? findNodePathById(document.nodes, selectedNode.id) : [];
   }, [document.nodes, selectedLeafNodeId, selectedNode]);
-  const selectedSceneNodeId = selectedSceneHighlightNodeId ?? sceneHighlightIdForNode(document.nodes, selectedNode) ?? selectedNodeId;
+  const selectedSceneNodeId = sceneHighlightIdForNode(document.nodes, selectedNode) ?? selectedSceneHighlightNodeId ?? selectedNodeId;
   const selectedNodeCanEdit = selectedNodeLineNumber !== undefined && canEditDeclarationLine(authoringSource, selectedNodeLineNumber);
 
   const handleSecondaryReplay = useCallback((publicKey: string) => {

@@ -18,6 +18,7 @@ import { cameraNodeForSelection } from './cameraSelection';
 import { CameraClipController } from './CameraClipController';
 import { povCollisionRadius } from './povNavigation';
 import { EditorSelectionControls } from './EditorSelectionControls';
+import { SelectionBounds } from './SelectionBounds';
 import type { AxisName } from '../xyzdsl/types';
 
 export type CameraMode = 'orbit' | 'pov';
@@ -112,20 +113,20 @@ export function SceneRoot({ document: spatialDocument, selectedNodeId, onSelectN
         <CsgPrimitive
           key={expression.id}
           expression={expression}
-          isSelected={expression.base.id === selectedNodeId}
           onSelect={onSelectNode}
           selectionEnabled={cameraMode === 'orbit'}
         />
       ))}
       {spatialDocument.renderNodes.map((node) => (
         node.model?.source ? (
-          <ModelPrimitive key={node.id} isSelected={node.id === selectedNodeId} node={node} onSelect={onSelectNode} selectionEnabled={cameraMode === 'orbit'} onPrecisionScaleChange={handleModelPrecisionScaleChange} />
+          <ModelPrimitive key={node.id} node={node} onSelect={onSelectNode} selectionEnabled={cameraMode === 'orbit'} onPrecisionScaleChange={handleModelPrecisionScaleChange} />
         ) : node.content?.kind ? (
-          <ContentPrimitive key={node.id} isSelected={node.id === selectedNodeId} node={node} onSelect={onSelectNode} selectionEnabled={cameraMode === 'orbit'} />
+          <ContentPrimitive key={node.id} node={node} onSelect={onSelectNode} selectionEnabled={cameraMode === 'orbit'} />
         ) : (
-          <SpatialPrimitive key={node.id} isSelected={node.id === selectedNodeId} node={node} onSelect={onSelectNode} selectionEnabled={cameraMode === 'orbit'} />
+          <SpatialPrimitive key={node.id} node={node} onSelect={onSelectNode} selectionEnabled={cameraMode === 'orbit'} />
         )
       ))}
+      {selectedNode ? <SelectionBounds node={selectedNode} /> : null}
       {cameraMode === 'orbit' ? <OrbitControls target={orbitTarget} maxPolarAngle={Math.PI} /> : null}
       <PovControls
         active={cameraMode === 'pov'}

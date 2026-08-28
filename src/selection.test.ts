@@ -32,12 +32,12 @@ describe('selectionTargetForNodeId', () => {
     expect(findNodePathById(document.nodes, plate.id).map((node) => node.namespacePath)).toEqual(['Outlet/', 'Outlet/Plate/']);
   });
 
-  it('maps promoted container anchors back to a renderable scene highlight', () => {
+  it('keeps promoted container anchors as the scene highlight', () => {
     const document = createSpatialDocument(OUTLET_XYZDSL);
     const plate = document.csgExpressions[0].base;
     const root = selectionTargetForNodeId(document.nodes, plate.id);
 
-    expect(sceneHighlightIdForNode(document.nodes, root)).toBe(plate.id);
+    expect(sceneHighlightIdForNode(document.nodes, root)).toBe(root?.id);
   });
 
   it('maps consumed boolean tools back to their rendered boolean base for highlighting', () => {

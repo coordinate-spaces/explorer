@@ -1,5 +1,5 @@
 import { Component, Suspense, useCallback, useEffect, useMemo, type ErrorInfo, type ReactNode } from 'react';
-import { Edges, useGLTF } from '@react-three/drei';
+import { useGLTF } from '@react-three/drei';
 import type { ThreeEvent } from '@react-three/fiber';
 import { SkeletonUtils } from 'three-stdlib';
 import { Box3, Color, type Material, type Mesh } from 'three';
@@ -60,7 +60,7 @@ function ResolvedModel({ model, node, targetScale, onPrecisionScaleChange }: { m
   return <LoadedModel source={source} fit={model.fit} align={model.align} node={node} targetScale={targetScale} onPrecisionScaleChange={onPrecisionScaleChange} />;
 }
 
-export function ModelPrimitive({ node, isSelected = false, onSelect, selectionEnabled = true, onPrecisionScaleChange }: { node: SpatialNode; isSelected?: boolean; onSelect?: (id: string) => void; selectionEnabled?: boolean; onPrecisionScaleChange?: (id: string, scale: number | undefined) => void }) {
+export function ModelPrimitive({ node, onSelect, selectionEnabled = true, onPrecisionScaleChange }: { node: SpatialNode; onSelect?: (id: string) => void; selectionEnabled?: boolean; onPrecisionScaleChange?: (id: string, scale: number | undefined) => void }) {
   const model = node.model!;
   const { position, rotation, scale } = node.transform;
   const handlePrecisionScaleChange = useCallback(
@@ -73,10 +73,9 @@ export function ModelPrimitive({ node, isSelected = false, onSelect, selectionEn
     <ModelErrorBoundary key={`${model.source}:${model.fit}:${model.align}`}>
       <Suspense fallback={<ModelBox color="#60a5fa" />}><ResolvedModel model={model} node={node} targetScale={scale} onPrecisionScaleChange={handlePrecisionScaleChange} /></Suspense>
     </ModelErrorBoundary>
-    <mesh scale={isSelected ? 1.03 : 1} userData={{ povCollisionIgnored: true }}>
+    <mesh userData={{ povCollisionIgnored: true }}>
       <boxGeometry />
       <meshBasicMaterial transparent opacity={0} depthWrite={false} />
-      {isSelected ? <Edges color="#facc15" /> : null}
     </mesh>
   </group>;
 }

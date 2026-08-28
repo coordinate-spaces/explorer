@@ -42,6 +42,58 @@ describe('cameraNodeForSelection', () => {
     expect(cameraNodeForSelection(document, rendered.id)).toBe(rendered);
   });
 
+  it('aggregates rendered primitive and evaluated CSG descendant bounds for a composite container', () => {
+    const child = node('child', -4, -2);
+    const base = node('base', 0, 1);
+    const container = { ...node('container', 20, 21), renderable: false, children: [child, base] };
+    const document: SpatialDocument = {
+      id: 'document',
+      nodes: [container],
+      renderNodes: [child],
+      csgExpressions: [{ id: 'csg', base, operations: [{ op: 'union', tool: node('extension', 1, 5) }] }],
+      diagnostics: [],
+    };
+    const selected = cameraNodeForSelection(document, container.id);
+
+    expect(selected?.bounds).toEqual({ minX: -4, maxX: 5, minY: 0, maxY: 1, minZ: 0, maxZ: 1 });
+    expect(selected?.transform.position).toEqual([0.5, 0.5, 0.5]);
+  });
+
+  it('includes a CSG result when only its operation tool belongs to the container', () => {
+    const base = node('external-base', 0, 1);
+    const tool = node('nested-tool', 1, 5);
+    const container = { ...node('container', 20, 21), renderable: false, children: [tool] };
+    const document: SpatialDocument = {
+      id: 'document',
+      nodes: [base, container],
+      renderNodes: [],
+      csgExpressions: [{ id: 'csg', base, operations: [{ op: 'union', tool }] }],
+      diagnostics: [],
+    };
+
+    expect(cameraNodeForSelection(document, container.id)?.bounds).toEqual({
+      minX: 0,
+      maxX: 5,
+      minY: 0,
+      maxY: 1,
+      minZ: 0,
+      maxZ: 1,
+    });
+  });
+
+  it('does not create selection bounds for an unrendered hierarchy declaration', () => {
+    const declaration = { ...node('unrendered', 20, 21), renderable: false };
+    const document: SpatialDocument = {
+      id: 'document',
+      nodes: [declaration],
+      renderNodes: [],
+      csgExpressions: [],
+      diagnostics: [],
+    };
+
+    expect(cameraNodeForSelection(document, declaration.id)).toBeUndefined();
+  });
+
   it('uses an intersection tool for CSG focus bounds, center, and precision scale', () => {
     const base = node('base', 0, 10);
     const intersection = node('intersection', 8, 8.01);
