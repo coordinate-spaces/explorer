@@ -57,7 +57,7 @@ function formatDeclaration(parts: DeclarationParts): string {
   return `${parts.indent}"${parts.path}"${parts.middle}"${parts.properties}"${parts.suffix}`;
 }
 
-function formatPathNumber(value: number): string {
+export function formatPathNumber(value: number): string {
   const millimetres = Math.max(0, Math.round(value * MILLIMETRES_PER_UNIT));
 
   if (millimetres % 1000 === 0) {
@@ -66,6 +66,23 @@ function formatPathNumber(value: number): string {
   if (millimetres % 100 === 0) return `${millimetres / 100}d`;
   if (millimetres % 10 === 0) return `${millimetres / 10}c`;
   return `${millimetres}m`;
+}
+
+export const PROSPECTIVE_OBJECT_SIZE = 0.1;
+
+export function appendProspectiveObjectDeclaration(
+  source: string,
+  position: readonly [number, number, number],
+  size = PROSPECTIVE_OBJECT_SIZE,
+): { source: string; lineNumber: number } {
+  const halfSize = size / 2;
+  const offsets = position.map((value) => Math.max(0, value - halfSize));
+  const path = offsets.map((offset) => formatAxis({ offset, size })).join('/');
+  const declaration = `"${path}" : ""`;
+  const separator = source.length > 0 && !source.endsWith('\n') ? '\n' : '';
+  const nextSource = `${source}${separator}${declaration}`;
+
+  return { source: nextSource, lineNumber: nextSource.split('\n').length };
 }
 
 function parseAxis(segment: string): AxisParts | undefined {

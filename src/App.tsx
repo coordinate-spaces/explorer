@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { canEditDeclarationLine, moveDeclarationPath, resizeDeclarationPath, rotateDeclarationPath, updateDeclarationProperty } from './xyzdsl/editXyzDslSource';
+import { appendProspectiveObjectDeclaration, canEditDeclarationLine, moveDeclarationPath, resizeDeclarationPath, rotateDeclarationPath, updateDeclarationProperty } from './xyzdsl/editXyzDslSource';
 import type { AxisName } from './xyzdsl/types';
 import { createSpatialDocument } from './model/createSpatialDocument';
 import type { SpatialNode } from './model/SpatialNode';
@@ -21,6 +21,7 @@ import type { ActiveSecondaryTenant, XyzDslTransaction, SecondaryKeyReference, S
 import { usePublicKeyTransactions } from './transactions/usePublicKeyTransactions';
 import { XyzDslDrawer } from './ui/XyzDslDrawer';
 import { usePersistentState } from './ui/usePersistentState';
+import { linearTransformStepForNode } from './model/transformStep';
 
 const INITIAL_XYZDSL = `"+2d+4d/+0d+6d/+1d+3d" : "geometry: cylinder; color: 0x333333; metalness: 0.8; roughness: 0.2"
 "+2d+4d/+7d+6d/+0d+10m" : "geometry: cone; color: yellow; metalness: 0.2; roughness: 0.5"
@@ -791,6 +792,17 @@ export default function App() {
     editSelectedDeclaration((source, lineNumber) => updateDeclarationProperty(source, lineNumber, key, value));
   }, [editSelectedDeclaration]);
 
+  const createProspectiveObject = useCallback((position: [number, number, number]) => {
+    setAuthoringSource((source) => {
+      const appended = appendProspectiveObjectDeclaration(source, position);
+      setSelectedNodeId(undefined);
+      setSelectedLeafNodeId(undefined);
+      setSelectedSceneHighlightNodeId(undefined);
+      setSelectedLineNumber(appended.lineNumber);
+      return appended.source;
+    });
+  }, []);
+
   const resetAuthoringToRemote = useCallback(() => {
     if (!hasRemoteBaseline) {
       return;
@@ -812,6 +824,13 @@ export default function App() {
         onSelectNode={handleSelectNode}
         cameraMode={cameraMode}
         onCameraModeChange={setCameraMode}
+        editorMode={appMode === 'editor'}
+        selectedNodeCanEdit={selectedNodeCanEdit}
+        editorLinearStep={selectedNode ? linearTransformStepForNode(selectedNode) : 0.01}
+        onMoveNode={moveSelectedDeclaration}
+        onResizeNode={resizeSelectedDeclaration}
+        onRotateNode={rotateSelectedDeclaration}
+        onCreateNode={createProspectiveObject}
       />
       <XyzDslDrawer
         appMode={appMode}
