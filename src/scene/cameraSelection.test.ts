@@ -83,4 +83,18 @@ describe('cameraNodeForSelection', () => {
     expect(selected?.bounds.maxX).toBeCloseTo(10);
     expect(selected?.metadata?.cameraPrecisionScale).toBeCloseTo(0.001);
   });
+
+  it('ignores a small CSG tool inside geometry removed by an earlier operation', () => {
+    const base = node('base', 0, 10);
+    const selected = cameraNodeForSelection(documentWith({
+      id: 'csg',
+      base,
+      operations: [
+        { op: 'subtraction', tool: node('large-cutout', 4, 6) },
+        { op: 'subtraction', tool: node('redundant-detail', 4.5, 4.501) },
+      ],
+    }), base.id);
+
+    expect(selected?.metadata?.cameraPrecisionScale).toBeCloseTo(1);
+  });
 });

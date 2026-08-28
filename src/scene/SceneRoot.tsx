@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { OrbitControls, PerspectiveCamera } from '@react-three/drei';
 import { Canvas } from '@react-three/fiber';
 import type { SpatialDocument } from '../model/SpatialDocument';
@@ -34,9 +34,29 @@ const DEFAULT_CAMERA_POSITION: [number, number, number] = [1.4, 1.1, 1.8];
 export function SceneRoot({ document: spatialDocument, selectedNodeId, onSelectNode, cameraMode, onCameraModeChange }: SceneRootProps) {
   const cameraSizingNodes = useMemo(() => nodesForRoomSizing(spatialDocument), [spatialDocument]);
   const roomDimensions = dimensionsFromNodes(cameraSizingNodes);
+  const [modelPrecisionScales, setModelPrecisionScales] = useState<Record<string, number>>({});
+  const handleModelPrecisionScaleChange = useCallback((id: string, scale: number | undefined) => {
+    setModelPrecisionScales((current) => {
+      if (scale === undefined) {
+        if (!(id in current)) return current;
+        const next = { ...current };
+        delete next[id];
+        return next;
+      }
+      if (current[id] === scale) return current;
+      return { ...current, [id]: scale };
+    });
+  }, []);
   const selectedNode = useMemo(
-    () => cameraNodeForSelection(spatialDocument, selectedNodeId),
-    [selectedNodeId, spatialDocument],
+    () => {
+      const node = cameraNodeForSelection(spatialDocument, selectedNodeId);
+      const precisionScale = node && modelPrecisionScales[node.id];
+      return node && precisionScale ? {
+        ...node,
+        metadata: { ...node.metadata, cameraPrecisionScale: precisionScale },
+      } : node;
+    },
+    [modelPrecisionScales, selectedNodeId, spatialDocument],
   );
   const sceneScale = cameraSceneScale(cameraSizingNodes, selectedNode, DEFAULT_CAMERA_POSITION);
   const clips = cameraClipPlanes(sceneScale, cameraSizingNodes, DEFAULT_CAMERA_POSITION);
@@ -90,7 +110,7 @@ export function SceneRoot({ document: spatialDocument, selectedNodeId, onSelectN
       ))}
       {spatialDocument.renderNodes.map((node) => (
         node.model?.source ? (
-          <ModelPrimitive key={node.id} isSelected={node.id === selectedNodeId} node={node} onSelect={onSelectNode} selectionEnabled={cameraMode === 'orbit'} />
+          <ModelPrimitive key={node.id} isSelected={node.id === selectedNodeId} node={node} onSelect={onSelectNode} selectionEnabled={cameraMode === 'orbit'} onPrecisionScaleChange={handleModelPrecisionScaleChange} />
         ) : node.content?.kind ? (
           <ContentPrimitive key={node.id} isSelected={node.id === selectedNodeId} node={node} onSelect={onSelectNode} selectionEnabled={cameraMode === 'orbit'} />
         ) : (

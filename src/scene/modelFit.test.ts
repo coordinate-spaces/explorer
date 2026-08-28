@@ -1,6 +1,6 @@
-import { BoxGeometry, Mesh, PlaneGeometry } from 'three';
+import { Box3, BoxGeometry, Mesh, PlaneGeometry } from 'three';
 import { describe, expect, it } from 'vitest';
-import { modelFitTransform } from './modelFit';
+import { modelFitTransform, modelFitTransformFromBounds, renderedModelPrecisionScale } from './modelFit';
 
 describe('modelFitTransform', () => {
   it('contains an off-center model uniformly and can align it to the floor', () => {
@@ -38,5 +38,11 @@ describe('modelFitTransform', () => {
     const worldScale = transform.scale.map((value, index) => value * [4, 2, 2][index]);
     expect(worldScale).toEqual([0.5, 0.5, 0.5]);
     expect([2, 4, 1].map((value, index) => value * worldScale[index])).toEqual([1, 2, 0.5]);
+  });
+
+  it('derives precision from the fitted model rather than its target box', () => {
+    const bounds = new Box3().setFromObject(new Mesh(new BoxGeometry(100, 100, 1)));
+    const fitted = modelFitTransformFromBounds(bounds, 'contain', 'center', [1, 1, 1]);
+    expect(renderedModelPrecisionScale(bounds, fitted.scale, [1, 1, 1])).toBeCloseTo(0.01);
   });
 });
