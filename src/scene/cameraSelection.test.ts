@@ -42,11 +42,21 @@ describe('cameraNodeForSelection', () => {
     expect(cameraNodeForSelection(document, rendered.id)).toBe(rendered);
   });
 
-  it('returns a nested composite container so its complete bounds can be highlighted', () => {
-    const container = { ...node('container', -2, 6), renderable: false, children: [node('child', 0, 1)] };
-    const document: SpatialDocument = { id: 'document', nodes: [container], renderNodes: container.children, csgExpressions: [], diagnostics: [] };
+  it('aggregates rendered primitive and evaluated CSG descendant bounds for a composite container', () => {
+    const child = node('child', -4, -2);
+    const base = node('base', 0, 1);
+    const container = { ...node('container', 20, 21), renderable: false, children: [child, base] };
+    const document: SpatialDocument = {
+      id: 'document',
+      nodes: [container],
+      renderNodes: [child],
+      csgExpressions: [{ id: 'csg', base, operations: [{ op: 'union', tool: node('extension', 1, 5) }] }],
+      diagnostics: [],
+    };
+    const selected = cameraNodeForSelection(document, container.id);
 
-    expect(cameraNodeForSelection(document, container.id)).toBe(container);
+    expect(selected?.bounds).toEqual({ minX: -4, maxX: 5, minY: 0, maxY: 1, minZ: 0, maxZ: 1 });
+    expect(selected?.transform.position).toEqual([0.5, 0.5, 0.5]);
   });
 
   it('uses an intersection tool for CSG focus bounds, center, and precision scale', () => {
