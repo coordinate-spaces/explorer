@@ -70,4 +70,17 @@ describe('cameraNodeForSelection', () => {
     expect(selected?.transform.position[0]).toBeCloseTo(0.0005);
     expect(selected?.metadata?.cameraPrecisionScale).toBeCloseTo(0.001);
   });
+
+  it('uses a small internal subtraction tool for composite precision', () => {
+    const base = node('base', 0, 10);
+    const selected = cameraNodeForSelection(documentWith({
+      id: 'csg',
+      base,
+      operations: [{ op: 'subtraction', tool: node('small-cutout', 4, 4.001) }],
+    }), base.id);
+
+    expect(selected?.bounds.minX).toBeCloseTo(0);
+    expect(selected?.bounds.maxX).toBeCloseTo(10);
+    expect(selected?.metadata?.cameraPrecisionScale).toBeCloseTo(0.001);
+  });
 });

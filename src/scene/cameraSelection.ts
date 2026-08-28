@@ -68,7 +68,7 @@ export function cameraNodeForSelection(
   const precisionScales = [
     ...(evaluatedDimensions.length > 0 ? [Math.min(...evaluatedDimensions)] : []),
     nodePrecisionScale(expression.base),
-    ...expression.operations.filter(({ op }) => op !== 'subtraction').map(({ tool }) => nodePrecisionScale(tool)),
+    ...expression.operations.map(({ tool }) => nodePrecisionScale(tool)),
   ].filter((scale): scale is number => scale !== undefined);
   const position: [number, number, number] = [
     (bounds.minX + bounds.maxX) / 2,
