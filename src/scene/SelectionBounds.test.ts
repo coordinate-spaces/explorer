@@ -2,7 +2,10 @@ import { describe, expect, it } from 'vitest';
 import type { SpatialNode } from '../model/SpatialNode';
 import { selectionBoundsForNode, selectionBoundsTransform } from './SelectionBounds';
 
-function contentNode(rotation: [number, number, number] = [0, 0, 0]): SpatialNode {
+function contentNode(
+  rotation: [number, number, number] = [0, 0, 0],
+  overrides: Partial<SpatialNode> = {},
+): SpatialNode {
   return {
     id: 'content',
     source: '',
@@ -12,6 +15,7 @@ function contentNode(rotation: [number, number, number] = [0, 0, 0]): SpatialNod
     content: { kind: 'text', text: 'Card', diagnostics: [] },
     geometry: { kind: 'box', dimensions: [2, 3, 10] },
     transform: { position: [0, 0, 0], rotation, scale: [2, 3, 10], pivot: [0, 0, 0] },
+    ...overrides,
   };
 }
 
@@ -40,5 +44,19 @@ describe('selectionBoundsTransform', () => {
     expect(scale[0]).toBeCloseTo(0.4);
     expect(scale[1]).toBeCloseTo(3);
     expect(scale[2]).toBeCloseTo(2);
+  });
+
+  it('keeps model bounds when a node also declares content', () => {
+    const node = contentNode([0, 0, 0], {
+      model: { source: 'model.glb', fit: 'contain', align: 'center', diagnostics: [] },
+    });
+
+    expect(selectionBoundsForNode(node)).toBe(node.bounds);
+  });
+
+  it('keeps evaluated bounds for CSG-backed content nodes', () => {
+    const node = contentNode([0, 0, 0], { csgExpressionId: 'csg-1' });
+
+    expect(selectionBoundsForNode(node)).toBe(node.bounds);
   });
 });
