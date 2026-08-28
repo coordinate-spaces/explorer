@@ -1,4 +1,4 @@
-import { Edges, RoundedBoxGeometry } from '@react-three/drei';
+import { RoundedBoxGeometry } from '@react-three/drei';
 import type { ThreeEvent } from '@react-three/fiber';
 import type { MeshStandardMaterialParameters } from 'three';
 import type { SpatialGeometry } from '../model/geometry';
@@ -8,7 +8,6 @@ import { defaultBoxMaterial, unionHighlightMaterial } from './materials';
 
 interface SpatialPrimitiveProps {
   node: SpatialNode;
-  isSelected?: boolean;
   onSelect?: (id: string) => void;
   selectionEnabled?: boolean;
 }
@@ -47,7 +46,7 @@ export function materialParameters(node: SpatialNode): MeshStandardMaterialParam
   };
 }
 
-export function SpatialPrimitive({ node, isSelected = false, onSelect, selectionEnabled = true }: SpatialPrimitiveProps) {
+export function SpatialPrimitive({ node, onSelect, selectionEnabled = true }: SpatialPrimitiveProps) {
   const { position, rotation, scale } = node.transform;
   const material = materialParameters(node);
 
@@ -72,7 +71,6 @@ export function SpatialPrimitive({ node, isSelected = false, onSelect, selection
       }}
     >
       <PrimitiveGeometry geometry={node.geometry} />
-      {isSelected ? <Edges color="#facc15" scale={1.03} /> : null}
       <meshStandardMaterial {...material} />
     </mesh>
   );

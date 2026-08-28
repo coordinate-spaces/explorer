@@ -1,11 +1,10 @@
-import { Edges, Html, Text } from '@react-three/drei';
+import { Html, Text } from '@react-three/drei';
 import type { ThreeEvent } from '@react-three/fiber';
 import type { SpatialNode } from '../model/SpatialNode';
 import { CONTENT_CARD_DEPTH } from './contentGeometry';
 
 interface ContentPrimitiveProps {
   node: SpatialNode;
-  isSelected?: boolean;
   onSelect?: (id: string) => void;
   selectionEnabled?: boolean;
 }
@@ -27,7 +26,7 @@ function contentLabel(node: SpatialNode): string {
   }
 }
 
-export function ContentPrimitive({ node, isSelected = false, onSelect, selectionEnabled = true }: ContentPrimitiveProps) {
+export function ContentPrimitive({ node, onSelect, selectionEnabled = true }: ContentPrimitiveProps) {
   if (!node.content?.kind) {
     return null;
   }
@@ -54,7 +53,6 @@ export function ContentPrimitive({ node, isSelected = false, onSelect, selection
       <mesh castShadow receiveShadow onClick={handleClick}>
         <boxGeometry args={[1, 1, CONTENT_CARD_DEPTH]} />
         <meshStandardMaterial color={node.content.kind === 'url' ? '#e7eef8' : '#f4ecd8'} roughness={0.86} metalness={0} />
-        {isSelected ? <Edges color="#facc15" scale={1.04} /> : null}
       </mesh>
       {node.content.kind === 'text' ? (
         <Text
