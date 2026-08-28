@@ -92,7 +92,6 @@ interface XyzDslDrawerProps {
   document: SpatialDocument;
   isOpen: boolean;
   source: string;
-  selectedLineNumber?: number;
   transactionPublicKey: string;
   transactionPublicKeyShareUrl?: string;
   transactionRange: TransactionRange;
@@ -142,7 +141,6 @@ export function XyzDslDrawer({
   document,
   isOpen,
   source,
-  selectedLineNumber,
   transactionPublicKey,
   transactionPublicKeyShareUrl,
   transactionRange,
@@ -286,7 +284,6 @@ export function XyzDslDrawer({
               remoteBaselineChanged,
               authoringChangeSummary,
             )}
-            selectedLineNumber={selectedLineNumber}
             value={source}
             onChange={onChange}
           />

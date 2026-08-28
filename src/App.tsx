@@ -837,7 +837,6 @@ export default function App() {
         document={document}
         isOpen={drawerOpen}
         source={authoringSource}
-        selectedLineNumber={selectedNodeLineNumber}
         transactionPublicKey={transactionPublicKey}
         transactionPublicKeyShareUrl={transactionPublicKeyShareUrl}
         transactionRange={transactionRange}
