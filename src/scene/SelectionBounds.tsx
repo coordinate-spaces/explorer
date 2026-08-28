@@ -1,5 +1,31 @@
 import { Edges } from '@react-three/drei';
-import type { SpatialBounds } from '../model/SpatialNode';
+import { Box3, Euler, Matrix4, Quaternion, Vector3 } from 'three';
+import type { SpatialBounds, SpatialNode } from '../model/SpatialNode';
+import { CONTENT_CARD_DEPTH } from './contentGeometry';
+
+export function selectionBoundsForNode(node: SpatialNode): SpatialBounds {
+  if (!node.content?.kind) return node.bounds;
+
+  const { position, rotation, scale } = node.transform;
+  const matrix = new Matrix4().compose(
+    new Vector3(...position),
+    new Quaternion().setFromEuler(new Euler(...rotation, 'XYZ')),
+    new Vector3(...scale),
+  );
+  const renderedBounds = new Box3(
+    new Vector3(-0.5, -0.5, -CONTENT_CARD_DEPTH / 2),
+    new Vector3(0.5, 0.5, CONTENT_CARD_DEPTH / 2),
+  ).applyMatrix4(matrix);
+
+  return {
+    minX: renderedBounds.min.x,
+    maxX: renderedBounds.max.x,
+    minY: renderedBounds.min.y,
+    maxY: renderedBounds.max.y,
+    minZ: renderedBounds.min.z,
+    maxZ: renderedBounds.max.z,
+  };
+}
 
 export function selectionBoundsTransform(bounds: SpatialBounds): {
   position: [number, number, number];
@@ -19,8 +45,8 @@ export function selectionBoundsTransform(bounds: SpatialBounds): {
   };
 }
 
-export function SelectionBounds({ bounds }: { bounds: SpatialBounds }) {
-  const { position, scale } = selectionBoundsTransform(bounds);
+export function SelectionBounds({ node }: { node: SpatialNode }) {
+  const { position, scale } = selectionBoundsTransform(selectionBoundsForNode(node));
 
   return (
     <mesh position={position} scale={scale} userData={{ povCollisionIgnored: true }}>

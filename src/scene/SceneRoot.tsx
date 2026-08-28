@@ -126,7 +126,7 @@ export function SceneRoot({ document: spatialDocument, selectedNodeId, onSelectN
           <SpatialPrimitive key={node.id} node={node} onSelect={onSelectNode} selectionEnabled={cameraMode === 'orbit'} />
         )
       ))}
-      {selectedNode ? <SelectionBounds bounds={selectedNode.bounds} /> : null}
+      {selectedNode ? <SelectionBounds node={selectedNode} /> : null}
       {cameraMode === 'orbit' ? <OrbitControls target={orbitTarget} maxPolarAngle={Math.PI} /> : null}
       <PovControls
         active={cameraMode === 'pov'}
