@@ -4,7 +4,7 @@ import type { SpatialBounds, SpatialNode } from '../model/SpatialNode';
 import { CONTENT_CARD_DEPTH } from './contentGeometry';
 
 export function selectionBoundsForNode(node: SpatialNode): SpatialBounds {
-  const rendersAsContentCard = node.content?.kind && !node.model?.source && !node.csgExpressionId;
+  const rendersAsContentCard = node.renderable && node.content?.kind && !node.model?.source && !node.csgExpressionId;
   if (!rendersAsContentCard) return node.bounds;
 
   const { position, rotation, scale } = node.transform;

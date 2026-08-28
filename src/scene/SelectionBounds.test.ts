@@ -15,6 +15,7 @@ function contentNode(
     content: { kind: 'text', text: 'Card', diagnostics: [] },
     geometry: { kind: 'box', dimensions: [2, 3, 10] },
     transform: { position: [0, 0, 0], rotation, scale: [2, 3, 10], pivot: [0, 0, 0] },
+    renderable: true,
     ...overrides,
   };
 }
@@ -56,6 +57,15 @@ describe('selectionBoundsTransform', () => {
 
   it('keeps evaluated bounds for CSG-backed content nodes', () => {
     const node = contentNode([0, 0, 0], { csgExpressionId: 'csg-1' });
+
+    expect(selectionBoundsForNode(node)).toBe(node.bounds);
+  });
+
+  it('keeps aggregate bounds for a non-renderable container that declares content', () => {
+    const node = contentNode([0, 0, 0], {
+      renderable: false,
+      bounds: { minX: -8, maxX: 12, minY: -3, maxY: 6, minZ: -4, maxZ: 9 },
+    });
 
     expect(selectionBoundsForNode(node)).toBe(node.bounds);
   });
