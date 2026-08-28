@@ -1,7 +1,7 @@
 import { PerspectiveCamera } from 'three';
 import { describe, expect, it, vi } from 'vitest';
 import type { SpatialNode } from '../model/SpatialNode';
-import { cameraClipPlanes, cameraSceneScale, updateCameraClipPlanes } from './cameraScale';
+import { cameraClipPlanes, cameraSceneScale, sceneBoundsFromNodes, updateCameraClipPlanes } from './cameraScale';
 
 function node(dimensions: [number, number, number], position: [number, number, number] = [0, 0, 0]): SpatialNode {
   return {
@@ -47,12 +47,19 @@ describe('camera scene scale', () => {
     expect(cameraClipPlanes(1, [node([1, 1, 1], [-300, 0, 0])], [1.4, 1.1, 1.8]).far).toBeGreaterThan(600);
   });
 
+  it('precomputes aggregate scene bounds for live clipping updates', () => {
+    expect(sceneBoundsFromNodes([
+      node([2, 3, 4], [-5, 1, 2]),
+      node([1, 1, 1], [10, -2, -8]),
+    ])).toEqual({ minX: -5, maxX: 11, minY: -2, maxY: 4, minZ: -8, maxZ: 6 });
+  });
+
   it('grows the far plane from the live camera position as POV navigation moves away', () => {
     const camera = new PerspectiveCamera(45, 1, 0.1, 100);
     const updateProjectionMatrix = vi.spyOn(camera, 'updateProjectionMatrix');
     camera.position.set(250, 0, 0);
 
-    expect(updateCameraClipPlanes(camera, 1, [node([1, 1, 1])])).toBe(true);
+    expect(updateCameraClipPlanes(camera, 1, sceneBoundsFromNodes([node([1, 1, 1])]))).toBe(true);
     expect(camera.far).toBeGreaterThan(500);
     expect(updateProjectionMatrix).toHaveBeenCalledOnce();
   });

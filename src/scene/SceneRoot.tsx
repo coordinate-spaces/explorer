@@ -32,7 +32,7 @@ const DEFAULT_ORBIT_TARGET: [number, number, number] = [0.6, 0.5, 0.4];
 const DEFAULT_CAMERA_POSITION: [number, number, number] = [1.4, 1.1, 1.8];
 
 export function SceneRoot({ document: spatialDocument, selectedNodeId, onSelectNode, cameraMode, onCameraModeChange }: SceneRootProps) {
-  const cameraSizingNodes = nodesForRoomSizing(spatialDocument);
+  const cameraSizingNodes = useMemo(() => nodesForRoomSizing(spatialDocument), [spatialDocument]);
   const roomDimensions = dimensionsFromNodes(cameraSizingNodes);
   const selectedNode = useMemo(
     () => cameraNodeForSelection(spatialDocument, selectedNodeId),

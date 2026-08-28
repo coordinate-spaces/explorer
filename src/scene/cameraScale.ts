@@ -1,5 +1,5 @@
 import type { PerspectiveCamera } from 'three';
-import type { SpatialNode } from '../model/SpatialNode';
+import type { SpatialBounds, SpatialNode } from '../model/SpatialNode';
 
 const MIN_SCENE_SCALE = 0.001;
 const MAX_SCENE_SCALE = 10;
@@ -48,12 +48,35 @@ export function cameraClipPlanes(
   nodes: readonly SpatialNode[],
   cameraPosition: readonly [number, number, number],
 ): { near: number; far: number } {
-  const farthestDistance = nodes.reduce((farthest, { bounds }) => {
-    const distanceX = Math.max(Math.abs(bounds.minX - cameraPosition[0]), Math.abs(bounds.maxX - cameraPosition[0]));
-    const distanceY = Math.max(Math.abs(bounds.minY - cameraPosition[1]), Math.abs(bounds.maxY - cameraPosition[1]));
-    const distanceZ = Math.max(Math.abs(bounds.minZ - cameraPosition[2]), Math.abs(bounds.maxZ - cameraPosition[2]));
-    return Math.max(farthest, Math.hypot(distanceX, distanceY, distanceZ));
-  }, 0);
+  return cameraClipPlanesForBounds(scale, sceneBoundsFromNodes(nodes), cameraPosition);
+}
+
+export function sceneBoundsFromNodes(nodes: readonly SpatialNode[]): SpatialBounds | undefined {
+  return nodes.reduce<SpatialBounds | undefined>((combined, { bounds }) => {
+    const values = [bounds.minX, bounds.maxX, bounds.minY, bounds.maxY, bounds.minZ, bounds.maxZ];
+    if (!values.every(Number.isFinite)) return combined;
+    if (!combined) return { ...bounds };
+
+    return {
+      minX: Math.min(combined.minX, bounds.minX),
+      maxX: Math.max(combined.maxX, bounds.maxX),
+      minY: Math.min(combined.minY, bounds.minY),
+      maxY: Math.max(combined.maxY, bounds.maxY),
+      minZ: Math.min(combined.minZ, bounds.minZ),
+      maxZ: Math.max(combined.maxZ, bounds.maxZ),
+    };
+  }, undefined);
+}
+
+export function cameraClipPlanesForBounds(
+  scale: number,
+  bounds: SpatialBounds | undefined,
+  cameraPosition: readonly [number, number, number],
+): { near: number; far: number } {
+  const distanceX = bounds ? Math.max(Math.abs(bounds.minX - cameraPosition[0]), Math.abs(bounds.maxX - cameraPosition[0])) : 0;
+  const distanceY = bounds ? Math.max(Math.abs(bounds.minY - cameraPosition[1]), Math.abs(bounds.maxY - cameraPosition[1])) : 0;
+  const distanceZ = bounds ? Math.max(Math.abs(bounds.minZ - cameraPosition[2]), Math.abs(bounds.maxZ - cameraPosition[2])) : 0;
+  const farthestDistance = Math.hypot(distanceX, distanceY, distanceZ);
 
   return {
     near: Math.max(0.0001, Math.min(0.05, scale * 0.02)),
@@ -64,10 +87,10 @@ export function cameraClipPlanes(
 export function updateCameraClipPlanes(
   camera: PerspectiveCamera,
   scale: number,
-  nodes: readonly SpatialNode[],
+  bounds: SpatialBounds | undefined,
 ): boolean {
   const position = camera.position.toArray() as [number, number, number];
-  const clips = cameraClipPlanes(scale, nodes, position);
+  const clips = cameraClipPlanesForBounds(scale, bounds, position);
   let changed = false;
 
   if (camera.near !== clips.near) {
