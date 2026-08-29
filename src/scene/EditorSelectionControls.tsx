@@ -14,6 +14,27 @@ interface EditorSelectionControlsProps {
   onCreate: (position: [number, number, number]) => void;
 }
 
+export interface ResizeShortcut {
+  axes: AxisName[];
+  deltaDirection: -1 | 1;
+}
+
+export function resizeShortcutForEvent(event: Pick<KeyboardEvent, 'key' | 'ctrlKey' | 'metaKey' | 'shiftKey'>): ResizeShortcut | undefined {
+  if (!event.ctrlKey && !event.metaKey) return undefined;
+  const key = event.key.toLowerCase();
+  if (key === '+' || key === '=' || key === '-') {
+    return { axes: ['x', 'y', 'z'], deltaDirection: key === '-' ? -1 : 1 };
+  }
+  if (key === 'x' || key === 'y' || key === 'z') {
+    return { axes: [key], deltaDirection: event.shiftKey ? -1 : 1 };
+  }
+  return undefined;
+}
+
+export function shouldRotateFromWheel(modifierKeyDown: boolean): boolean {
+  return modifierKeyDown;
+}
+
 function isTypingTarget(target: EventTarget | null): boolean {
   return target instanceof HTMLElement && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON'].includes(target.tagName));
 }
@@ -34,8 +55,10 @@ export function EditorSelectionControls({ active, canEditSelection, linearStep, 
   useEffect(() => {
     if (!active) return;
     const canvas = gl.domElement;
+    let rotationModifierKeyDown = false;
 
     const keyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Control' || event.key === 'Meta') rotationModifierKeyDown = true;
       if (!canEditSelection || isTypingTarget(event.target)) return;
       const key = event.key.toLowerCase();
       const movement: Partial<Record<string, [AxisName, number]>> = {
@@ -48,15 +71,21 @@ export function EditorSelectionControls({ active, canEditSelection, linearStep, 
         onMove(...move);
         return;
       }
-      if ((event.metaKey || event.ctrlKey) && (event.key === '+' || event.key === '=' || event.key === '-')) {
+      const resize = resizeShortcutForEvent(event);
+      if (resize) {
         event.preventDefault();
-        const delta = event.key === '-' ? -linearStep : linearStep;
-        (['x', 'y', 'z'] as AxisName[]).forEach((axis) => onResize(axis, delta));
+        resize.axes.forEach((axis) => onResize(axis, resize.deltaDirection * linearStep));
       }
     };
 
+    const keyUp = (event: KeyboardEvent) => {
+      if (event.key === 'Control' || event.key === 'Meta') rotationModifierKeyDown = false;
+    };
+
+    const clearRotationModifier = () => { rotationModifierKeyDown = false; };
+
     const wheel = (event: WheelEvent) => {
-      if (!canEditSelection || isTypingTarget(event.target)) return;
+      if (!canEditSelection || isTypingTarget(event.target) || !shouldRotateFromWheel(rotationModifierKeyDown)) return;
       event.preventDefault();
       event.stopImmediatePropagation();
       if (Math.abs(event.deltaX) > 0.01) onRotate('y', Math.sign(event.deltaX) * rotationStep);
@@ -80,10 +109,14 @@ export function EditorSelectionControls({ active, canEditSelection, linearStep, 
     };
 
     window.addEventListener('keydown', keyDown);
+    window.addEventListener('keyup', keyUp);
+    window.addEventListener('blur', clearRotationModifier);
     canvas.addEventListener('wheel', wheel, { passive: false, capture: true });
     canvas.addEventListener('dblclick', doubleClick);
     return () => {
       window.removeEventListener('keydown', keyDown);
+      window.removeEventListener('keyup', keyUp);
+      window.removeEventListener('blur', clearRotationModifier);
       canvas.removeEventListener('wheel', wheel, true);
       canvas.removeEventListener('dblclick', doubleClick);
     };
