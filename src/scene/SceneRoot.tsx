@@ -159,7 +159,7 @@ export function SceneRoot({ document: spatialDocument, selectedNodeId, onSelectN
         <button className="camera-option" type="button" aria-pressed={collision} onClick={() => setCollision((value) => !value)}>{collision ? 'Collision on' : 'No clip'}</button>
         <button className="camera-option" type="button" disabled={!selectedNode} onClick={() => setFocusRequest((value) => value + 1)}>Focus selection</button>
         <button className="camera-option" type="button" onClick={() => setResetRequest((value) => value + 1)}>Reset camera</button>
-      </> : null}
+      </> : editorMode ? <p>Ctrl/Cmd + wheel rotate · +/− resize all · X/Y/Z resize axis · Shift decreases</p> : null}
     </section>
     {cameraMode === 'pov' && pointerLocked ? <div className="pov-crosshair" aria-hidden="true">+</div> : null}
     </div>

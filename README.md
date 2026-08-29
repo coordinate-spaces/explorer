@@ -15,6 +15,8 @@ The viewer supports both orbit and first-person **POV** cameras. Choose **POV** 
 
 POV navigation defaults to **No clip**, which is useful for entering enclosed or subtracted composite geometry. Enable **Collision** when surface blocking is preferred. The speed control changes the scale-aware movement rate, **Focus selection** moves to a safe inspection pose outside the selected object, and the center crosshair selects geometry while the pointer is captured.
 
+In **Editor** mode, hold Ctrl (Windows/Linux) or Command (macOS) while scrolling over the scene to rotate the selected object; unmodified scrolling continues to zoom the orbit camera. Ctrl/Command with `+` or `-` resizes all axes. Ctrl/Command with `X`, `Y`, or `Z` increases only that axis, and adding Shift decreases it.
+
 
 ## Deploy to GitHub Pages
 
