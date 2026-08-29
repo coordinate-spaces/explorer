@@ -22,6 +22,7 @@ import { usePublicKeyTransactions } from './transactions/usePublicKeyTransaction
 import { XyzDslDrawer } from './ui/XyzDslDrawer';
 import { usePersistentState } from './ui/usePersistentState';
 import { linearTransformStepForNode } from './model/transformStep';
+import type { LinearStepChoice, RotationStep } from './ui/SelectedNodeInspector';
 
 const INITIAL_XYZDSL = `"+2d+4d/+0d+6d/+1d+3d" : "geometry: cylinder; color: 0x333333; metalness: 0.8; roughness: 0.2"
 "+2d+4d/+7d+6d/+0d+10m" : "geometry: cone; color: yellow; metalness: 0.2; roughness: 0.5"
@@ -164,6 +165,8 @@ export default function App() {
   const [selectedLeafNodeId, setSelectedLeafNodeId] = useState<string | undefined>();
   const [selectedSceneHighlightNodeId, setSelectedSceneHighlightNodeId] = useState<string | undefined>();
   const [selectedLineNumber, setSelectedLineNumber] = useState<number | undefined>();
+  const [linearStepChoice, setLinearStepChoice] = useState<LinearStepChoice>('auto');
+  const [rotationStep, setRotationStep] = useState<RotationStep>(1);
   const [transactionPublicKey, setTransactionPublicKey] = usePersistentState(
     'xyzdsl-transaction-public-key',
     '',
@@ -816,6 +819,10 @@ export default function App() {
     setRemoteBaselineAppliedToEditor(remoteBaselineSource);
   }, [hasAuthoringEdits, hasRemoteBaseline, remoteBaselineSource]);
 
+  const editorLinearStep = linearStepChoice === 'auto'
+    ? (selectedNode ? linearTransformStepForNode(selectedNode) : 0.01)
+    : linearStepChoice;
+
   return (
     <main className={`app-shell app-shell--${appMode}`}>
       <SceneRoot
@@ -826,7 +833,11 @@ export default function App() {
         onCameraModeChange={setCameraMode}
         editorMode={appMode === 'editor'}
         selectedNodeCanEdit={selectedNodeCanEdit}
-        editorLinearStep={selectedNode ? linearTransformStepForNode(selectedNode) : 0.01}
+        editorLinearStep={editorLinearStep}
+        editorRotationStep={rotationStep}
+        linearStepChoice={linearStepChoice}
+        onLinearStepChoiceChange={setLinearStepChoice}
+        onRotationStepChange={setRotationStep}
         onMoveNode={moveSelectedDeclaration}
         onResizeNode={resizeSelectedDeclaration}
         onRotateNode={rotateSelectedDeclaration}
@@ -879,6 +890,10 @@ export default function App() {
         onRotateNode={rotateSelectedDeclaration}
         onPathNodeSelect={handleSelectHierarchyNode}
         onNodePropertyChange={updateSelectedDeclarationProperty}
+        linearStepChoice={linearStepChoice}
+        rotationStep={rotationStep}
+        onLinearStepChoiceChange={setLinearStepChoice}
+        onRotationStepChange={setRotationStep}
       />
     </main>
   );

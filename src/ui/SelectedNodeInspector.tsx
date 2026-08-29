@@ -15,7 +15,14 @@ interface SelectedNodeInspectorProps {
   onPathNodeSelect: (id: string) => void;
   onPropertyChange: (key: string, value: string) => void;
   onSelectNode: (id: string) => void;
+  linearStepChoice: LinearStepChoice;
+  rotationStep: RotationStep;
+  onLinearStepChoiceChange: (choice: LinearStepChoice) => void;
+  onRotationStepChange: (step: RotationStep) => void;
 }
+
+export type LinearStepChoice = 'auto' | 0.001 | 0.01 | 0.1 | 1 | 10;
+export type RotationStep = 1 | 15;
 
 function metadataValue<T>(node: SpatialNode, key: string): T | undefined {
   return node.metadata?.[key] as T | undefined;
@@ -98,10 +105,11 @@ export function SelectedNodeInspector({
   onPathNodeSelect,
   onPropertyChange,
   onSelectNode,
+  linearStepChoice,
+  rotationStep,
+  onLinearStepChoiceChange,
+  onRotationStepChange,
 }: SelectedNodeInspectorProps) {
-  const [linearStepChoice, setLinearStepChoice] = useState<'auto' | number>('auto');
-  const [rotationStep, setRotationStep] = useState(1);
-
   if (!node) {
     return (
       <section className="selected-node-inspector is-empty" aria-label="Object properties">
@@ -162,7 +170,7 @@ export function SelectedNodeInspector({
           <select
             aria-label="Linear transform step"
             value={linearStepChoice}
-            onChange={(event) => setLinearStepChoice(event.target.value === 'auto' ? 'auto' : Number(event.target.value))}
+            onChange={(event) => onLinearStepChoiceChange(event.target.value === 'auto' ? 'auto' : Number(event.target.value) as LinearStepChoice)}
           >
             <option value="auto">Auto ({linearStep} m)</option>
             <option value="0.001">1 mm</option>
@@ -177,7 +185,7 @@ export function SelectedNodeInspector({
           <select
             aria-label="Rotation step"
             value={rotationStep}
-            onChange={(event) => setRotationStep(Number(event.target.value))}
+            onChange={(event) => onRotationStepChange(Number(event.target.value) as RotationStep)}
           >
             <option value="1">1°</option>
             <option value="15">15°</option>
