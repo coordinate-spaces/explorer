@@ -3,6 +3,7 @@ import type { ThreeEvent } from '@react-three/fiber';
 import type { CsgExpression } from '../model/csg';
 import { materialParameters } from './SpatialPrimitive';
 import { evaluateCsgExpressionGeometry } from './csgGeometry';
+import { shouldSelectFromClick } from './selectionClick';
 
 interface CsgPrimitiveProps {
   expression: CsgExpression;
@@ -16,7 +17,7 @@ export function CsgPrimitive({ expression, onSelect, selectionEnabled = true }: 
 
   function handleClick(event: ThreeEvent<MouseEvent>) {
     event.stopPropagation();
-    if (selectionEnabled) onSelect?.(expression.base.id);
+    if (shouldSelectFromClick(selectionEnabled, event)) onSelect?.(expression.base.id);
   }
 
   return (
