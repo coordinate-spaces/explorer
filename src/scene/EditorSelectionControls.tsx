@@ -2,12 +2,16 @@ import { useEffect, useMemo, useRef } from 'react';
 import { useThree } from '@react-three/fiber';
 import { Plane, Raycaster, Vector2, Vector3 } from 'three';
 import type { AxisName } from '../xyzdsl/types';
+import type { LinearStepChoice, RotationStep } from '../ui/SelectedNodeInspector';
 
 interface EditorSelectionControlsProps {
   active: boolean;
   canEditSelection: boolean;
   linearStep: number;
-  rotationStep: number;
+  rotationStep: RotationStep;
+  linearStepChoice: LinearStepChoice;
+  onLinearStepChoiceChange: (choice: LinearStepChoice) => void;
+  onRotationStepChange: (step: RotationStep) => void;
   onMove: (axis: AxisName, delta: number) => void;
   onResize: (axis: AxisName, delta: number) => void;
   onRotate: (axis: AxisName, delta: number) => void;
@@ -35,6 +39,23 @@ export function shouldRotateFromWheel(modifierKeyDown: boolean): boolean {
   return modifierKeyDown;
 }
 
+export type TransformStepToggle = 'linear' | 'rotation';
+
+export function transformStepToggleForEvent(event: Pick<KeyboardEvent, 'key' | 'ctrlKey' | 'metaKey' | 'altKey'>): TransformStepToggle | undefined {
+  if (event.ctrlKey || event.metaKey || event.altKey) return undefined;
+  if (event.key === '[') return 'linear';
+  if (event.key === ']') return 'rotation';
+  return undefined;
+}
+
+export function toggledLinearStep(choice: LinearStepChoice): LinearStepChoice {
+  return choice === 0.01 ? 1 : 0.01;
+}
+
+export function toggledRotationStep(step: RotationStep): RotationStep {
+  return step === 1 ? 15 : 1;
+}
+
 function isTypingTarget(target: EventTarget | null): boolean {
   return target instanceof HTMLElement && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON'].includes(target.tagName));
 }
@@ -48,7 +69,7 @@ function hasSpatialNode(object: { parent: unknown; userData: Record<string, unkn
   return false;
 }
 
-export function EditorSelectionControls({ active, canEditSelection, linearStep, rotationStep, onMove, onResize, onRotate, onCreate }: EditorSelectionControlsProps) {
+export function EditorSelectionControls({ active, canEditSelection, linearStep, rotationStep, linearStepChoice, onLinearStepChoiceChange, onRotationStepChange, onMove, onResize, onRotate, onCreate }: EditorSelectionControlsProps) {
   const { camera, gl, scene } = useThree();
   const raycaster = useMemo(() => new Raycaster(), []);
   const rotationModifierKeyDown = useRef(false);
@@ -64,6 +85,13 @@ export function EditorSelectionControls({ active, canEditSelection, linearStep, 
     const keyDown = (event: KeyboardEvent) => {
       if (event.key === 'Control' || event.key === 'Meta') rotationModifierKeyDown.current = true;
       if (!canEditSelection || isTypingTarget(event.target)) return;
+      const stepToggle = transformStepToggleForEvent(event);
+      if (stepToggle) {
+        event.preventDefault();
+        if (stepToggle === 'linear') onLinearStepChoiceChange(toggledLinearStep(linearStepChoice));
+        else onRotationStepChange(toggledRotationStep(rotationStep));
+        return;
+      }
       const key = event.key.toLowerCase();
       const movement: Partial<Record<string, [AxisName, number]>> = {
         a: ['x', -linearStep], d: ['x', linearStep], q: ['y', -linearStep], e: ['y', linearStep],
@@ -124,7 +152,7 @@ export function EditorSelectionControls({ active, canEditSelection, linearStep, 
       canvas.removeEventListener('wheel', wheel, true);
       canvas.removeEventListener('dblclick', doubleClick);
     };
-  }, [active, camera, canEditSelection, gl, linearStep, onCreate, onMove, onResize, onRotate, raycaster, rotationStep, scene]);
+  }, [active, camera, canEditSelection, gl, linearStep, linearStepChoice, onCreate, onLinearStepChoiceChange, onMove, onResize, onRotate, onRotationStepChange, raycaster, rotationStep, scene]);
 
   return null;
 }

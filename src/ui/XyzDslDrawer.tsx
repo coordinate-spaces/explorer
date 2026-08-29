@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import type { SpatialDocument } from '../model/SpatialDocument';
 import type { SpatialNode } from '../model/SpatialNode';
 import type { AxisName } from '../xyzdsl/types';
+import type { LinearStepChoice, RotationStep } from './SelectedNodeInspector';
 import { UNIT_SCALE_DESCRIPTION } from '../model/units';
 import type { RejectedTransaction, SecondaryTenant, TransactionRange } from '../transactions/types';
 import { normalizeXyzDslTransaction } from '../transactions/transactionXyzDsl';
@@ -134,6 +135,10 @@ interface XyzDslDrawerProps {
   onRotateNode: (axis: AxisName, delta: number) => void;
   onPathNodeSelect: (id: string) => void;
   onNodePropertyChange: (key: string, value: string) => void;
+  linearStepChoice: LinearStepChoice;
+  rotationStep: RotationStep;
+  onLinearStepChoiceChange: (choice: LinearStepChoice) => void;
+  onRotationStepChange: (step: RotationStep) => void;
 }
 
 export function XyzDslDrawer({
@@ -183,6 +188,10 @@ export function XyzDslDrawer({
   onRotateNode,
   onPathNodeSelect,
   onNodePropertyChange,
+  linearStepChoice,
+  rotationStep,
+  onLinearStepChoiceChange,
+  onRotationStepChange,
 }: XyzDslDrawerProps) {
   const isEditorMode = appMode === 'editor';
   const [activeTab, setActiveTab] = usePersistentState<DrawerTab>('xyzdsl-drawer-active-tab', 'objects');
@@ -238,6 +247,10 @@ export function XyzDslDrawer({
                 onPathNodeSelect={onPathNodeSelect}
                 onPropertyChange={onNodePropertyChange}
                 onSelectNode={(id) => onSelectNode?.(id)}
+                linearStepChoice={linearStepChoice}
+                rotationStep={rotationStep}
+                onLinearStepChoiceChange={onLinearStepChoiceChange}
+                onRotationStepChange={onRotationStepChange}
               />
             </div>
           ) : null}

@@ -20,6 +20,7 @@ import { povCollisionRadius } from './povNavigation';
 import { EditorSelectionControls } from './EditorSelectionControls';
 import { SelectionBounds } from './SelectionBounds';
 import type { AxisName } from '../xyzdsl/types';
+import type { LinearStepChoice, RotationStep } from '../ui/SelectedNodeInspector';
 
 export type CameraMode = 'orbit' | 'pov';
 
@@ -32,6 +33,10 @@ interface SceneRootProps {
   editorMode: boolean;
   selectedNodeCanEdit: boolean;
   editorLinearStep: number;
+  editorRotationStep: RotationStep;
+  linearStepChoice: LinearStepChoice;
+  onLinearStepChoiceChange: (choice: LinearStepChoice) => void;
+  onRotationStepChange: (step: RotationStep) => void;
   onMoveNode: (axis: AxisName, delta: number) => void;
   onResizeNode: (axis: AxisName, delta: number) => void;
   onRotateNode: (axis: AxisName, delta: number) => void;
@@ -41,7 +46,7 @@ interface SceneRootProps {
 const DEFAULT_ORBIT_TARGET: [number, number, number] = [0.6, 0.5, 0.4];
 const DEFAULT_CAMERA_POSITION: [number, number, number] = [1.4, 1.1, 1.8];
 
-export function SceneRoot({ document: spatialDocument, selectedNodeId, onSelectNode, cameraMode, onCameraModeChange, editorMode, selectedNodeCanEdit, editorLinearStep, onMoveNode, onResizeNode, onRotateNode, onCreateNode }: SceneRootProps) {
+export function SceneRoot({ document: spatialDocument, selectedNodeId, onSelectNode, cameraMode, onCameraModeChange, editorMode, selectedNodeCanEdit, editorLinearStep, editorRotationStep, linearStepChoice, onLinearStepChoiceChange, onRotationStepChange, onMoveNode, onResizeNode, onRotateNode, onCreateNode }: SceneRootProps) {
   const cameraSizingNodes = useMemo(() => nodesForRoomSizing(spatialDocument), [spatialDocument]);
   const roomDimensions = dimensionsFromNodes(cameraSizingNodes);
   const [modelPrecisionScales, setModelPrecisionScales] = useState<Record<string, number>>({});
@@ -141,7 +146,10 @@ export function SceneRoot({ document: spatialDocument, selectedNodeId, onSelectN
         active={editorMode && cameraMode === 'orbit'}
         canEditSelection={Boolean(selectedNodeId && selectedNodeCanEdit)}
         linearStep={editorLinearStep}
-        rotationStep={1}
+        rotationStep={editorRotationStep}
+        linearStepChoice={linearStepChoice}
+        onLinearStepChoiceChange={onLinearStepChoiceChange}
+        onRotationStepChange={onRotationStepChange}
         onMove={onMoveNode}
         onResize={onResizeNode}
         onRotate={onRotateNode}
@@ -159,7 +167,7 @@ export function SceneRoot({ document: spatialDocument, selectedNodeId, onSelectN
         <button className="camera-option" type="button" aria-pressed={collision} onClick={() => setCollision((value) => !value)}>{collision ? 'Collision on' : 'No clip'}</button>
         <button className="camera-option" type="button" disabled={!selectedNode} onClick={() => setFocusRequest((value) => value + 1)}>Focus selection</button>
         <button className="camera-option" type="button" onClick={() => setResetRequest((value) => value + 1)}>Reset camera</button>
-      </> : <p>{editorMode ? 'Ctrl/Cmd + wheel rotate · +/− resize all · X/Y/Z resize axis · Shift decreases · ' : ''}Cmd/Ctrl + click to select</p>}
+      </> : <p>{editorMode ? 'Ctrl/Cmd + wheel rotate · +/− resize all · X/Y/Z resize axis · Shift decreases · [ step fine/coarse · ] angle fine/coarse · ' : ''}Cmd/Ctrl + click to select</p>}
     </section>
     {cameraMode === 'pov' && pointerLocked ? <div className="pov-crosshair" aria-hidden="true">+</div> : null}
     </div>
