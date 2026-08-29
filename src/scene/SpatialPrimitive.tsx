@@ -5,6 +5,7 @@ import type { SpatialGeometry } from '../model/geometry';
 import { normalizedXyzDslStrength, normalizedRoundedBoxRadius } from './primitiveGeometry';
 import type { SpatialNode } from '../model/SpatialNode';
 import { defaultBoxMaterial, unionHighlightMaterial } from './materials';
+import { shouldSelectFromClick } from './selectionClick';
 
 interface SpatialPrimitiveProps {
   node: SpatialNode;
@@ -52,7 +53,7 @@ export function SpatialPrimitive({ node, onSelect, selectionEnabled = true }: Sp
 
   function handleClick(event: ThreeEvent<MouseEvent>) {
     event.stopPropagation();
-    if (selectionEnabled) onSelect?.(node.id);
+    if (shouldSelectFromClick(selectionEnabled, event)) onSelect?.(node.id);
   }
 
   return (

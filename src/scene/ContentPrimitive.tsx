@@ -2,6 +2,7 @@ import { Html, Text } from '@react-three/drei';
 import type { ThreeEvent } from '@react-three/fiber';
 import type { SpatialNode } from '../model/SpatialNode';
 import { CONTENT_CARD_DEPTH } from './contentGeometry';
+import { shouldSelectFromClick } from './selectionClick';
 
 interface ContentPrimitiveProps {
   node: SpatialNode;
@@ -36,7 +37,7 @@ export function ContentPrimitive({ node, onSelect, selectionEnabled = true }: Co
 
   function handleClick(event: ThreeEvent<MouseEvent>) {
     event.stopPropagation();
-    if (selectionEnabled) onSelect?.(node.id);
+    if (shouldSelectFromClick(selectionEnabled, event)) onSelect?.(node.id);
   }
 
   return (

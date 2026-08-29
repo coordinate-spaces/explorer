@@ -6,6 +6,7 @@ import { Box3, Color, type Material, type Mesh } from 'three';
 import type { SpatialNode } from '../model/SpatialNode';
 import { resolveModelUrl } from '../model/resolveModelUrl';
 import { modelFitTransformFromBounds, renderedModelPrecisionScale } from './modelFit';
+import { shouldSelectFromClick } from './selectionClick';
 
 function ModelBox({ color }: { color: string }) {
   return <mesh><boxGeometry /><meshStandardMaterial color={color} wireframe transparent opacity={0.45} /></mesh>;
@@ -67,7 +68,7 @@ export function ModelPrimitive({ node, onSelect, selectionEnabled = true, onPrec
     (precisionScale: number | undefined) => onPrecisionScaleChange?.(node.id, precisionScale),
     [node.id, onPrecisionScaleChange],
   );
-  function handleClick(event: ThreeEvent<MouseEvent>) { event.stopPropagation(); if (selectionEnabled) onSelect?.(node.id); }
+  function handleClick(event: ThreeEvent<MouseEvent>) { event.stopPropagation(); if (shouldSelectFromClick(selectionEnabled, event)) onSelect?.(node.id); }
 
   return <group position={position} rotation={rotation} scale={scale} onClick={handleClick} userData={{ spatialNodeId: node.id, model: model.source }}>
     <ModelErrorBoundary key={`${model.source}:${model.fit}:${model.align}`}>
