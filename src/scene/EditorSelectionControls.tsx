@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { useThree } from '@react-three/fiber';
 import { Plane, Raycaster, Vector2, Vector3 } from 'three';
 import type { AxisName } from '../xyzdsl/types';
@@ -51,14 +51,18 @@ function hasSpatialNode(object: { parent: unknown; userData: Record<string, unkn
 export function EditorSelectionControls({ active, canEditSelection, linearStep, rotationStep, onMove, onResize, onRotate, onCreate }: EditorSelectionControlsProps) {
   const { camera, gl, scene } = useThree();
   const raycaster = useMemo(() => new Raycaster(), []);
+  const rotationModifierKeyDown = useRef(false);
+
+  useEffect(() => {
+    if (!active) rotationModifierKeyDown.current = false;
+  }, [active]);
 
   useEffect(() => {
     if (!active) return;
     const canvas = gl.domElement;
-    let rotationModifierKeyDown = false;
 
     const keyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Control' || event.key === 'Meta') rotationModifierKeyDown = true;
+      if (event.key === 'Control' || event.key === 'Meta') rotationModifierKeyDown.current = true;
       if (!canEditSelection || isTypingTarget(event.target)) return;
       const key = event.key.toLowerCase();
       const movement: Partial<Record<string, [AxisName, number]>> = {
@@ -79,13 +83,13 @@ export function EditorSelectionControls({ active, canEditSelection, linearStep, 
     };
 
     const keyUp = (event: KeyboardEvent) => {
-      if (event.key === 'Control' || event.key === 'Meta') rotationModifierKeyDown = false;
+      if (event.key === 'Control' || event.key === 'Meta') rotationModifierKeyDown.current = false;
     };
 
-    const clearRotationModifier = () => { rotationModifierKeyDown = false; };
+    const clearRotationModifier = () => { rotationModifierKeyDown.current = false; };
 
     const wheel = (event: WheelEvent) => {
-      if (!canEditSelection || isTypingTarget(event.target) || !shouldRotateFromWheel(rotationModifierKeyDown)) return;
+      if (!canEditSelection || isTypingTarget(event.target) || !shouldRotateFromWheel(rotationModifierKeyDown.current)) return;
       event.preventDefault();
       event.stopImmediatePropagation();
       if (Math.abs(event.deltaX) > 0.01) onRotate('y', Math.sign(event.deltaX) * rotationStep);
