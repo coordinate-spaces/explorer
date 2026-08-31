@@ -219,7 +219,7 @@ export function XyzDslDrawer({
       {isEditorMode && isOpen ? (
         <div className="drawer-panel">
           <header className="drawer-titlebar">
-            <strong>XYZSpec</strong>
+            <strong>XYZOrigin</strong>
             <span>Workspace</span>
             <button className="drawer-close-button" type="button" aria-label="Close workspace and return to viewer mode" title="Close workspace" onClick={() => onModeChange('viewer')}>×</button>
           </header>
