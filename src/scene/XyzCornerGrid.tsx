@@ -1,5 +1,6 @@
 import { Line } from '@react-three/drei';
 import { useMemo } from 'react';
+import { floorMaterial, wallMaterial } from './materials';
 
 // 1.5 mm separates the three planes at their shared axes to prevent flicker.
 export const GRID_OFFSET = 0.0015;
@@ -94,6 +95,21 @@ export function XyzCornerGrid({ width, depth, height }: XyzCornerGridProps) {
 
   return (
     <group>
+      <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[width / 2, 0, depth / 2]} userData={{ povCollisionSurface: true }}>
+        <planeGeometry args={[width, depth]} />
+        <meshStandardMaterial {...floorMaterial} />
+      </mesh>
+
+      <mesh receiveShadow position={[width / 2, height / 2, 0]} userData={{ povCollisionSurface: true }}>
+        <planeGeometry args={[width, height]} />
+        <meshStandardMaterial {...wallMaterial} />
+      </mesh>
+
+      <mesh receiveShadow rotation={[0, Math.PI / 2, 0]} position={[0, height / 2, depth / 2]} userData={{ povCollisionSurface: true }}>
+        <planeGeometry args={[depth, height]} />
+        <meshStandardMaterial {...wallMaterial} color="#cfc8bc" />
+      </mesh>
+
       {(['xy', 'xz', 'yz'] as const).map((plane) => (
         <group key={plane}>
           <GridLayer lines={grid[plane].decimetres} metres={false} />

@@ -1,6 +1,6 @@
 import { Box3, BufferGeometry, DoubleSide, InstancedMesh, Line3, Matrix4, Mesh, Ray, Triangle, Vector3, type Object3D } from 'three';
 import { MeshBVH } from 'three-mesh-bvh';
-import { spatialNodeIdForPovCollision } from './povPicking';
+import { objectParticipatesInPovCollision } from './povPicking';
 
 const geometryBoundsTrees = new WeakMap<BufferGeometry, MeshBVH>();
 
@@ -131,7 +131,7 @@ export function sweptSphereIntersectsScene(
   scene.updateWorldMatrix(true, true);
   scene.traverse((object) => {
     if (!(object instanceof Mesh) || !object.visible) return;
-    if (spatialNodeIdForPovCollision(object) === undefined) return;
+    if (!objectParticipatesInPovCollision(object)) return;
     const transforms: Matrix4[] = [];
     if (object instanceof InstancedMesh) {
       const instanceMatrix = new Matrix4();

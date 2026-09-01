@@ -22,3 +22,14 @@ export function spatialNodeIdForPovCollision(object: Object3D): string | undefin
   }
   return spatialNodeIdForPovRaycast(object);
 }
+
+export function objectParticipatesInPovCollision(object: Object3D): boolean {
+  let current: Object3D | null = object;
+  let isCollisionSurface = false;
+  while (current) {
+    if (current.userData.povCollisionIgnored === true) return false;
+    isCollisionSurface ||= current.userData.povCollisionSurface === true;
+    current = current.parent;
+  }
+  return isCollisionSurface || spatialNodeIdForPovRaycast(object) !== undefined;
+}
