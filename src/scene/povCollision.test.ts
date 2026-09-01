@@ -1,4 +1,4 @@
-import { BoxGeometry, Group, InstancedMesh, Matrix4, Mesh, MeshBasicMaterial, Vector3 } from 'three';
+import { BoxGeometry, Group, InstancedMesh, Matrix4, Mesh, MeshBasicMaterial, PlaneGeometry, Vector3 } from 'three';
 import { describe, expect, it } from 'vitest';
 import { sweptSphereIntersectsScene } from './povCollision';
 
@@ -35,5 +35,14 @@ describe('sweptSphereIntersectsScene', () => {
 
     expect(sweptSphereIntersectsScene(scene, new Vector3(0.8, 0, 0), new Vector3(1.2, 0, 0), 0.05)).toBe(true);
     expect(sweptSphereIntersectsScene(scene, new Vector3(-0.2, 0, 0), new Vector3(0.2, 0, 0), 0.05)).toBe(false);
+  });
+
+  it('blocks movement through a non-selectable room surface', () => {
+    const scene = new Group();
+    const wall = new Mesh(new PlaneGeometry(2, 2));
+    wall.userData.povCollisionSurface = true;
+    scene.add(wall);
+
+    expect(sweptSphereIntersectsScene(scene, new Vector3(0, 0, 0.5), new Vector3(0, 0, -0.5), 0.1)).toBe(true);
   });
 });

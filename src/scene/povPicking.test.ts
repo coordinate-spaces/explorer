@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { BufferGeometry, LineBasicMaterial, LineSegments, Object3D } from 'three';
-import { spatialNodeIdForPovCollision, spatialNodeIdForPovRaycast, spatialNodeIdFromObject } from './povPicking';
+import { objectParticipatesInPovCollision, spatialNodeIdForPovCollision, spatialNodeIdForPovRaycast, spatialNodeIdFromObject } from './povPicking';
 
 describe('spatialNodeIdFromObject', () => {
   it('finds selection metadata on an ancestor', () => {
@@ -31,5 +31,13 @@ describe('spatialNodeIdFromObject', () => {
     parent.add(proxy);
     expect(spatialNodeIdForPovRaycast(proxy)).toBe('model-node');
     expect(spatialNodeIdForPovCollision(proxy)).toBeUndefined();
+  });
+
+  it('includes non-selectable room surfaces in POV collision', () => {
+    const surface = new Object3D();
+    surface.userData.povCollisionSurface = true;
+
+    expect(spatialNodeIdForPovRaycast(surface)).toBeUndefined();
+    expect(objectParticipatesInPovCollision(surface)).toBe(true);
   });
 });
