@@ -8,9 +8,13 @@ export const DECIMETRE_GRID_SPACING = 0.1;
 export const GRID_DEPTH_MATERIAL = {
   depthTest: true,
   depthWrite: false,
+} as const;
+// WebGL polygon offset only affects filled primitives, so bias the room planes
+// away from the camera rather than attempting to bias GL_LINES.
+export const GRID_SURFACE_DEPTH_BIAS = {
   polygonOffset: true,
-  polygonOffsetFactor: -1,
-  polygonOffsetUnits: -1,
+  polygonOffsetFactor: 1,
+  polygonOffsetUnits: 1,
 } as const;
 
 export type GridPlane = 'xy' | 'xz' | 'yz';
@@ -121,17 +125,17 @@ export function XyzCornerGrid({ width, depth, height }: XyzCornerGridProps) {
     <group>
       <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[width / 2, 0, depth / 2]} userData={{ povCollisionSurface: true }}>
         <planeGeometry args={[width, depth]} />
-        <meshStandardMaterial {...floorMaterial} />
+        <meshStandardMaterial {...floorMaterial} {...GRID_SURFACE_DEPTH_BIAS} />
       </mesh>
 
       <mesh receiveShadow position={[width / 2, height / 2, 0]} userData={{ povCollisionSurface: true }}>
         <planeGeometry args={[width, height]} />
-        <meshStandardMaterial {...wallMaterial} />
+        <meshStandardMaterial {...wallMaterial} {...GRID_SURFACE_DEPTH_BIAS} />
       </mesh>
 
       <mesh receiveShadow rotation={[0, Math.PI / 2, 0]} position={[0, height / 2, depth / 2]} userData={{ povCollisionSurface: true }}>
         <planeGeometry args={[depth, height]} />
-        <meshStandardMaterial {...wallMaterial} color="#cfc8bc" />
+        <meshStandardMaterial {...wallMaterial} {...GRID_SURFACE_DEPTH_BIAS} color="#cfc8bc" />
       </mesh>
 
       {(['xy', 'xz', 'yz'] as const).map((plane) => (

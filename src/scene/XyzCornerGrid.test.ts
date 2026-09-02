@@ -3,6 +3,7 @@ import {
   DECIMETRE_GRID_SPACING,
   GRID_DEPTH_MATERIAL,
   GRID_OFFSET,
+  GRID_SURFACE_DEPTH_BIAS,
   createXyzGridLines,
   flattenGridLines,
 } from './XyzCornerGrid';
@@ -53,14 +54,16 @@ describe('grid rendering', () => {
     expect(Array.from(positions)).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
   });
 
-  it('keeps depth testing, disables depth writes, and biases the grid material', () => {
+  it('keeps depth testing, disables depth writes, and biases the filled surfaces', () => {
     expect(GRID_OFFSET).toBeGreaterThan(0.0015);
     expect(GRID_DEPTH_MATERIAL).toEqual({
       depthTest: true,
       depthWrite: false,
+    });
+    expect(GRID_SURFACE_DEPTH_BIAS).toEqual({
       polygonOffset: true,
-      polygonOffsetFactor: -1,
-      polygonOffsetUnits: -1,
+      polygonOffsetFactor: 1,
+      polygonOffsetUnits: 1,
     });
   });
 });
