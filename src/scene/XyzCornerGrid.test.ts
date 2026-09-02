@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { DECIMETRE_GRID_SPACING, GRID_OFFSET, createXyzGridLines } from './XyzCornerGrid';
+import {
+  DECIMETRE_GRID_SPACING,
+  GRID_DEPTH_MATERIAL,
+  GRID_OFFSET,
+  createXyzGridLines,
+  flattenGridLines,
+} from './XyzCornerGrid';
 
 describe('createXyzGridLines', () => {
   it('creates separate decimetre and metre layers on all three planes', () => {
@@ -33,5 +39,28 @@ describe('createXyzGridLines', () => {
     expect(grid.xy.decimetres).toContainEqual([[dimensions.width, 0, GRID_OFFSET], [dimensions.width, dimensions.height, GRID_OFFSET]]);
     expect(grid.xz.decimetres).toContainEqual([[0, GRID_OFFSET, dimensions.depth], [dimensions.width, GRID_OFFSET, dimensions.depth]]);
     expect(grid.yz.decimetres).toContainEqual([[GRID_OFFSET, dimensions.height, 0], [GRID_OFFSET, dimensions.height, dimensions.depth]]);
+  });
+});
+
+describe('grid rendering', () => {
+  it('flattens line segments into a native Three.js position buffer', () => {
+    const positions = flattenGridLines([
+      [[0, 1, 2], [3, 4, 5]],
+      [[6, 7, 8], [9, 10, 11]],
+    ]);
+
+    expect(positions).toBeInstanceOf(Float32Array);
+    expect(Array.from(positions)).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
+  });
+
+  it('keeps depth testing, disables depth writes, and biases the grid material', () => {
+    expect(GRID_OFFSET).toBeGreaterThan(0.0015);
+    expect(GRID_DEPTH_MATERIAL).toEqual({
+      depthTest: true,
+      depthWrite: false,
+      polygonOffset: true,
+      polygonOffsetFactor: -1,
+      polygonOffsetUnits: -1,
+    });
   });
 });

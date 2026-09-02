@@ -1,10 +1,17 @@
-import { Line } from '@react-three/drei';
 import { useMemo } from 'react';
 import { floorMaterial, wallMaterial } from './materials';
 
-// 1.5 mm separates the three planes at their shared axes to prevent flicker.
-export const GRID_OFFSET = 0.0015;
+// Keep the grid far enough in front of the filled surfaces to remain stable when
+// the depth buffer loses precision at the far end of the room.
+export const GRID_OFFSET = 0.003;
 export const DECIMETRE_GRID_SPACING = 0.1;
+export const GRID_DEPTH_MATERIAL = {
+  depthTest: true,
+  depthWrite: false,
+  polygonOffset: true,
+  polygonOffsetFactor: -1,
+  polygonOffsetUnits: -1,
+} as const;
 
 export type GridPlane = 'xy' | 'xz' | 'yz';
 export type GridPoint = [number, number, number];
@@ -72,22 +79,39 @@ export function createXyzGridLines({ width, depth, height }: XyzCornerGridProps)
 }
 
 function GridLayer({ lines, metres }: { lines: GridLineSegment[]; metres: boolean }) {
+  const positions = useMemo(() => flattenGridLines(lines), [lines]);
+
   if (lines.length === 0) {
     return null;
   }
 
   return (
-    <Line
-      points={lines.flat()}
-      segments
-      color="#ffffff"
-      lineWidth={metres ? 1.8 : 0.65}
-      opacity={metres ? 0.55 : 0.18}
-      transparent
-      depthWrite={false}
-      renderOrder={metres ? 2 : 1}
-    />
+    <lineSegments renderOrder={metres ? 2 : 1}>
+      <bufferGeometry>
+        <bufferAttribute attach="attributes-position" args={[positions, 3]} />
+      </bufferGeometry>
+      <lineBasicMaterial
+        color="#ffffff"
+        opacity={metres ? 0.55 : 0.18}
+        transparent
+        {...GRID_DEPTH_MATERIAL}
+      />
+    </lineSegments>
   );
+}
+
+/** Converts classified segments to the non-indexed position buffer used by Three.js lines. */
+export function flattenGridLines(lines: GridLineSegment[]): Float32Array {
+  const positions = new Float32Array(lines.length * 6);
+  let offset = 0;
+
+  for (const [start, end] of lines) {
+    positions.set(start, offset);
+    positions.set(end, offset + 3);
+    offset += 6;
+  }
+
+  return positions;
 }
 
 export function XyzCornerGrid({ width, depth, height }: XyzCornerGridProps) {
